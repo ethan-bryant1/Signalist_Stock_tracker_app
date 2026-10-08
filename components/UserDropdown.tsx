@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
-import NavItems from "./navitems";
+import NavItems from "@/components/NavItems";
 
 const UserDropdown = () => {
     const router = useRouter();
