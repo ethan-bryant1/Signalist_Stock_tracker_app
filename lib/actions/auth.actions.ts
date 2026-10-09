@@ -3,8 +3,19 @@
 import {getAuth} from "@/lib/better-auth/auth";
 import {inngest} from "@/lib/inngest/client";
 import {headers} from "next/headers";
+import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from "@/lib/constants";
+
+const isOption = (options: { value: string }[], value: string) => options.some((option) => option.value === value);
 
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
+    // These go into the welcome email prompt, so only accept the values the form offers
+    const validProfile = /^[A-Z]{2}$/.test(country)
+        && isOption(INVESTMENT_GOALS, investmentGoals)
+        && isOption(RISK_TOLERANCE_OPTIONS, riskTolerance)
+        && isOption(PREFERRED_INDUSTRIES, preferredIndustry);
+
+    if(!validProfile) return { success: false, error: 'Please choose your country and preferences from the lists' }
+
     try {
         const auth = await getAuth();
         const response = await auth.api.signUpEmail({ body: { email, password, name: fullName }, headers: await headers() })

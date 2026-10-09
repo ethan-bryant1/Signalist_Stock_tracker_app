@@ -27,6 +27,11 @@ let authInstance: ReturnType<typeof createAuth> | null = null;
 export const getAuth = async () => {
     if(authInstance) return authInstance;
 
+    // Without this, Better Auth falls back to a public default secret outside production
+    if(!process.env.BETTER_AUTH_SECRET && !process.env.AUTH_SECRET) {
+        throw new Error('BETTER_AUTH_SECRET must be set within .env');
+    }
+
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
 

@@ -9,10 +9,18 @@ export const transporter = nodemailer.createTransport({
     }
 })
 
+const escapeHtml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData) => {
+    // Replacer functions stop `$` in the values being read as replace() patterns
     const htmlTemplate = WELCOME_EMAIL_TEMPLATE
-        .replace('{{name}}', name)
-        .replace('{{intro}}', intro);
+        .replace('{{name}}', () => escapeHtml(name))
+        .replace('{{intro}}', () => intro);
 
     const mailOptions = {
         from: `"Signalist" <${process.env.NODEMAILER_EMAIL}>`,

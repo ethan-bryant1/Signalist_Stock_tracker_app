@@ -15,21 +15,25 @@ export const sendSignUpEmail = inngest.createFunction(
 
         const prompt = PERSONALIZED_WELCOME_EMAIL_PROMPT.replace('{{userProfile}}', userProfile)
 
-        const response = await step.ai.infer('generate-welcome-intro', {
-            model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),
-            body: {
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [
-                            { text: prompt }
-                        ]
-                    }]
-            }
-        })
+        // Without a Gemini key, skip the AI step and send the default intro
+        let response: Awaited<ReturnType<typeof step.ai.infer>> | null = null;
+        if(process.env.GEMINI_API_KEY) {
+            response = await step.ai.infer('generate-welcome-intro', {
+                model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),
+                body: {
+                    contents: [
+                        {
+                            role: 'user',
+                            parts: [
+                                { text: prompt }
+                            ]
+                        }]
+                }
+            })
+        }
 
         await step.run('send-welcome-email', async () => {
-            const part = response.candidates?.[0]?.content?.parts?.[0];
+            const part = response?.candidates?.[0]?.content?.parts?.[0];
             const introText = (part && 'text' in part ? part.text : null) ||'Thanks for joining Signalist. You now have the tools to track markets and make smarter moves.'
 
             const { data: { email, name } } = event;
