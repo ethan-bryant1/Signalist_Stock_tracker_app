@@ -116,9 +116,9 @@
 @theme {
   /* Extended Gray Scale */
   --color-gray-900: #050505;
-  --color-gray-800: #141414;
+  --color-gray-800: var(--color-gray-800);
   --color-gray-700: #212328;
-  --color-gray-600: #30333A;
+  --color-gray-600: var(--color-gray-600);
   --color-gray-500: #9095A1;
   --color-gray-400: #CCDADC;
 
@@ -130,6 +130,21 @@
   --color-red-500: #FF495B;
   --color-orange-500: #FF8243;
   --color-purple-500: #D13BFF;
+}
+
+/* Light theme (when <html> has no "dark" class): flip the gray scale, which
+   the whole app uses for backgrounds, borders and text */
+:root:not(.dark) {
+  --color-gray-950: #000000;
+  --color-gray-900: #FFFFFF;
+  --color-gray-800: #F4F4F5;
+  --color-gray-700: #E4E4E7;
+  --color-gray-600: #D4D4D8;
+  --color-gray-500: #52525B;
+  --color-gray-400: #27272A;
+  --color-gray-300: #18181B;
+  --color-gray-200: #0F0F10;
+  --color-gray-100: #0A0A0A;
 }
 
 @layer base {
@@ -188,10 +203,10 @@
     @apply text-sm font-medium text-gray-400;
   }
   .form-input {
-    @apply h-12 px-3 py-3 text-white text-base placeholder:text-gray-500 border-gray-600 bg-gray-800 rounded-lg focus:!border-yellow-500 focus:ring-0;
+    @apply h-12 px-3 py-3 text-gray-100 text-base placeholder:text-gray-500 border-gray-600 bg-gray-800 rounded-lg focus:!border-yellow-500 focus:ring-0;
   }
   .select-trigger {
-    @apply w-full !h-12 px-3 py-3 text-base border-gray-600 bg-gray-800 text-white rounded-lg focus:!border-yellow-500 focus:ring-0;
+    @apply w-full !h-12 px-3 py-3 text-base border-gray-600 bg-gray-800 text-gray-100 rounded-lg focus:!border-yellow-500 focus:ring-0;
   }
   .country-select-trigger {
     @apply h-12 px-3 py-3 text-base w-full justify-between font-normal border-gray-600 bg-gray-800 text-gray-400 rounded-lg focus:!border-yellow-500 focus:ring-0;
@@ -203,7 +218,7 @@
     @apply text-gray-500 py-6 text-center !bg-gray-800;
   }
   .country-select-item {
-    @apply text-white cursor-pointer px-3 py-2 rounded-sm bg-gray-800 hover:!bg-gray-600;
+    @apply text-gray-100 cursor-pointer px-3 py-2 rounded-sm bg-gray-800 hover:!bg-gray-600;
   }
   .footer-link {
     @apply text-gray-400 font-medium hover:text-yellow-400 hover:underline transition-colors;
@@ -391,30 +406,30 @@
 /* TradingView Advanced Chart Widget Styles */
 .tradingview-widget-container {
   position: relative;
-  background-color: #141414 !important;
+  background-color: var(--color-gray-800) !important;
   border-radius: 8px !important;
   overflow: hidden !important;
 }
 
 .tv-embed-widget-wrapper__body {
-  background-color: #141414 !important;
+  background-color: var(--color-gray-800) !important;
 }
 
 .tradingview-widget-container__widget {
-  background-color: #141414 !important;
+  background-color: var(--color-gray-800) !important;
   height: 100% !important;
 
 }
 
 .widget-stock-heatmap-container .screenerMapWrapper-BBVfGP0b {
   overflow: hidden !important;
-  background: #141414 !important;
-  background-color: #141414 !important;
+  background: var(--color-gray-800) !important;
+  background-color: var(--color-gray-800) !important;
 }
 
 .canvasContainer-tyaAU8aH {
-  background: #141414 !important;
-  background-color: #141414 !important;
+  background: var(--color-gray-800) !important;
+  background-color: var(--color-gray-800) !important;
 }
 
 .tv-site-widget--bg_none {
@@ -441,17 +456,17 @@
 }
 
 .tv-embed-widget-wrapper .tv-embed-widget-wrapper__body {
-  background: #141414 !important;
-  background-color: #141414 !important;
+  background: var(--color-gray-800) !important;
+  background-color: var(--color-gray-800) !important;
 }
 
 .tradingview-widget-container iframe {
-  background-color: #141414 !important;
+  background-color: var(--color-gray-800) !important;
   width: 100% !important;
 }
 
 .custom-chart.tradingview-widget-container iframe {
-  border: 1px solid #30333A;
+  border: 1px solid var(--color-gray-600);
   border-radius: 8px !important;
   overflow: hidden !important;
 }
@@ -477,13 +492,13 @@
 }
 
 .scrollbar-hide-default:hover {
-  scrollbar-color: #30333A transparent;
+  scrollbar-color: var(--color-gray-600) transparent;
 }
 
 .scrollbar-hide-default:hover::-webkit-scrollbar-thumb {
-  background-color: #30333A;
+  background-color: var(--color-gray-600);
 }
 
 .scrollbar-hide-default::-webkit-scrollbar-thumb:hover {
-  background-color: #9095A1;
+  background-color: var(--color-gray-500);
 }
