@@ -58,11 +58,11 @@ const SectorChip = ({ label, count, active, onClick }: { label: string; count?: 
 
 // Search box and sector filter for the Market Data page. With neither in use it shows TradingView's
 // screener of every US stock; otherwise it lists the matching S&P 500 companies with live prices.
-const MarketDataExplorer = () => {
+const MarketDataExplorer = ({ initialSector }: { initialSector?: MarketSector }) => {
     const [query, setQuery] = useState("");
     // The list follows the search box after a short pause, so the widget doesn't reload on every key
     const [appliedQuery, setAppliedQuery] = useState("");
-    const [sector, setSector] = useState<SectorFilter>("All");
+    const [sector, setSector] = useState<SectorFilter>(initialSector ?? "All");
 
     const applyQuery = useDebounce(() => setAppliedQuery(query.trim()), 300);
 

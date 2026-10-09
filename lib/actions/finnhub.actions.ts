@@ -2,6 +2,7 @@
 
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
+import { INDEX_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { cache } from 'react';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -366,4 +367,99 @@ export async function getStockOverview(symbol: string): Promise<StockOverview> {
     week52High: nonZero(m['52WeekHigh']),
     week52Low: nonZero(m['52WeekLow']),
   };
+}
+
+export type MarketSession = 'pre-market' | 'regular' | 'post-market' | 'closed';
+
+export type MarketQuote = {
+  price?: number;
+  change?: number;
+  changePercent?: number;
+  dayHigh?: number;
+  dayLow?: number;
+};
+
+// Live figures for the dashboard and heatmap: whether the market is open, and prices for the index and sector funds
+export type MarketSnapshot = {
+  session: MarketSession;
+  holiday?: string;
+  quotes: Record<string, MarketQuote>;
+  // Time of the latest price, in milliseconds
+  asOf?: number;
+};
+
+type FinnhubMarketStatus = { isOpen?: boolean; session?: string | null; holiday?: string | null };
+
+// The US trading session from the New York clock: pre-market 4:00, open 9:30, close 16:00, after hours until 20:00.
+// Used when Finnhub's market status can't load; it doesn't know about holidays.
+const sessionFromClock = (date = new Date()): MarketSession => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  if (part('weekday') === 'Sat' || part('weekday') === 'Sun') return 'closed';
+
+  const minutes = Number(part('hour')) * 60 + Number(part('minute'));
+  if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
+  if (minutes >= 9 * 60 + 30 && minutes < 16 * 60) return 'regular';
+  if (minutes >= 16 * 60 && minutes < 20 * 60) return 'post-market';
+  return 'closed';
+};
+
+// Index fund prices, plus the sector funds when the page shows sector performance
+export async function getMarketSnapshot(includeSectors = false): Promise<MarketSnapshot> {
+  const symbols: string[] = [
+    ...INDEX_ETFS.map(({ symbol }) => symbol),
+    ...(includeSectors ? SECTOR_ETFS.map(({ symbol }) => symbol) : []),
+  ];
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getMarketSnapshot:', new Error('FINNHUB API key is not configured'));
+    return { session: sessionFromClock(), quotes: {} };
+  }
+
+  const [status, quotes] = await Promise.all([
+    fetchJSON<FinnhubMarketStatus>(`${FINNHUB_BASE_URL}/stock/market-status?exchange=US&token=${token}`, 60).catch((e) => {
+      console.error('Error fetching market status', e);
+      return null;
+    }),
+    Promise.all(
+      symbols.map((symbol) =>
+        fetchJSON<FinnhubFullQuote & { t?: number }>(`${FINNHUB_BASE_URL}/quote?symbol=${symbol}&token=${token}`, 60).catch((e) => {
+          console.error('Error fetching quote for', symbol, e);
+          return null;
+        })
+      )
+    ),
+  ]);
+
+  const snapshot: MarketSnapshot = { session: sessionFromClock(), quotes: {} };
+  if (status) {
+    const session = status.session;
+    snapshot.session = session === 'pre-market' || session === 'regular' || session === 'post-market'
+      ? session
+      : status.isOpen ? 'regular' : 'closed';
+    snapshot.holiday = status.holiday || undefined;
+  }
+
+  symbols.forEach((symbol, i) => {
+    const quote = quotes[i];
+    // Finnhub returns a price of 0 for symbols it has no quote for
+    if (!nonZero(quote?.c)) return;
+    snapshot.quotes[symbol] = {
+      price: num(quote?.c),
+      change: num(quote?.d),
+      changePercent: num(quote?.dp),
+      dayHigh: nonZero(quote?.h),
+      dayLow: nonZero(quote?.l),
+    };
+    const time = nonZero(quote?.t);
+    if (time && time * 1000 > (snapshot.asOf ?? 0)) snapshot.asOf = time * 1000;
+  });
+
+  return snapshot;
 }

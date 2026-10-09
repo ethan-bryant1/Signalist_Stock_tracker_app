@@ -135,8 +135,7 @@ export const MARKET_DATA_WIDGET_CONFIG = {
     locale: 'en',
     showSymbolLogo: true,
     colorTheme: 'dark',
-    isTransparent: false,
-    backgroundColor: '#0F0F0F',
+    isTransparent: true, // blends into the dashboard panel in both themes
     symbolsGroups: [
         {
             name: 'Financial',
@@ -177,11 +176,12 @@ export const MARKET_DATA_WIDGET_CONFIG = {
 // Larger versions of the homepage widgets for their own pages (/market-overview, /heatmap, ...)
 export const MARKET_OVERVIEW_PAGE_WIDGET_CONFIG = { ...MARKET_OVERVIEW_WIDGET_CONFIG, height: 700 };
 
+// The heatmap page's own toolbar picks the colors, sizes and grouping (components/HeatmapTerminal.tsx).
+// The map fills its box, so it can grow to full screen.
 export const HEATMAP_PAGE_WIDGET_CONFIG = {
     ...HEATMAP_WIDGET_CONFIG,
-    hasTopBar: true, // lets you switch the list (S&P 500, Nasdaq 100, ...) and how blocks are sized and colored
-    isDataSetEnabled: true,
-    height: '800',
+    width: '100%',
+    height: '100%',
 };
 
 export const TOP_STORIES_PAGE_WIDGET_CONFIG = { ...TOP_STORIES_WIDGET_CONFIG, height: '800' };
