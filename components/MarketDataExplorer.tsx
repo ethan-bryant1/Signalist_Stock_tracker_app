@@ -13,6 +13,10 @@ type SectorFilter = MarketSector | "All";
 
 const COMPANY_BY_SYMBOL = new Map(SP500_COMPANIES.map((company) => [company.symbol, company]));
 
+// Sizes of TradingView's quotes list (column headings, then one row per stock), in pixels
+const QUOTES_HEADER_HEIGHT = 60;
+const QUOTES_ROW_HEIGHT = 36;
+
 // Lets a ticker like BRK.B be typed as "brk b" or "brkb"
 const normalizeSymbol = (value: string) => value.toLowerCase().replace(/[\s.-]/g, "");
 
@@ -94,10 +98,14 @@ const MarketDataExplorer = () => {
     const sectorLabel = MARKET_SECTORS.find(({ value }) => value === sector)?.label;
     const listTitle = appliedQuery ? "Search results" : sectorLabel ?? "Stocks";
 
+    // Tall enough to show every stock in the list, so the page scrolls instead of the widget
+    const listHeight = QUOTES_HEADER_HEIGHT + results.length * QUOTES_ROW_HEIGHT;
+
     // Rebuild the widget only when the list of stocks actually changes
     const symbolsKey = results.map(({ symbol }) => symbol).join(",");
     const listConfig = useMemo(() => ({
         ...MARKET_DATA_LIST_WIDGET_CONFIG,
+        height: listHeight,
         symbolsGroups: [{
             name: listTitle,
             symbols: symbolsKey.split(",").filter(Boolean).map((symbol) => ({
@@ -105,9 +113,7 @@ const MarketDataExplorer = () => {
                 displayName: COMPANY_BY_SYMBOL.get(symbol)?.name ?? symbol,
             })),
         }],
-    }), [symbolsKey, listTitle]);
-    // Short lists get a shorter box
-    const listHeight = Math.min(800, Math.max(300, 160 + results.length * 56));
+    }), [symbolsKey, listTitle, listHeight]);
 
     const stockWord = results.length === 1 ? "stock" : "stocks";
     const matchWord = results.length === 1 ? "matches" : "match";
