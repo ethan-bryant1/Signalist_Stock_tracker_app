@@ -47,7 +47,7 @@ const WatchlistButton = ({
           fill={added ? "#FACC15" : "none"}
           stroke="#FACC15"
           strokeWidth="1.5"
-          className="watchlist-star"
+          className="h-5 w-5"
         >
           <path
             strokeLinecap="round"

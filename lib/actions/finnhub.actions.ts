@@ -163,3 +163,53 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
     return [];
   }
 });
+
+type FinnhubQuote = { c?: number; d?: number; dp?: number };
+type FinnhubStockProfile = { name?: string; marketCapitalization?: number };
+type FinnhubMetrics = { metric?: { peTTM?: number; peBasicExclExtraTTM?: number } };
+
+export type StockMarketData = {
+  name?: string;
+  currentPrice?: number;
+  changeAmount?: number;
+  changePercent?: number;
+  marketCap?: number; // in millions, as Finnhub returns it
+  peRatio?: number;
+};
+
+// Price, change, market cap and P/E for one stock. Any piece that fails to load is left out.
+export async function getStockMarketData(symbol: string): Promise<StockMarketData> {
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getStockMarketData:', new Error('FINNHUB API key is not configured'));
+    return {};
+  }
+
+  const sym = encodeURIComponent(symbol.toUpperCase());
+  const [quote, profile, metrics] = await Promise.all([
+    fetchJSON<FinnhubQuote>(`${FINNHUB_BASE_URL}/quote?symbol=${sym}&token=${token}`, 60).catch((e) => {
+      console.error('Error fetching quote for', symbol, e);
+      return null;
+    }),
+    fetchJSON<FinnhubStockProfile>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${sym}&token=${token}`, 3600).catch((e) => {
+      console.error('Error fetching profile2 for', symbol, e);
+      return null;
+    }),
+    fetchJSON<FinnhubMetrics>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${sym}&metric=all&token=${token}`, 3600).catch((e) => {
+      console.error('Error fetching metrics for', symbol, e);
+      return null;
+    }),
+  ]);
+
+  // Finnhub returns a price of 0 for symbols it has no quote for
+  const hasQuote = !!quote?.c;
+
+  return {
+    name: profile?.name || undefined,
+    currentPrice: hasQuote ? quote?.c : undefined,
+    changeAmount: hasQuote ? quote?.d ?? undefined : undefined,
+    changePercent: hasQuote ? quote?.dp ?? undefined : undefined,
+    marketCap: profile?.marketCapitalization || undefined,
+    peRatio: metrics?.metric?.peTTM ?? metrics?.metric?.peBasicExclExtraTTM ?? undefined,
+  };
+}
