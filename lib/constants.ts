@@ -37,6 +37,9 @@ export const CONDITION_OPTIONS = [
 ];
 
 // TradingView Charts
+// Start of every TradingView embed script URL; add e.g. 'stock-heatmap.js'
+export const TRADINGVIEW_SCRIPT_URL = 'https://s3.tradingview.com/external-embedding/embed-widget-';
+
 export const MARKET_OVERVIEW_WIDGET_CONFIG = {
     colorTheme: 'dark', // dark mode
     dateRange: '12M', // last 12 months
@@ -170,6 +173,48 @@ export const MARKET_DATA_WIDGET_CONFIG = {
     ],
 };
 
+
+// Larger versions of the homepage widgets for their own pages (/market-overview, /heatmap, ...)
+export const MARKET_OVERVIEW_PAGE_WIDGET_CONFIG = { ...MARKET_OVERVIEW_WIDGET_CONFIG, height: 700 };
+
+export const HEATMAP_PAGE_WIDGET_CONFIG = {
+    ...HEATMAP_WIDGET_CONFIG,
+    hasTopBar: true, // lets you switch the list (S&P 500, Nasdaq 100, ...) and how blocks are sized and colored
+    isDataSetEnabled: true,
+    height: '800',
+};
+
+export const TOP_STORIES_PAGE_WIDGET_CONFIG = { ...TOP_STORIES_WIDGET_CONFIG, height: '800' };
+
+export const MARKET_DATA_PAGE_WIDGET_CONFIG = { ...MARKET_DATA_WIDGET_CONFIG, height: 800 };
+
+// Full chart on the Market Overview page. Its top toolbar lets you switch between
+// candles, bars, line and other chart types, and search for any symbol.
+export const MARKET_CHART_WIDGET_CONFIG = {
+    allow_symbol_change: true,
+    calendar: false,
+    details: false,
+    hide_side_toolbar: true,
+    hide_top_toolbar: false,
+    hide_legend: false,
+    hide_volume: false,
+    hotlist: false,
+    interval: 'D',
+    locale: 'en',
+    save_image: false,
+    style: 1, // candles
+    symbol: 'AMEX:SPY', // S&P 500 ETF
+    theme: 'dark',
+    timezone: 'Etc/UTC',
+    backgroundColor: '#141414',
+    gridColor: '#141414',
+    watchlist: [],
+    withdateranges: true,
+    compareSymbols: [],
+    studies: [],
+    width: '100%',
+    height: 700,
+};
 
 export const SYMBOL_INFO_WIDGET_CONFIG = (symbol: string) => ({
     symbol: symbol.toUpperCase(),
