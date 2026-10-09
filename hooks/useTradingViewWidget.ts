@@ -7,7 +7,7 @@ const LIGHT_BACKGROUND = '#F4F4F5';
 
 // Adjusts a widget config for the current theme, and points TradingView's
 // "open symbol" links at our own /stocks page instead of tradingview.com
-const prepareConfig = (config: Record<string, unknown>): Record<string, unknown> => {
+const prepareConfig = (scriptUrl: string, config: Record<string, unknown>): Record<string, unknown> => {
     const theme = getCurrentTheme();
     const result: Record<string, unknown> = { ...config };
 
@@ -22,7 +22,8 @@ const prepareConfig = (config: Record<string, unknown>): Record<string, unknown>
 
     // TradingView adds ?tvwidgetsymbol=EXCHANGE:SYMBOL to these links; app/(root)/stocks/page.tsx handles it
     const stockPageUrl = `${window.location.origin}/stocks`;
-    if ('largeChartUrl' in result) result.largeChartUrl = stockPageUrl;
+    // Every embed widget except the advanced chart supports largeChartUrl, so set it even when the config leaves it out
+    if (!scriptUrl.includes('advanced-chart')) result.largeChartUrl = stockPageUrl;
     if ('symbolUrl' in result) result.symbolUrl = stockPageUrl;
 
     return result;
@@ -48,7 +49,7 @@ const useTradingViewWidget = (scriptUrl: string, config: Record<string, unknown>
         const script = document.createElement("script");
         script.src = scriptUrl;
         script.async = true;
-        script.innerHTML = JSON.stringify(prepareConfig(config));
+        script.innerHTML = JSON.stringify(prepareConfig(scriptUrl, config));
 
         container.appendChild(script);
         container.dataset.loaded = 'true';
