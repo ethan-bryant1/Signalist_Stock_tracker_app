@@ -71,6 +71,21 @@ declare global {
         initialNews?: MarketNewsArticle[]; // Initial news data
     };
 
+    type StockDetailsPageProps = {
+        params: Promise<{
+            symbol: string;
+        }>;
+    };
+
+    type WatchlistButtonProps = {
+        symbol: string;
+        company: string;
+        isInWatchlist: boolean;
+        showTrashIcon?: boolean;
+        type?: 'button' | 'icon';
+        onWatchlistChange?: (symbol: string, isAdded: boolean) => void;
+    };
+
     type SearchCommandProps = {
         renderAs?: 'button' | 'text';
         label?: string;
