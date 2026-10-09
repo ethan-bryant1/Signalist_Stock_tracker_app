@@ -1,6 +1,8 @@
 'use server';
 
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
+import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
+import { cache } from 'react';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
@@ -93,3 +95,71 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
     throw new Error('Failed to fetch news');
   }
 }
+
+type FinnhubProfile = { name?: string; ticker?: string; exchange?: string };
+
+export const searchStocks = cache(async (query?: string): Promise<StockWithWatchlistStatus[]> => {
+  try {
+    const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+    if (!token) {
+      // If no token, log and return empty so the header still renders
+      console.error('Error in stock search:', new Error('FINNHUB API key is not configured'));
+      return [];
+    }
+
+    const trimmed = typeof query === 'string' ? query.trim() : '';
+
+    let results: (FinnhubSearchResult & { exchange?: string })[] = [];
+
+    if (!trimmed) {
+      // Fetch top 10 popular symbols' profiles
+      const top = POPULAR_STOCK_SYMBOLS.slice(0, 10);
+      const profiles = await Promise.all(
+        top.map(async (sym) => {
+          try {
+            const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(sym)}&token=${token}`;
+            // Revalidate every hour
+            const profile = await fetchJSON<FinnhubProfile>(url, 3600);
+            return { sym, profile };
+          } catch (e) {
+            console.error('Error fetching profile2 for', sym, e);
+            return { sym, profile: null };
+          }
+        })
+      );
+
+      results = profiles.flatMap(({ sym, profile }) => {
+        const symbol = sym.toUpperCase();
+        const name = profile?.name || profile?.ticker;
+        if (!name) return [];
+        return [{
+          symbol,
+          description: name,
+          displaySymbol: symbol,
+          type: 'Common Stock',
+          exchange: profile?.exchange,
+        }];
+      });
+    } else {
+      const url = `${FINNHUB_BASE_URL}/search?q=${encodeURIComponent(trimmed)}&token=${token}`;
+      const data = await fetchJSON<FinnhubSearchResponse>(url, 1800);
+      results = Array.isArray(data?.result) ? data.result : [];
+    }
+
+    return results
+      .map((r) => {
+        const upper = (r.symbol || '').toUpperCase();
+        return {
+          symbol: upper,
+          name: r.description || upper,
+          exchange: r.displaySymbol || r.exchange || 'US',
+          type: r.type || 'Stock',
+          isInWatchlist: false,
+        };
+      })
+      .slice(0, 15);
+  } catch (err) {
+    console.error('Error in stock search:', err);
+    return [];
+  }
+});
