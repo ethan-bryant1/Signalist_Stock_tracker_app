@@ -20,7 +20,7 @@ import NavItems from "@/components/NavItems";
 import { signOut } from "@/lib/actions/auth.actions";
 import { toast } from "sonner";
 
-const UserDropdown = ({ user }: { user: User }) => {
+const UserDropdown = ({ user, initialStocks }: { user: User; initialStocks: StockWithWatchlistStatus[] }) => {
     const router = useRouter();
 
     const handleSignOut = async () => {
@@ -93,7 +93,7 @@ const UserDropdown = ({ user }: { user: User }) => {
                 <DropdownMenuSeparator className="hidden bg-gray-600 sm:block" />
 
                 <nav className="sm:hidden">
-                    <NavItems />
+                    <NavItems initialStocks={initialStocks} inMenu />
                 </nav>
             </DropdownMenuContent>
         </DropdownMenu>
