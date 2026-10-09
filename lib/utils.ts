@@ -115,6 +115,23 @@ export const formatPrice = (price: number) => {
   }).format(price);
 };
 
+// A price in the stock's own currency (dollars when the currency code is unknown)
+export const formatCurrency = (value: number, currency = 'USD') => {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return formatPrice(value);
+  }
+};
+
+// A price change with its sign, like +1.23 or -0.45
+export const formatSignedNumber = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
+
 // A function so a long-running server gets today's date, not the date it started
 export const formatDateToday = () => new Date().toLocaleDateString('en-US', {
   weekday: 'long',

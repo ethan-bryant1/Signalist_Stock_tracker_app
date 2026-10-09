@@ -269,20 +269,101 @@ const toTradingViewExchange = (exchange?: string) => {
   return undefined;
 };
 
-// TradingView's company profile and financials widgets need the exchange in front of the
-// ticker (NASDAQ:AAPL) to find the company's data. Falls back to the plain ticker.
-export async function getTradingViewSymbol(symbol: string): Promise<string> {
+type FinnhubFullQuote = { c?: number; d?: number; dp?: number; h?: number; l?: number; o?: number; pc?: number };
+type FinnhubFullProfile = {
+  name?: string;
+  logo?: string;
+  exchange?: string;
+  finnhubIndustry?: string;
+  marketCapitalization?: number;
+  currency?: string;
+  weburl?: string;
+};
+type FinnhubAllMetrics = { metric?: Record<string, unknown> };
+
+export type StockOverview = {
+  symbol: string;
+  // Ticker with its exchange (NASDAQ:AAPL), which TradingView's profile and financials widgets need
+  tradingViewSymbol: string;
+  name?: string;
+  logo?: string;
+  exchange?: string;
+  industry?: string;
+  currency: string;
+  website?: string;
+  price?: number;
+  change?: number;
+  changePercent?: number;
+  open?: number;
+  previousClose?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  marketCap?: number; // in millions, as Finnhub returns it
+  peRatio?: number;
+  eps?: number;
+  dividendYield?: number; // percent
+  beta?: number;
+  week52High?: number;
+  week52Low?: number;
+};
+
+// Finnhub sometimes sends 0 or nothing for figures it doesn't have
+const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+const nonZero = (value: unknown) => num(value) || undefined;
+
+// Everything the top of a stock's page shows: name, logo, price and key figures.
+// Pieces that fail to load are left out, so the page still renders.
+export async function getStockOverview(symbol: string): Promise<StockOverview> {
   const sym = symbol.toUpperCase();
   const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-  if (!token) return sym;
-
-  try {
-    const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(sym)}&token=${token}`;
-    const profile = await fetchJSON<{ exchange?: string }>(url, 3600);
-    const prefix = toTradingViewExchange(profile?.exchange);
-    return prefix ? `${prefix}:${sym}` : sym;
-  } catch (e) {
-    console.error('Error fetching exchange for', sym, e);
-    return sym;
+  if (!token) {
+    console.error('getStockOverview:', new Error('FINNHUB API key is not configured'));
+    return { symbol: sym, tradingViewSymbol: sym, currency: 'USD' };
   }
+
+  const q = encodeURIComponent(sym);
+  const [quote, profile, metrics] = await Promise.all([
+    fetchJSON<FinnhubFullQuote>(`${FINNHUB_BASE_URL}/quote?symbol=${q}&token=${token}`, 60).catch((e) => {
+      console.error('Error fetching quote for', sym, e);
+      return null;
+    }),
+    fetchJSON<FinnhubFullProfile>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${q}&token=${token}`, 3600).catch((e) => {
+      console.error('Error fetching profile2 for', sym, e);
+      return null;
+    }),
+    fetchJSON<FinnhubAllMetrics>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${q}&metric=all&token=${token}`, 3600).catch((e) => {
+      console.error('Error fetching metrics for', sym, e);
+      return null;
+    }),
+  ]);
+
+  const m = metrics?.metric ?? {};
+  // Finnhub returns a price of 0 for symbols it has no quote for
+  const hasQuote = !!nonZero(quote?.c);
+  const prefix = toTradingViewExchange(profile?.exchange);
+
+  return {
+    symbol: sym,
+    tradingViewSymbol: prefix ? `${prefix}:${sym}` : sym,
+    name: profile?.name || undefined,
+    logo: profile?.logo || undefined,
+    exchange: prefix ?? (profile?.exchange || undefined),
+    industry: profile?.finnhubIndustry || undefined,
+    currency: profile?.currency || 'USD',
+    website: profile?.weburl && /^https?:\/\//i.test(profile.weburl) ? profile.weburl : undefined,
+    price: hasQuote ? num(quote?.c) : undefined,
+    change: hasQuote ? num(quote?.d) : undefined,
+    changePercent: hasQuote ? num(quote?.dp) : undefined,
+    open: hasQuote ? nonZero(quote?.o) : undefined,
+    previousClose: nonZero(quote?.pc),
+    dayHigh: hasQuote ? nonZero(quote?.h) : undefined,
+    dayLow: hasQuote ? nonZero(quote?.l) : undefined,
+    marketCap: nonZero(profile?.marketCapitalization) ?? nonZero(m.marketCapitalization),
+    peRatio: num(m.peTTM) ?? num(m.peBasicExclExtraTTM),
+    eps: num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM),
+    dividendYield: num(m.dividendYieldIndicatedAnnual) ?? num(m.currentDividendYieldTTM),
+    beta: num(m.beta),
+    week52High: nonZero(m['52WeekHigh']),
+    week52Low: nonZero(m['52WeekLow']),
+  };
 }

@@ -238,19 +238,11 @@ export const MARKET_CHART_WIDGET_CONFIG = {
     height: 700,
 };
 
-export const SYMBOL_INFO_WIDGET_CONFIG = (symbol: string) => ({
-    symbol: symbol.toUpperCase(),
-    colorTheme: 'dark',
-    isTransparent: true,
-    locale: 'en',
-    width: '100%',
-    height: 170,
-});
-
+// Main chart on a stock's page. Its top toolbar switches between candles, line, baseline and other chart types.
 export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     allow_symbol_change: false,
     calendar: false,
-    details: true,
+    details: false,
     hide_side_toolbar: true,
     hide_top_toolbar: false,
     hide_legend: false,
@@ -266,37 +258,11 @@ export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     backgroundColor: '#141414',
     gridColor: '#141414',
     watchlist: [],
-    withdateranges: false,
+    withdateranges: true, // 1D, 5D, 1M, ... buttons under the chart
     compareSymbols: [],
     studies: [],
     width: '100%',
-    height: 600,
-});
-
-export const BASELINE_WIDGET_CONFIG = (symbol: string) => ({
-    allow_symbol_change: false,
-    calendar: false,
-    details: false,
-    hide_side_toolbar: true,
-    hide_top_toolbar: false,
-    hide_legend: false,
-    hide_volume: false,
-    hotlist: false,
-    interval: 'D',
-    locale: 'en',
-    save_image: false,
-    style: 10,
-    symbol: symbol.toUpperCase(),
-    theme: 'dark',
-    timezone: 'Etc/UTC',
-    backgroundColor: '#141414',
-    gridColor: '#141414',
-    watchlist: [],
-    withdateranges: false,
-    compareSymbols: [],
-    studies: [],
-    width: '100%',
-    height: 600,
+    height: 560,
 });
 
 export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({
@@ -305,7 +271,7 @@ export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({
     isTransparent: 'true',
     locale: 'en',
     width: '100%',
-    height: 400,
+    height: 440,
     interval: '1h',
     largeChartUrl: '',
 });
