@@ -154,6 +154,16 @@
   body {
     @apply bg-gray-900 text-foreground;
   }
+  /* Native scrollbars and form controls follow the theme too */
+  :root {
+    color-scheme: light;
+  }
+  :root.dark {
+    color-scheme: dark;
+  }
+  ::selection {
+    @apply bg-gray-100 text-gray-900;
+  }
 }
 
 @layer utilities {
@@ -321,7 +331,7 @@
     @apply text-xl md:text-2xl font-bold text-gray-100;
   }
   .watchlist-table {
-    @apply !relative overflow-hidden !w-full bg-gray-800 border !border-gray-600 !rounded-lg;
+    @apply !relative overflow-x-auto !w-full bg-gray-800 border !border-gray-600 !rounded-lg;
   }
   .table-header-row {
     @apply text-gray-400 font-medium bg-gray-700 border-b border-gray-600 hover:bg-gray-700;
@@ -333,7 +343,7 @@
     @apply border-b cursor-pointer text-gray-100 border-gray-600 hover:bg-gray-700/50 transition-colors;
   }
   .table-cell {
-    @apply font-medium text-base
+    @apply font-medium text-base whitespace-nowrap;
   }
   .add-alert {
     @apply flex text-sm items-center whitespace-nowrap gap-1.5 px-3 w-fit py-2 text-gray-100 border border-gray-600 rounded font-medium bg-transparent hover:bg-transparent cursor-pointer transition-colors;

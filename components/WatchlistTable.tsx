@@ -11,7 +11,7 @@ const WatchlistTable = ({ watchlist }: { watchlist: StockWithData[] }) => {
   const router = useRouter();
 
   return (
-    <div className="watchlist-table overflow-x-auto">
+    <div className="watchlist-table">
       <table className="w-full text-left">
         <thead>
           <tr className="table-header-row">

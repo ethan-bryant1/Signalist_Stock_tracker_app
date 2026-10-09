@@ -3,6 +3,7 @@ import Image from "next/image";
 import {getAuth} from "@/lib/better-auth/auth";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
+import {Star} from "lucide-react";
 
 const Layout = async ({ children }: { children : React.ReactNode }) => {
     // Read headers first so Next renders this per request instead of at build time
@@ -33,9 +34,10 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
                             <cite className="auth-testimonial-author">- Ethan R.</cite>
                             <p className="max-md:text-xs text-gray-500">Retail Investor</p>
                         </div>
-                        <div className="flex items-center gap-0.5">
+                        {/* Drawn as icons so the stars follow the theme's text color */}
+                        <div className="flex items-center gap-0.5" role="img" aria-label="Rated 5 out of 5 stars">
                             {[1, 2, 3, 4, 5].map((star) => (
-                                <Image src="/assets/icons/star.svg" alt="Star" key={star} width={20} height={20} className="w-5 h-5" />
+                                <Star key={star} aria-hidden className="w-5 h-5 fill-current text-gray-400" />
                             ))}
                         </div>
                     </div>

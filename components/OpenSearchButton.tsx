@@ -6,7 +6,7 @@ import { OPEN_SEARCH_EVENT } from "@/components/SearchCommand";
 const OpenSearchButton = ({ label }: { label: string }) => (
   <button
     type="button"
-    className="watchlist-btn px-6 w-fit"
+    className="watchlist-btn px-6 w-fit!"
     onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
   >
     {label}
