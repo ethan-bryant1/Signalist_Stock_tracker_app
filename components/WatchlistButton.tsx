@@ -44,8 +44,8 @@ const WatchlistButton = ({
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
-          fill={added ? "#FACC15" : "none"}
-          stroke="#FACC15"
+          fill={added ? "currentColor" : "none"}
+          stroke="currentColor"
           strokeWidth="1.5"
           className="h-5 w-5"
         >

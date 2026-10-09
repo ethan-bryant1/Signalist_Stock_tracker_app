@@ -43,7 +43,7 @@ const WatchlistTable = ({ watchlist }: { watchlist: StockWithData[] }) => {
                 {/* A real link so keyboard users can tab to each stock; the row click is a mouse shortcut */}
                 <Link
                   href={`/stocks/${encodeURIComponent(stock.symbol)}`}
-                  className="rounded hover:text-yellow-500 focus-visible:outline-2 focus-visible:outline-yellow-500 focus-visible:outline-offset-2"
+                  className="rounded hover:text-gray-400 focus-visible:outline-2 focus-visible:outline-gray-100 focus-visible:outline-offset-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {stock.company}

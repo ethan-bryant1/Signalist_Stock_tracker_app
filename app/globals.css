@@ -161,7 +161,7 @@
     @apply mx-auto max-w-screen-2xl px-4 md:px-6 lg:px-8;
   }
   .yellow-btn {
-    @apply h-12 cursor-pointer bg-gradient-to-b from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-gray-950 font-medium text-base rounded-lg shadow-lg disabled:opacity-50;
+    @apply h-12 cursor-pointer bg-gray-100 hover:opacity-85 text-gray-900 transition-opacity font-medium text-base rounded-lg shadow-lg disabled:opacity-50;
   }
   .home-wrapper {
     @apply text-gray-400 flex-col gap-4 md:gap-10 items-center sm:items-start;
@@ -203,13 +203,13 @@
     @apply text-sm font-medium text-gray-400;
   }
   .form-input {
-    @apply h-12 px-3 py-3 text-gray-100 text-base placeholder:text-gray-500 border-gray-600 bg-gray-800 rounded-lg focus:!border-yellow-500 focus:ring-0;
+    @apply h-12 px-3 py-3 text-gray-100 text-base placeholder:text-gray-500 border-gray-600 bg-gray-800 rounded-lg focus:!border-gray-400 focus:ring-0;
   }
   .select-trigger {
-    @apply w-full !h-12 px-3 py-3 text-base border-gray-600 bg-gray-800 text-gray-100 rounded-lg focus:!border-yellow-500 focus:ring-0;
+    @apply w-full !h-12 px-3 py-3 text-base border-gray-600 bg-gray-800 text-gray-100 rounded-lg focus:!border-gray-400 focus:ring-0;
   }
   .country-select-trigger {
-    @apply h-12 px-3 py-3 text-base w-full justify-between font-normal border-gray-600 bg-gray-800 text-gray-400 rounded-lg focus:!border-yellow-500 focus:ring-0;
+    @apply h-12 px-3 py-3 text-base w-full justify-between font-normal border-gray-600 bg-gray-800 text-gray-400 rounded-lg focus:!border-gray-400 focus:ring-0;
   }
   .country-select-input {
     @apply !bg-gray-800 text-gray-400 border-0 border-b border-gray-600 rounded-none focus:ring-0 placeholder:text-gray-500;
@@ -221,13 +221,13 @@
     @apply text-gray-100 cursor-pointer px-3 py-2 rounded-sm bg-gray-800 hover:!bg-gray-600;
   }
   .footer-link {
-    @apply text-gray-400 font-medium hover:text-yellow-400 hover:underline transition-colors;
+    @apply text-gray-400 font-medium hover:text-gray-100 hover:underline transition-colors;
   }
   .search-text {
-    @apply cursor-pointer hover:text-yellow-500;
+    @apply cursor-pointer hover:text-gray-100;
   }
   .search-btn {
-    @apply cursor-pointer px-4 py-2 w-fit flex items-center gap-2 text-sm md:text-base bg-yellow-500 hover:bg-yellow-500 text-black font-medium rounded;
+    @apply cursor-pointer px-4 py-2 w-fit flex items-center gap-2 text-sm md:text-base bg-gray-100 hover:opacity-85 text-gray-900 font-medium rounded;
   }
   .search-dialog {
     @apply !bg-gray-800 lg:min-w-[800px] border-gray-600 fixed top-10 left-1/2 -translate-x-1/2 translate-y-10;
@@ -303,10 +303,10 @@
     @apply items-start gap-6 h-full flex-col w-full lg:col-span-1;
   }
   .watchlist-icon-btn {
-    @apply w-fit cursor-pointer hover:bg-transparent! text-gray-400 hover:text-yellow-500;
+    @apply w-fit cursor-pointer hover:bg-transparent! text-gray-400 hover:text-gray-100;
   }
   .watchlist-icon-added {
-    @apply !text-yellow-500 hover:!text-yellow-600;
+    @apply !text-gray-100 hover:!text-gray-400;
   }
   .watchlist-icon {
     @apply w-8 h-8 rounded-full flex items-center justify-center bg-gray-700/50;
@@ -336,7 +336,7 @@
     @apply font-medium text-base
   }
   .add-alert {
-    @apply flex text-sm items-center whitespace-nowrap gap-1.5 px-3 w-fit py-2 text-yellow-600 border border-yellow-600/20 rounded font-medium bg-transparent hover:bg-transparent cursor-pointer transition-colors;
+    @apply flex text-sm items-center whitespace-nowrap gap-1.5 px-3 w-fit py-2 text-gray-100 border border-gray-600 rounded font-medium bg-transparent hover:bg-transparent cursor-pointer transition-colors;
   }
   .watchlist-news {
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4;
@@ -357,7 +357,7 @@
     @apply text-gray-400 flex-1 text-base leading-relaxed mb-3 line-clamp-3;
   }
   .news-cta {
-    @apply text-sm align-bottom text-yellow-500 hover:text-gray-400;
+    @apply text-sm align-bottom text-gray-100 hover:text-gray-400;
   }
   .alert-dialog {
     @apply bg-gray-800 border-gray-600 text-gray-400 max-w-md;
@@ -375,7 +375,7 @@
     @apply p-4 rounded-lg bg-gray-700 border border-gray-600;
   }
   .alert-name {
-    @apply mb-2 text-lg text-yellow-500 font-semibold;
+    @apply mb-2 text-lg text-gray-100 font-semibold;
   }
   .alert-details {
     @apply flex border-b pb-3 items-center justify-between gap-3 mb-2;
