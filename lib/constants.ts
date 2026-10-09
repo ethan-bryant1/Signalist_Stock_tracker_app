@@ -326,7 +326,7 @@ export const COMPANY_FINANCIALS_WIDGET_CONFIG = (symbol: string) => ({
     locale: 'en',
     width: '100%',
     height: 464,
-    displayMode: 'regular',
+    displayMode: 'adaptive', // fits the layout to the box width
     largeChartUrl: '',
 });
 

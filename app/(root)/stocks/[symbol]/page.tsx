@@ -11,7 +11,7 @@ import {
   COMPANY_FINANCIALS_WIDGET_CONFIG,
 } from "@/lib/constants";
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
-import { getCompanyNews } from "@/lib/actions/finnhub.actions";
+import { getCompanyNews, getTradingViewSymbol } from "@/lib/actions/finnhub.actions";
 import { formatTimeAgo } from "@/lib/utils";
 
 // Loads the company's news separately, so the charts don't wait for it
@@ -39,7 +39,10 @@ const NewsLoading = () => (
 export default async function StockDetails({ params }: StockDetailsPageProps) {
   const { symbol: rawSymbol } = await params;
   const symbol = rawSymbol.toUpperCase();
-  const isInWatchlist = await isStockInWatchlist(symbol);
+  const [isInWatchlist, tradingViewSymbol] = await Promise.all([
+    isStockInWatchlist(symbol),
+    getTradingViewSymbol(symbol),
+  ]);
   const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
   return (
@@ -69,7 +72,7 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
 
           <TradingViewWidget
             scriptUrl={`${scriptUrl}financials.js`}
-            config={COMPANY_FINANCIALS_WIDGET_CONFIG(symbol)}
+            config={COMPANY_FINANCIALS_WIDGET_CONFIG(tradingViewSymbol)}
             height={464}
           />
         </div>
@@ -94,8 +97,8 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
           />
 
           <TradingViewWidget
-            scriptUrl={`${scriptUrl}company-profile.js`}
-            config={COMPANY_PROFILE_WIDGET_CONFIG(symbol)}
+            scriptUrl={`${scriptUrl}symbol-profile.js`}
+            config={COMPANY_PROFILE_WIDGET_CONFIG(tradingViewSymbol)}
             height={440}
           />
         </div>

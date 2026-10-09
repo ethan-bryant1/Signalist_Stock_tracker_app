@@ -258,3 +258,31 @@ export async function getCompanyNews(symbol: string, limit = 20): Promise<Market
     return null;
   }
 }
+
+// Turns Finnhub's exchange name (like "NASDAQ NMS - GLOBAL MARKET") into TradingView's prefix
+const toTradingViewExchange = (exchange?: string) => {
+  const name = exchange?.toUpperCase() ?? '';
+  if (name.includes('NASDAQ')) return 'NASDAQ';
+  if (name.includes('NYSE MKT') || name.includes('AMERICAN') || name.includes('ARCA')) return 'AMEX';
+  if (name.includes('NEW YORK STOCK EXCHANGE') || name === 'NYSE') return 'NYSE';
+  if (name.includes('CBOE') || name.includes('BATS')) return 'CBOE';
+  return undefined;
+};
+
+// TradingView's company profile and financials widgets need the exchange in front of the
+// ticker (NASDAQ:AAPL) to find the company's data. Falls back to the plain ticker.
+export async function getTradingViewSymbol(symbol: string): Promise<string> {
+  const sym = symbol.toUpperCase();
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) return sym;
+
+  try {
+    const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(sym)}&token=${token}`;
+    const profile = await fetchJSON<{ exchange?: string }>(url, 3600);
+    const prefix = toTradingViewExchange(profile?.exchange);
+    return prefix ? `${prefix}:${sym}` : sym;
+  } catch (e) {
+    console.error('Error fetching exchange for', sym, e);
+    return sym;
+  }
+}
