@@ -5,6 +5,17 @@ import { getWatchlistWithData } from "@/lib/actions/watchlist.actions";
 export default async function WatchlistPage() {
   const watchlist = await getWatchlistWithData();
 
+  if (watchlist === null) {
+    return (
+      <section className="watchlist-empty-container flex">
+        <div className="watchlist-empty">
+          <h2 className="empty-title">Couldn&apos;t load your watchlist</h2>
+          <p className="empty-description">Something went wrong while loading your saved stocks. Refresh the page to try again.</p>
+        </div>
+      </section>
+    );
+  }
+
   if (watchlist.length === 0) {
     return (
       <section className="watchlist-empty-container flex">

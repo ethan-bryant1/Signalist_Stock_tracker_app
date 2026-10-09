@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import WatchlistButton from "@/components/WatchlistButton";
 import { getChangeColorClass } from "@/lib/utils";
@@ -38,7 +39,16 @@ const WatchlistTable = ({ watchlist }: { watchlist: StockWithData[] }) => {
                   onWatchlistChange={() => router.refresh()}
                 />
               </td>
-              <td className="table-cell px-4 py-3">{stock.company}</td>
+              <td className="table-cell px-4 py-3">
+                {/* A real link so keyboard users can tab to each stock; the row click is a mouse shortcut */}
+                <Link
+                  href={`/stocks/${encodeURIComponent(stock.symbol)}`}
+                  className="rounded hover:text-yellow-500 focus-visible:outline-2 focus-visible:outline-yellow-500 focus-visible:outline-offset-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {stock.company}
+                </Link>
+              </td>
               <td className="table-cell px-4 py-3 text-gray-400">{stock.symbol}</td>
               <td className="table-cell px-4 py-3">{stock.priceFormatted}</td>
               <td className={`table-cell px-4 py-3 ${getChangeColorClass(stock.changePercent)}`}>

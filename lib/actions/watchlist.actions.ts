@@ -88,42 +88,51 @@ export async function removeFromWatchlist(symbol: string): Promise<{ success: bo
   }
 }
 
-// The signed-in user's watchlist, newest first, with live price data from Finnhub
-export async function getWatchlistWithData(): Promise<StockWithData[]> {
+// Finnhub's free plan allows about 30 calls a second; each stock makes 3, so load a few stocks at a time
+const STOCKS_PER_BATCH = 5;
+
+// The signed-in user's watchlist, newest first, with live price data from Finnhub.
+// Returns null when the watchlist could not be loaded, so the page can tell that apart from an empty list.
+export async function getWatchlistWithData(): Promise<StockWithData[] | null> {
   // Kept outside the try so Next's "render per request" signal from headers() is not swallowed
   const userId = await getCurrentUserId();
   if (!userId) return [];
 
   try {
-
     await connectToDatabase();
     const items = await Watchlist.find({ userId }).sort({ addedAt: -1 }).lean();
 
-    return await Promise.all(
-      items.map(async (item) => {
-        const data = await getStockMarketData(item.symbol);
-        const changeAmount = data.changeAmount;
+    const result: StockWithData[] = [];
+    for (let i = 0; i < items.length; i += STOCKS_PER_BATCH) {
+      const batch = items.slice(i, i + STOCKS_PER_BATCH);
+      const rows = await Promise.all(
+        batch.map(async (item) => {
+          const data = await getStockMarketData(item.symbol);
+          const changeAmount = data.changeAmount;
 
-        return {
-          _id: String(item._id),
-          userId: item.userId,
-          symbol: item.symbol,
-          company: data.name || item.company,
-          addedAt: item.addedAt,
-          currentPrice: data.currentPrice,
-          changePercent: data.changePercent,
-          changeAmount,
-          priceFormatted: data.currentPrice !== undefined ? formatPrice(data.currentPrice) : '—',
-          changeFormatted: formatChangePercent(data.changePercent) || '—',
-          changeAmountFormatted:
-            changeAmount !== undefined ? `${changeAmount > 0 ? '+' : ''}${changeAmount.toFixed(2)}` : '',
-          marketCap: data.marketCap ? formatMarketCapValue(data.marketCap) : '—',
-          peRatio: data.peRatio !== undefined ? data.peRatio.toFixed(1) : '—',
-        };
-      })
-    );
+          return {
+            _id: String(item._id),
+            userId: item.userId,
+            symbol: item.symbol,
+            company: data.name || item.company,
+            addedAt: item.addedAt,
+            currentPrice: data.currentPrice,
+            changePercent: data.changePercent,
+            changeAmount,
+            priceFormatted: data.currentPrice !== undefined ? formatPrice(data.currentPrice) : '—',
+            changeFormatted: formatChangePercent(data.changePercent) || '—',
+            changeAmountFormatted:
+              changeAmount !== undefined ? `${changeAmount > 0 ? '+' : ''}${changeAmount.toFixed(2)}` : '',
+            marketCap: data.marketCap ? formatMarketCapValue(data.marketCap) : '—',
+            peRatio: data.peRatio !== undefined ? data.peRatio.toFixed(1) : '—',
+          };
+        })
+      );
+      result.push(...rows);
+    }
+    return result;
   } catch (err) {
     console.error('getWatchlistWithData error:', err);
-    return [];
+    return null;
   }
 }
