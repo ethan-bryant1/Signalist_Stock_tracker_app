@@ -23,10 +23,10 @@ export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData)
         .replace('{{intro}}', () => intro);
 
     const mailOptions = {
-        from: `"Signalist" <${process.env.NODEMAILER_EMAIL}>`,
+        from: `"Loops Watch" <${process.env.NODEMAILER_EMAIL}>`,
         to: email,
-        subject: `Welcome to Signalist - your stock market toolkit is ready!`,
-        text: 'Thanks for joining Signalist',
+        subject: `Welcome to Loops Watch - your stock market toolkit is ready!`,
+        text: 'Thanks for joining Loops Watch',
         html: htmlTemplate,
     }
 
@@ -41,10 +41,10 @@ export const sendNewsSummaryEmail = async (
         .replace('{{newsContent}}', () => newsContent);
 
     const mailOptions = {
-        from: `"Signalist News" <${process.env.NODEMAILER_EMAIL}>`,
+        from: `"Loops Watch News" <${process.env.NODEMAILER_EMAIL}>`,
         to: email,
         subject: `📈 Market News Summary Today - ${date}`,
-        text: `Today's market news summary from Signalist`,
+        text: `Today's market news summary from Loops Watch`,
         html: htmlTemplate,
     };
 
