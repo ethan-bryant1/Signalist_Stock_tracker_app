@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stock Feed",
+  title: "Loops Watch",
   description: "Track real-time stock prices, get personalized alerts and explore detailed company insights.",
 };
 
