@@ -420,7 +420,7 @@ export const SP500_COMPANIES: SectorCompany[] = [
     { symbol: "REGN", name: "Regeneron Pharmaceuticals", sector: "Health Care", industry: "Biotechnology" },
     { symbol: "RF", name: "Regions Financial Corporation", sector: "Financials", industry: "Regional Banks" },
     { symbol: "RSG", name: "Republic Services", sector: "Industrials", industry: "Environmental & Facilities Services" },
-    { symbol: "RMD", name: "ResMed|", sector: "Health Care", industry: "Health Care Equipment" },
+    { symbol: "RMD", name: "ResMed", sector: "Health Care", industry: "Health Care Equipment" },
     { symbol: "RVTY", name: "Revvity", sector: "Health Care", industry: "Health Care Equipment" },
     { symbol: "HOOD", name: "Robinhood Markets", sector: "Financials", industry: "Investment Banking & Brokerage" },
     { symbol: "ROK", name: "Rockwell Automation", sector: "Industrials", industry: "Electrical Components & Equipment" },
