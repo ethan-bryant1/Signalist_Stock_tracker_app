@@ -1,18 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Command, CommandDialog, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command"
+import { useEffect, useRef, useState } from "react"
+import { Command, CommandDialog, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import {Button} from "@/components/ui/button";
 import {Loader2, TrendingUp} from "lucide-react";
-import Link from "next/link";
+import {useRouter} from "next/navigation";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {useDebounce} from "@/hooks/useDebounce";
+
+// Other triggers (like the mobile menu) open the search dialog by dispatching this event
+export const OPEN_SEARCH_EVENT = "open-stock-search";
 
 export default function SearchCommand({ renderAs = 'button', label = 'Add stock', initialStocks }: SearchCommandProps) {
   const [open, setOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(false)
   const [stocks, setStocks] = useState<StockWithWatchlistStatus[]>(initialStocks);
+  const latestTermRef = useRef("");
+  const router = useRouter();
 
   const isSearchMode = !!searchTerm.trim();
   const displayStocks = isSearchMode ? stocks : stocks?.slice(0, 10);
@@ -24,21 +29,33 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
         setOpen(v => !v)
       }
     }
+    const onOpenSearch = () => setOpen(true)
     window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpenSearch)
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener(OPEN_SEARCH_EVENT, onOpenSearch)
+    }
   }, [])
 
   const handleSearch = async () => {
-    if(!isSearchMode) return setStocks(initialStocks);
+    const term = searchTerm.trim();
+    latestTermRef.current = term;
+
+    if(!term) {
+      setLoading(false);
+      return setStocks(initialStocks);
+    }
 
     setLoading(true)
     try {
-        const results = await searchStocks(searchTerm.trim());
-        setStocks(results);
+        const results = await searchStocks(term);
+        // Ignore results for a term the user has already changed
+        if(latestTermRef.current === term) setStocks(results);
     } catch {
-      setStocks([])
+      if(latestTermRef.current === term) setStocks([])
     } finally {
-      setLoading(false)
+      if(latestTermRef.current === term) setLoading(false)
     }
   }
 
@@ -48,7 +65,8 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
     debouncedSearch();
   }, [searchTerm, debouncedSearch]);
 
-  const handleSelectStock = () => {
+  const handleSelectStock = (symbol: string) => {
+    router.push(`/stocks/${symbol}`);
     setOpen(false);
     setSearchTerm("");
     setStocks(initialStocks);
@@ -57,9 +75,9 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
   return (
     <>
       {renderAs === 'text' ? (
-          <span onClick={() => setOpen(true)} className="search-text">
+          <button type="button" onClick={() => setOpen(true)} className="search-text">
             {label}
-          </span>
+          </button>
       ): (
           <Button onClick={() => setOpen(true)} className="search-btn">
             {label}
@@ -80,18 +98,19 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
                   {isSearchMode ? 'No results found' : 'No stocks available'}
                 </div>
               ) : (
-              <ul>
+              <div>
                 <div className="search-count">
                   {isSearchMode ? 'Search results' : 'Popular stocks'}
                   {` `}({displayStocks?.length || 0})
                 </div>
                 {displayStocks?.map((stock) => (
-                    <li key={stock.symbol} className="search-item">
-                      <Link
-                          href={`/stocks/${stock.symbol}`}
-                          onClick={handleSelectStock}
-                          className="search-item-link"
-                      >
+                    <CommandItem
+                        key={stock.symbol}
+                        value={stock.symbol}
+                        onSelect={() => handleSelectStock(stock.symbol)}
+                        className="search-item"
+                    >
+                      <div className="search-item-link">
                         <TrendingUp className="h-4 w-4 text-gray-500" />
                         <div className="flex-1">
                           <div className="search-item-name">
@@ -101,10 +120,10 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
                             {stock.symbol} | {stock.exchange} | {stock.type}
                           </div>
                         </div>
-                      </Link>
-                    </li>
+                      </div>
+                    </CommandItem>
                 ))}
-              </ul>
+              </div>
             )}
           </CommandList>
         </Command>

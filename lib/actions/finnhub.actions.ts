@@ -152,7 +152,7 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
         return {
           symbol: upper,
           name: r.description || upper,
-          exchange: r.displaySymbol || r.exchange || 'US',
+          exchange: r.exchange || r.displaySymbol || 'US',
           type: r.type || 'Stock',
           isInWatchlist: false,
         };
