@@ -1,11 +1,16 @@
-import Image from "next/image";
+import { cn } from "@/lib/utils";
 
-// The chart icon plus the app name, drawn as text so it follows the theme's text color
-const Logo = () => (
-    <span className="flex items-center gap-2">
-        <Image src="/assets/icons/logo-icon.svg" alt="" width={28} height={30} className="h-8 w-auto" />
-        <span className="whitespace-nowrap text-2xl font-bold tracking-tight text-gray-100">Loops Watch</span>
-    </span>
+// The Loops logo, drawn through a mask so it takes the theme's text color
+// (black in light mode, white in dark mode)
+const LOGO_MASK = "url(/assets/icons/loops-logo.png) center / contain no-repeat";
+
+const Logo = ({ className }: { className?: string }) => (
+    <span
+        role="img"
+        aria-label="Loops Watch"
+        className={cn("block h-14 aspect-[637/414] bg-gray-100", className)}
+        style={{ mask: LOGO_MASK, WebkitMask: LOGO_MASK }}
+    />
 );
 
 export default Logo;
