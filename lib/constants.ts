@@ -200,6 +200,16 @@ export const MARKET_DATA_PAGE_WIDGET_CONFIG = {
     locale: 'en',
 };
 
+// Live price list the Market Data page shows for a picked sector or a search.
+// The page fills in symbolsGroups with the matching stocks.
+export const MARKET_DATA_LIST_WIDGET_CONFIG = {
+    width: '100%',
+    locale: 'en',
+    showSymbolLogo: true,
+    colorTheme: 'dark',
+    isTransparent: true,
+};
+
 // Full chart on the Market Overview page. Its top toolbar lets you switch between
 // candles, bars, line and other chart types, and search for any symbol.
 export const MARKET_CHART_WIDGET_CONFIG = {

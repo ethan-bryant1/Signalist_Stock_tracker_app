@@ -8,7 +8,8 @@ import {useRouter} from "next/navigation";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 import {useDebounce} from "@/hooks/useDebounce";
 
-// Other triggers (like the mobile menu) open the search dialog by dispatching this event
+// Other triggers (like the mobile menu) open the search dialog by dispatching this event.
+// A CustomEvent whose detail is a string also fills in the search box with it.
 export const OPEN_SEARCH_EVENT = "open-stock-search";
 
 export default function SearchCommand({ renderAs = 'button', label = 'Add stock', initialStocks }: SearchCommandProps) {
@@ -29,7 +30,10 @@ export default function SearchCommand({ renderAs = 'button', label = 'Add stock'
         setOpen(v => !v)
       }
     }
-    const onOpenSearch = () => setOpen(true)
+    const onOpenSearch = (e: Event) => {
+      if (e instanceof CustomEvent && typeof e.detail === "string" && e.detail) setSearchTerm(e.detail)
+      setOpen(true)
+    }
     window.addEventListener("keydown", onKeyDown)
     window.addEventListener(OPEN_SEARCH_EVENT, onOpenSearch)
     return () => {
