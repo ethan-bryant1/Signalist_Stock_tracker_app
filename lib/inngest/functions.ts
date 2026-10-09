@@ -117,17 +117,23 @@ export const sendDailyNewsSummary = inngest.createFunction(
         }
 
         // Step #4: Send the emails
-        await step.run('send-news-emails', async () => {
+        const sentCount = await step.run('send-news-emails', async () => {
             const date = formatDateToday();
-            await Promise.all(
+            const sent = await Promise.all(
                 userNewsSummaries.map(async ({ user, newsContent }) => {
                     if(!newsContent) return false;
 
-                    return await sendNewsSummaryEmail({ email: user.email, date, newsContent })
+                    await sendNewsSummaryEmail({ email: user.email, date, newsContent })
+                    return true;
                 })
             )
+            return sent.filter(Boolean).length;
         })
 
-        return { success: true, message: 'Daily news summary emails sent successfully' }
+        if(sentCount === 0) {
+            return { success: false, message: 'No news emails sent: no news found for any user (check FINNHUB_API_KEY and the dev server logs)' }
+        }
+
+        return { success: true, message: `Daily news summary emails sent to ${sentCount} of ${users.length} users` }
     }
 )
