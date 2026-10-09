@@ -186,7 +186,19 @@ export const HEATMAP_PAGE_WIDGET_CONFIG = {
 
 export const TOP_STORIES_PAGE_WIDGET_CONFIG = { ...TOP_STORIES_WIDGET_CONFIG, height: '800' };
 
-export const MARKET_DATA_PAGE_WIDGET_CONFIG = { ...MARKET_DATA_WIDGET_CONFIG, height: 800 };
+// The Market Data page shows TradingView's stock screener: every US-listed stock, biggest first,
+// with tabs for performance, valuation and more, and a toolbar to sort and filter
+export const MARKET_DATA_PAGE_WIDGET_CONFIG = {
+    width: '100%',
+    height: 800,
+    defaultColumn: 'overview',
+    defaultScreen: 'most_capitalized',
+    market: 'america',
+    showToolbar: true,
+    colorTheme: 'dark',
+    isTransparent: true,
+    locale: 'en',
+};
 
 // Full chart on the Market Overview page. Its top toolbar lets you switch between
 // candles, bars, line and other chart types, and search for any symbol.

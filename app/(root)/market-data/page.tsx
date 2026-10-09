@@ -8,7 +8,7 @@ export default function MarketDataPage() {
             <BackToDashboard />
             <TradingViewWidget
                 title="Market Data"
-                scriptUrl={`${TRADINGVIEW_SCRIPT_URL}market-quotes.js`}
+                scriptUrl={`${TRADINGVIEW_SCRIPT_URL}screener.js`}
                 config={MARKET_DATA_PAGE_WIDGET_CONFIG}
                 height={800}
             />
