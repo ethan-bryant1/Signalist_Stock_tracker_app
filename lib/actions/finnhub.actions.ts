@@ -213,3 +213,48 @@ export async function getStockMarketData(symbol: string): Promise<StockMarketDat
     peRatio: metrics?.metric?.peTTM ?? metrics?.metric?.peBasicExclExtraTTM ?? undefined,
   };
 }
+
+// Recent news about one company from the past week, newest first, without repeated headlines.
+// Returns null when the news can't be loaded, so the page can say so instead of "no news".
+export async function getCompanyNews(symbol: string, limit = 20): Promise<MarketNewsArticle[] | null> {
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getCompanyNews:', new Error('FINNHUB API key is not configured'));
+    return null;
+  }
+
+  const sym = symbol.toUpperCase();
+  const range = getDateRange(7);
+
+  try {
+    const url = `${FINNHUB_BASE_URL}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
+    const articles = await fetchJSON<RawNewsArticle[]>(url, 300);
+
+    const seen = new Set<string>();
+    return (Array.isArray(articles) ? articles : [])
+      // Only keep complete articles whose link is a normal web address
+      .filter((a) => a.headline?.trim() && a.datetime && a.url && /^https?:\/\//i.test(a.url))
+      .filter((a) => {
+        const key = a.headline!.trim().toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => b.datetime! - a.datetime!)
+      .slice(0, limit)
+      .map((a) => ({
+        id: a.id,
+        headline: a.headline!.trim(),
+        summary: a.summary?.trim() ?? '',
+        source: a.source || 'Company News',
+        url: a.url!,
+        datetime: a.datetime!,
+        category: 'company',
+        related: sym,
+        image: a.image || '',
+      }));
+  } catch (e) {
+    console.error('Error fetching company news for', sym, e);
+    return null;
+  }
+}

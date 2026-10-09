@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import WatchlistButton from "@/components/WatchlistButton";
+import CompanyNews from "@/components/CompanyNews";
 import {
   SYMBOL_INFO_WIDGET_CONFIG,
   CANDLE_CHART_WIDGET_CONFIG,
@@ -9,6 +11,30 @@ import {
   COMPANY_FINANCIALS_WIDGET_CONFIG,
 } from "@/lib/constants";
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
+import { getCompanyNews } from "@/lib/actions/finnhub.actions";
+import { formatTimeAgo } from "@/lib/utils";
+
+// Loads the company's news separately, so the charts don't wait for it
+async function NewsList({ symbol }: { symbol: string }) {
+  const articles = await getCompanyNews(symbol);
+
+  if (articles === null) {
+    return <p className="text-gray-500">News couldn&apos;t load right now. Refresh the page to try again.</p>;
+  }
+  if (articles.length === 0) {
+    return <p className="text-gray-500">No news about {symbol} in the past week.</p>;
+  }
+
+  return <CompanyNews articles={articles.map((article) => ({ ...article, timeAgo: formatTimeAgo(article.datetime) }))} />;
+}
+
+const NewsLoading = () => (
+  <div className="flex flex-col gap-3" aria-label="Loading news">
+    {[0, 1, 2].map((i) => (
+      <div key={i} className="h-32 rounded-lg border border-gray-600 bg-gray-800 animate-pulse" />
+    ))}
+  </div>
+);
 
 export default async function StockDetails({ params }: StockDetailsPageProps) {
   const { symbol: rawSymbol } = await params;
@@ -40,6 +66,12 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
             className="custom-chart"
             height={600}
           />
+
+          <TradingViewWidget
+            scriptUrl={`${scriptUrl}financials.js`}
+            config={COMPANY_FINANCIALS_WIDGET_CONFIG(symbol)}
+            height={464}
+          />
         </div>
 
         {/* Right column */}
@@ -47,6 +79,13 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
           <div className="flex items-center justify-between">
             <WatchlistButton symbol={symbol} company={symbol} isInWatchlist={isInWatchlist} />
           </div>
+
+          <section aria-labelledby="company-news-title" className="flex flex-col gap-4">
+            <h2 id="company-news-title" className="font-semibold text-xl text-gray-100">Latest {symbol} news</h2>
+            <Suspense fallback={<NewsLoading />}>
+              <NewsList symbol={symbol} />
+            </Suspense>
+          </section>
 
           <TradingViewWidget
             scriptUrl={`${scriptUrl}technical-analysis.js`}
@@ -58,12 +97,6 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
             scriptUrl={`${scriptUrl}company-profile.js`}
             config={COMPANY_PROFILE_WIDGET_CONFIG(symbol)}
             height={440}
-          />
-
-          <TradingViewWidget
-            scriptUrl={`${scriptUrl}financials.js`}
-            config={COMPANY_FINANCIALS_WIDGET_CONFIG(symbol)}
-            height={464}
           />
         </div>
       </section>
