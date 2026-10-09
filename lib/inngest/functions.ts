@@ -15,21 +15,27 @@ export const sendSignUpEmail = inngest.createFunction(
 
         const prompt = PERSONALIZED_WELCOME_EMAIL_PROMPT.replace('{{userProfile}}', userProfile)
 
-        // Without a Gemini key, skip the AI step and send the default intro
+        // Without a Gemini key, or if Gemini keeps failing, send the default intro
         let response: Awaited<ReturnType<typeof step.ai.infer>> | null = null;
         if(process.env.GEMINI_API_KEY) {
-            response = await step.ai.infer('generate-welcome-intro', {
-                model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),
-                body: {
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [
-                                { text: prompt }
-                            ]
-                        }]
-                }
-            })
+            try {
+                response = await step.ai.infer('generate-welcome-intro', {
+                    // gemini-2.5-flash-lite (used in the video) is closed to new API keys;
+                    // this alias always points at Google's current Flash model
+                    model: step.ai.models.gemini({ model: 'gemini-flash-latest' }),
+                    body: {
+                        contents: [
+                            {
+                                role: 'user',
+                                parts: [
+                                    { text: prompt }
+                                ]
+                            }]
+                    }
+                })
+            } catch (e) {
+                console.error('Gemini welcome intro failed, using default intro', e);
+            }
         }
 
         await step.run('send-welcome-email', async () => {
