@@ -71,9 +71,9 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
           />
 
           <TradingViewWidget
-            scriptUrl={`${scriptUrl}financials.js`}
-            config={COMPANY_FINANCIALS_WIDGET_CONFIG(tradingViewSymbol)}
-            height={464}
+            scriptUrl={`${scriptUrl}technical-analysis.js`}
+            config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(symbol)}
+            height={400}
           />
         </div>
 
@@ -91,15 +91,18 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
           </section>
 
           <TradingViewWidget
-            scriptUrl={`${scriptUrl}technical-analysis.js`}
-            config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(symbol)}
-            height={400}
-          />
-
-          <TradingViewWidget
             scriptUrl={`${scriptUrl}symbol-profile.js`}
             config={COMPANY_PROFILE_WIDGET_CONFIG(tradingViewSymbol)}
             height={440}
+          />
+        </div>
+
+        {/* Full width, so TradingView has room to show its financial statements side by side */}
+        <div className="md:col-span-2">
+          <TradingViewWidget
+            scriptUrl={`${scriptUrl}financials.js`}
+            config={COMPANY_FINANCIALS_WIDGET_CONFIG(tradingViewSymbol)}
+            height={464}
           />
         </div>
       </section>
