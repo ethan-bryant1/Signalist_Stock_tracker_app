@@ -54,6 +54,9 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
   const { symbol: rawSymbol } = await params;
   const symbol = rawSymbol.toUpperCase();
   const [overview, isInWatchlist] = await Promise.all([getStockOverview(symbol), isStockInWatchlist(symbol)]);
+  // TradingView's profile and financials stay blank without the exchange (NASDAQ:AAPL), which Finnhub
+  // doesn't give for funds like SPY, so those boxes only show when it's known
+  const hasExchange = overview.tradingViewSymbol.includes(":");
 
   return (
     <div className="flex flex-col gap-8">
@@ -77,14 +80,16 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <Section title="Company profile" className="lg:col-span-2">
-          <TradingViewWidget
-            scriptUrl={`${TRADINGVIEW_SCRIPT_URL}symbol-profile.js`}
-            config={COMPANY_PROFILE_WIDGET_CONFIG(overview.tradingViewSymbol)}
-            height={440}
-          />
-        </Section>
-        <Section title="Technical analysis">
+        {hasExchange && (
+          <Section title="Company profile" className="lg:col-span-2">
+            <TradingViewWidget
+              scriptUrl={`${TRADINGVIEW_SCRIPT_URL}symbol-profile.js`}
+              config={COMPANY_PROFILE_WIDGET_CONFIG(overview.tradingViewSymbol)}
+              height={440}
+            />
+          </Section>
+        )}
+        <Section title="Technical analysis" className={cn(!hasExchange && "lg:col-span-3")}>
           <TradingViewWidget
             scriptUrl={`${TRADINGVIEW_SCRIPT_URL}technical-analysis.js`}
             config={TECHNICAL_ANALYSIS_WIDGET_CONFIG(symbol)}
@@ -94,13 +99,15 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
       </div>
 
       {/* Full width, so TradingView has room to show its financial statements side by side */}
-      <Section>
-        <TradingViewWidget
-          scriptUrl={`${TRADINGVIEW_SCRIPT_URL}financials.js`}
-          config={COMPANY_FINANCIALS_WIDGET_CONFIG(overview.tradingViewSymbol)}
-          height={464}
-        />
-      </Section>
+      {hasExchange && (
+        <Section>
+          <TradingViewWidget
+            scriptUrl={`${TRADINGVIEW_SCRIPT_URL}financials.js`}
+            config={COMPANY_FINANCIALS_WIDGET_CONFIG(overview.tradingViewSymbol)}
+            height={464}
+          />
+        </Section>
+      )}
     </div>
   );
 }
