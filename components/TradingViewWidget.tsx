@@ -8,7 +8,7 @@ import {cn} from "@/lib/utils";
 
 interface TradingViewWidgetProps {
     title?: string;
-    // When set, the title links to this page (used to open a homepage section on its own page)
+    // When set, the title opens this page in a new browser tab (used to open a homepage section on its own page)
     href?: string;
     scriptUrl: string;
     config: Record<string, unknown>;
@@ -24,7 +24,7 @@ const TradingViewWidget = ({ title, href, scriptUrl, config, height = 600, class
             {title && (
                 <h3 className="font-semibold text-2xl text-gray-100 mb-5">
                     {href ? (
-                        <Link href={href} className="group inline-flex items-center gap-2 hover:text-gray-400 transition-colors">
+                        <Link href={href} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center gap-2 hover:text-gray-400 transition-colors">
                             {title}
                             <ArrowUpRight className="h-5 w-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                         </Link>
