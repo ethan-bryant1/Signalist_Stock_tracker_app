@@ -8,7 +8,20 @@ import type { MarketSession } from "@/lib/actions/finnhub.actions";
 import { INDEX_ETFS, MACRO_ETFS } from "@/lib/data/markets";
 import { cn, formatChangePercent, getChangeColorClass } from "@/lib/utils";
 
-const STRIP_FUNDS = [...INDEX_ETFS, ...MACRO_ETFS];
+const [SPY, QQQ, DIA, IWM] = INDEX_ETFS;
+const [GLD, USO, TLT] = MACRO_ETFS;
+
+// Beside the market status, wider screens have room for more prices, so none is cut off part way.
+// Phones hide the status and scroll through every price instead.
+const STRIP_FUNDS: { symbol: string; label: string; className?: string }[] = [
+    SPY,
+    QQQ,
+    { ...DIA, className: "sm:hidden lg:block" },
+    { ...IWM, className: "sm:hidden lg:block" },
+    { ...GLD, className: "sm:hidden xl:block" },
+    { ...USO, className: "sm:hidden 2xl:block" },
+    { ...TLT, className: "sm:hidden 2xl:block" },
+];
 
 const SESSION_LABELS: Record<MarketSession, string> = {
     "pre-market": "Pre-market",
@@ -61,12 +74,12 @@ const MarketStrip = () => {
             <div className="container flex h-9 items-center gap-4 text-xs">
                 <ul
                     aria-label="Market prices"
-                    className="-ml-3 flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-hide [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)]"
+                    className="-ml-3 flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-hide max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)]"
                 >
-                    {STRIP_FUNDS.map(({ symbol, label: name }) => {
+                    {STRIP_FUNDS.map(({ symbol, label: name, className }) => {
                         const quote = quotes[symbol];
                         return (
-                            <li key={symbol} className="shrink-0 border-l border-gray-600 first:border-l-0">
+                            <li key={symbol} className={cn("shrink-0 border-l border-gray-600 first:border-l-0", className)}>
                                 <Link
                                     href={`/stocks/${symbol}`}
                                     title={`${name}, tracked with the ${symbol} fund. Open ${symbol}.`}
