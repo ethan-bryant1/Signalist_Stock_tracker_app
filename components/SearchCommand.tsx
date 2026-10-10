@@ -154,7 +154,7 @@ const ResultRow = ({ value, row, query, saved, onOpen, onToggleSaved }: {
         <span className="min-w-0 flex-1 truncate text-sm text-gray-400">
             <Highlighted text={row.name} query={query} />
         </span>
-        {row.type && <TypeBadge type={row.type} />}
+        {row.type ? <TypeBadge type={row.type} /> : <span className="w-10 shrink-0" />}
         {saved !== undefined && (
             <StarButton
                 symbol={row.symbol}
@@ -364,16 +364,27 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
     // S&P 500 matches straight away, then Finnhub's results merged in, best matches first
     const results = useMemo<Row[]>(() => {
         if (!term) return [];
-        const rank = createMatcher(term);
-        const ranked = new Map<string, { row: Row; rank: number; order: number }>();
+        const matchRank = createMatcher(term);
+        const sp500 = new Set((companies ?? []).map(({ symbol }) => symbol));
+        // An exact symbol comes first, then matches from the start of a symbol or name, then
+        // matches inside a name, then industries. Big S&P 500 companies lead within each group.
+        const score = (row: Row, industry?: string) => {
+            const rank = matchRank({ ...row, industry });
+            if (rank === 0) return 0;
+            if (rank === 1 || rank === 2) return sp500.has(row.symbol) ? 1 : 2;
+            if (rank === 3) return sp500.has(row.symbol) ? 3 : 4;
+            return rank === 4 ? 5 : 6;
+        };
+        const ranked = new Map<string, { row: Row; score: number; order: number }>();
 
         (companies ?? [])
-            .map((company) => ({ company, rank: rank(company) }))
+            .map((company) => ({ company, rank: matchRank(company) }))
             .filter((match) => match.rank >= 0)
             .sort((a, b) => a.rank - b.rank)
             .slice(0, MAX_INSTANT_MATCHES)
-            .forEach(({ company, rank }) => {
-                ranked.set(company.symbol, { row: { symbol: company.symbol, name: company.name, type: "Common Stock" }, rank, order: ranked.size });
+            .forEach(({ company }) => {
+                const row = { symbol: company.symbol, name: company.name, type: "Common Stock" };
+                ranked.set(company.symbol, { row, score: score(row, company.industry), order: ranked.size });
             });
 
         if (remote?.term === term) {
@@ -381,15 +392,12 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
                 const known = ranked.get(row.symbol);
                 // Keep the S&P list's tidier name, but Finnhub knows the kind of security
                 if (known) known.row = { ...known.row, type: row.type ?? known.row.type };
-                else {
-                    const score = rank(row);
-                    ranked.set(row.symbol, { row, rank: score < 0 ? 5 : score, order: ranked.size });
-                }
+                else ranked.set(row.symbol, { row, score: score(row), order: ranked.size });
             }
         }
 
         return [...ranked.values()]
-            .sort((a, b) => a.rank - b.rank || a.order - b.order)
+            .sort((a, b) => a.score - b.score || a.order - b.order)
             .slice(0, MAX_RESULTS)
             .map(({ row }) => row);
     }, [term, companies, remote]);
@@ -411,6 +419,7 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
 
     const sections: Section[] = (() => {
         if (term) {
+            if (!loading && filteredResults.length === 0) return [];
             return [{
                 id: "result",
                 title: filter === "all" ? "Best matches" : filterInfo.label,
@@ -588,7 +597,7 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
                             </button>
                         </div>
 
-                        {term && (
+                        {term && results.length > 0 && (
                             <div role="group" aria-label="Kind of security" className="flex items-center gap-1 overflow-x-auto border-b border-gray-600 px-3 py-2 scrollbar-hide">
                                 {visibleFilters.map(({ value, label }) => {
                                     const active = filter === value;
