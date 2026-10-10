@@ -16,11 +16,15 @@ const escapeHtml = (value: string) => value
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// Where the "Visit Loops Watch" links in emails go: the address the app runs on
+const appUrl = () => (process.env.BETTER_AUTH_URL || 'http://localhost:3000').replace(/\/+$/, '');
+
 export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData) => {
     // Replacer functions stop `$` in the values being read as replace() patterns
     const htmlTemplate = WELCOME_EMAIL_TEMPLATE
         .replace('{{name}}', () => escapeHtml(name))
-        .replace('{{intro}}', () => intro);
+        .replace('{{intro}}', () => intro)
+        .replaceAll('{{appUrl}}', appUrl);
 
     const mailOptions = {
         from: `"Loops Watch" <${process.env.NODEMAILER_EMAIL}>`,
@@ -38,7 +42,8 @@ export const sendNewsSummaryEmail = async (
 ): Promise<void> => {
     const htmlTemplate = NEWS_SUMMARY_EMAIL_TEMPLATE
         .replace('{{date}}', () => date)
-        .replace('{{newsContent}}', () => newsContent);
+        .replace('{{newsContent}}', () => newsContent)
+        .replaceAll('{{appUrl}}', appUrl);
 
     const mailOptions = {
         from: `"Loops Watch News" <${process.env.NODEMAILER_EMAIL}>`,

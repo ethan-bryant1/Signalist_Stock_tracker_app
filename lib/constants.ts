@@ -37,6 +37,9 @@ export const CONDITION_OPTIONS = [
 ];
 
 // TradingView Charts
+// Start of every TradingView embed script URL; add e.g. 'stock-heatmap.js'
+export const TRADINGVIEW_SCRIPT_URL = 'https://s3.tradingview.com/external-embedding/embed-widget-';
+
 export const MARKET_OVERVIEW_WIDGET_CONFIG = {
     colorTheme: 'dark', // dark mode
     dateRange: '12M', // last 12 months
@@ -132,8 +135,10 @@ export const MARKET_DATA_WIDGET_CONFIG = {
     locale: 'en',
     showSymbolLogo: true,
     colorTheme: 'dark',
+    // A solid background, so the column and group headers that stay put while the list scrolls
+    // hide the rows passing under them. Matches the dashboard panel (light mode swaps it in useTradingViewWidget).
     isTransparent: false,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: '#141414',
     symbolsGroups: [
         {
             name: 'Financial',
@@ -171,19 +176,76 @@ export const MARKET_DATA_WIDGET_CONFIG = {
 };
 
 
-export const SYMBOL_INFO_WIDGET_CONFIG = (symbol: string) => ({
-    symbol: symbol.toUpperCase(),
+// Larger versions of the homepage widgets for their own pages (/market-overview, /heatmap, ...)
+export const MARKET_OVERVIEW_PAGE_WIDGET_CONFIG = { ...MARKET_OVERVIEW_WIDGET_CONFIG, height: 700 };
+
+// The heatmap page's own toolbar picks the colors, sizes and grouping (components/HeatmapTerminal.tsx).
+// The map fills its box, so it can grow to full screen.
+export const HEATMAP_PAGE_WIDGET_CONFIG = {
+    ...HEATMAP_WIDGET_CONFIG,
+    width: '100%',
+    height: '100%',
+};
+
+export const TOP_STORIES_PAGE_WIDGET_CONFIG = { ...TOP_STORIES_WIDGET_CONFIG, height: '800' };
+
+// The Market Data page shows TradingView's stock screener: every US-listed stock, biggest first,
+// with tabs for performance, valuation and more, and a toolbar to sort and filter
+export const MARKET_DATA_PAGE_WIDGET_CONFIG = {
+    width: '100%',
+    height: 800,
+    defaultColumn: 'overview',
+    defaultScreen: 'most_capitalized',
+    market: 'america',
+    showToolbar: true,
     colorTheme: 'dark',
     isTransparent: true,
     locale: 'en',
-    width: '100%',
-    height: 170,
-});
+};
 
+// Live price list the Market Data page shows for a picked sector or a search.
+// The page fills in symbolsGroups with the matching stocks.
+export const MARKET_DATA_LIST_WIDGET_CONFIG = {
+    width: '100%',
+    locale: 'en',
+    showSymbolLogo: true,
+    colorTheme: 'dark',
+    isTransparent: true,
+};
+
+// Full chart on the Market Overview page. Its top toolbar lets you switch between
+// candles, bars, line and other chart types, and search for any symbol.
+export const MARKET_CHART_WIDGET_CONFIG = {
+    allow_symbol_change: true,
+    calendar: false,
+    details: false,
+    hide_side_toolbar: true,
+    hide_top_toolbar: false,
+    hide_legend: false,
+    hide_volume: false,
+    hotlist: false,
+    interval: 'D',
+    locale: 'en',
+    save_image: false,
+    style: 1, // candles
+    symbol: 'AMEX:SPY', // S&P 500 ETF
+    theme: 'dark',
+    timezone: 'Etc/UTC',
+    backgroundColor: '#141414',
+    gridColor: '#141414',
+    watchlist: [],
+    withdateranges: true,
+    compareSymbols: [],
+    studies: [],
+    width: '100%',
+    height: 700,
+};
+
+// Main chart on a stock's page. Its top toolbar switches between candles, line, baseline and other chart types.
 export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     allow_symbol_change: false,
     calendar: false,
-    details: true,
+    details: false,
     hide_side_toolbar: true,
     hide_top_toolbar: false,
     hide_legend: false,
@@ -199,37 +261,11 @@ export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     backgroundColor: '#141414',
     gridColor: '#141414',
     watchlist: [],
-    withdateranges: false,
+    withdateranges: true, // 1D, 5D, 1M, ... buttons under the chart
     compareSymbols: [],
     studies: [],
     width: '100%',
-    height: 600,
-});
-
-export const BASELINE_WIDGET_CONFIG = (symbol: string) => ({
-    allow_symbol_change: false,
-    calendar: false,
-    details: false,
-    hide_side_toolbar: true,
-    hide_top_toolbar: false,
-    hide_legend: false,
-    hide_volume: false,
-    hotlist: false,
-    interval: 'D',
-    locale: 'en',
-    save_image: false,
-    style: 10,
-    symbol: symbol.toUpperCase(),
-    theme: 'dark',
-    timezone: 'Etc/UTC',
-    backgroundColor: '#141414',
-    gridColor: '#141414',
-    watchlist: [],
-    withdateranges: false,
-    compareSymbols: [],
-    studies: [],
-    width: '100%',
-    height: 600,
+    height: 560,
 });
 
 export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({
@@ -238,7 +274,7 @@ export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({
     isTransparent: 'true',
     locale: 'en',
     width: '100%',
-    height: 400,
+    height: 440,
     interval: '1h',
     largeChartUrl: '',
 });
@@ -259,7 +295,7 @@ export const COMPANY_FINANCIALS_WIDGET_CONFIG = (symbol: string) => ({
     locale: 'en',
     width: '100%',
     height: 464,
-    displayMode: 'regular',
+    displayMode: 'adaptive', // fits the layout to the box width
     largeChartUrl: '',
 });
 

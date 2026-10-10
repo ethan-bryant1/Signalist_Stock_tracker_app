@@ -2,6 +2,7 @@
 
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
+import { INDEX_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { cache } from 'react';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -212,4 +213,253 @@ export async function getStockMarketData(symbol: string): Promise<StockMarketDat
     marketCap: profile?.marketCapitalization || undefined,
     peRatio: metrics?.metric?.peTTM ?? metrics?.metric?.peBasicExclExtraTTM ?? undefined,
   };
+}
+
+// Recent news about one company from the past week, newest first, without repeated headlines.
+// Returns null when the news can't be loaded, so the page can say so instead of "no news".
+export async function getCompanyNews(symbol: string, limit = 20): Promise<MarketNewsArticle[] | null> {
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getCompanyNews:', new Error('FINNHUB API key is not configured'));
+    return null;
+  }
+
+  const sym = symbol.toUpperCase();
+  const range = getDateRange(7);
+
+  try {
+    const url = `${FINNHUB_BASE_URL}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
+    const articles = await fetchJSON<RawNewsArticle[]>(url, 300);
+
+    const seen = new Set<string>();
+    return (Array.isArray(articles) ? articles : [])
+      // Only keep complete articles whose link is a normal web address
+      .filter((a) => a.headline?.trim() && a.datetime && a.url && /^https?:\/\//i.test(a.url))
+      .filter((a) => {
+        const key = a.headline!.trim().toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => b.datetime! - a.datetime!)
+      .slice(0, limit)
+      .map((a) => ({
+        id: a.id,
+        headline: a.headline!.trim(),
+        summary: a.summary?.trim() ?? '',
+        source: a.source || 'Company News',
+        url: a.url!,
+        datetime: a.datetime!,
+        category: 'company',
+        related: sym,
+        image: a.image || '',
+      }));
+  } catch (e) {
+    console.error('Error fetching company news for', sym, e);
+    return null;
+  }
+}
+
+// Turns Finnhub's exchange name (like "NASDAQ NMS - GLOBAL MARKET") into TradingView's prefix
+const toTradingViewExchange = (exchange?: string) => {
+  const name = exchange?.toUpperCase() ?? '';
+  if (name.includes('NASDAQ')) return 'NASDAQ';
+  if (name.includes('NYSE MKT') || name.includes('AMERICAN') || name.includes('ARCA')) return 'AMEX';
+  if (name.includes('NEW YORK STOCK EXCHANGE') || name === 'NYSE') return 'NYSE';
+  if (name.includes('CBOE') || name.includes('BATS')) return 'CBOE';
+  return undefined;
+};
+
+type FinnhubFullQuote = { c?: number; d?: number; dp?: number; h?: number; l?: number; o?: number; pc?: number };
+type FinnhubFullProfile = {
+  name?: string;
+  logo?: string;
+  exchange?: string;
+  finnhubIndustry?: string;
+  marketCapitalization?: number;
+  currency?: string;
+  weburl?: string;
+};
+type FinnhubAllMetrics = { metric?: Record<string, unknown> };
+
+export type StockOverview = {
+  symbol: string;
+  // Ticker with its exchange (NASDAQ:AAPL), which TradingView's profile and financials widgets need
+  tradingViewSymbol: string;
+  name?: string;
+  logo?: string;
+  exchange?: string;
+  industry?: string;
+  currency: string;
+  website?: string;
+  price?: number;
+  change?: number;
+  changePercent?: number;
+  open?: number;
+  previousClose?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  marketCap?: number; // in millions, as Finnhub returns it
+  peRatio?: number;
+  eps?: number;
+  dividendYield?: number; // percent
+  beta?: number;
+  week52High?: number;
+  week52Low?: number;
+};
+
+// Finnhub sometimes sends 0 or nothing for figures it doesn't have
+const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+const nonZero = (value: unknown) => num(value) || undefined;
+
+// Everything the top of a stock's page shows: name, logo, price and key figures.
+// Pieces that fail to load are left out, so the page still renders.
+export async function getStockOverview(symbol: string): Promise<StockOverview> {
+  const sym = symbol.toUpperCase();
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getStockOverview:', new Error('FINNHUB API key is not configured'));
+    return { symbol: sym, tradingViewSymbol: sym, currency: 'USD' };
+  }
+
+  const q = encodeURIComponent(sym);
+  const [quote, profile, metrics] = await Promise.all([
+    fetchJSON<FinnhubFullQuote>(`${FINNHUB_BASE_URL}/quote?symbol=${q}&token=${token}`, 60).catch((e) => {
+      console.error('Error fetching quote for', sym, e);
+      return null;
+    }),
+    fetchJSON<FinnhubFullProfile>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${q}&token=${token}`, 3600).catch((e) => {
+      console.error('Error fetching profile2 for', sym, e);
+      return null;
+    }),
+    fetchJSON<FinnhubAllMetrics>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${q}&metric=all&token=${token}`, 3600).catch((e) => {
+      console.error('Error fetching metrics for', sym, e);
+      return null;
+    }),
+  ]);
+
+  const m = metrics?.metric ?? {};
+  // Finnhub returns a price of 0 for symbols it has no quote for
+  const hasQuote = !!nonZero(quote?.c);
+  const prefix = toTradingViewExchange(profile?.exchange);
+
+  return {
+    symbol: sym,
+    tradingViewSymbol: prefix ? `${prefix}:${sym}` : sym,
+    name: profile?.name || undefined,
+    logo: profile?.logo || undefined,
+    exchange: prefix ?? (profile?.exchange || undefined),
+    industry: profile?.finnhubIndustry || undefined,
+    currency: profile?.currency || 'USD',
+    website: profile?.weburl && /^https?:\/\//i.test(profile.weburl) ? profile.weburl : undefined,
+    price: hasQuote ? num(quote?.c) : undefined,
+    change: hasQuote ? num(quote?.d) : undefined,
+    changePercent: hasQuote ? num(quote?.dp) : undefined,
+    open: hasQuote ? nonZero(quote?.o) : undefined,
+    previousClose: nonZero(quote?.pc),
+    dayHigh: hasQuote ? nonZero(quote?.h) : undefined,
+    dayLow: hasQuote ? nonZero(quote?.l) : undefined,
+    marketCap: nonZero(profile?.marketCapitalization) ?? nonZero(m.marketCapitalization),
+    peRatio: num(m.peTTM) ?? num(m.peBasicExclExtraTTM),
+    eps: num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM),
+    dividendYield: num(m.dividendYieldIndicatedAnnual) ?? num(m.currentDividendYieldTTM),
+    beta: num(m.beta),
+    week52High: nonZero(m['52WeekHigh']),
+    week52Low: nonZero(m['52WeekLow']),
+  };
+}
+
+export type MarketSession = 'pre-market' | 'regular' | 'post-market' | 'closed';
+
+export type MarketQuote = {
+  price?: number;
+  change?: number;
+  changePercent?: number;
+  dayHigh?: number;
+  dayLow?: number;
+};
+
+// Live figures for the dashboard and heatmap: whether the market is open, and prices for the index and sector funds
+export type MarketSnapshot = {
+  session: MarketSession;
+  holiday?: string;
+  quotes: Record<string, MarketQuote>;
+  // Time of the latest price, in milliseconds
+  asOf?: number;
+};
+
+type FinnhubMarketStatus = { isOpen?: boolean; session?: string | null; holiday?: string | null };
+
+// The US trading session from the New York clock: pre-market 4:00, open 9:30, close 16:00, after hours until 20:00.
+// Used when Finnhub's market status can't load; it doesn't know about holidays.
+const sessionFromClock = (date = new Date()): MarketSession => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  if (part('weekday') === 'Sat' || part('weekday') === 'Sun') return 'closed';
+
+  const minutes = Number(part('hour')) * 60 + Number(part('minute'));
+  if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
+  if (minutes >= 9 * 60 + 30 && minutes < 16 * 60) return 'regular';
+  if (minutes >= 16 * 60 && minutes < 20 * 60) return 'post-market';
+  return 'closed';
+};
+
+// Index fund prices, plus the sector funds when the page shows sector performance
+export async function getMarketSnapshot(includeSectors = false): Promise<MarketSnapshot> {
+  const symbols: string[] = [
+    ...INDEX_ETFS.map(({ symbol }) => symbol),
+    ...(includeSectors ? SECTOR_ETFS.map(({ symbol }) => symbol) : []),
+  ];
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getMarketSnapshot:', new Error('FINNHUB API key is not configured'));
+    return { session: sessionFromClock(), quotes: {} };
+  }
+
+  const [status, quotes] = await Promise.all([
+    fetchJSON<FinnhubMarketStatus>(`${FINNHUB_BASE_URL}/stock/market-status?exchange=US&token=${token}`, 60).catch((e) => {
+      console.error('Error fetching market status', e);
+      return null;
+    }),
+    Promise.all(
+      symbols.map((symbol) =>
+        fetchJSON<FinnhubFullQuote & { t?: number }>(`${FINNHUB_BASE_URL}/quote?symbol=${symbol}&token=${token}`, 60).catch((e) => {
+          console.error('Error fetching quote for', symbol, e);
+          return null;
+        })
+      )
+    ),
+  ]);
+
+  const snapshot: MarketSnapshot = { session: sessionFromClock(), quotes: {} };
+  if (status) {
+    const session = status.session;
+    snapshot.session = session === 'pre-market' || session === 'regular' || session === 'post-market'
+      ? session
+      : status.isOpen ? 'regular' : 'closed';
+    snapshot.holiday = status.holiday || undefined;
+  }
+
+  symbols.forEach((symbol, i) => {
+    const quote = quotes[i];
+    // Finnhub returns a price of 0 for symbols it has no quote for
+    if (!nonZero(quote?.c)) return;
+    snapshot.quotes[symbol] = {
+      price: num(quote?.c),
+      change: num(quote?.d),
+      changePercent: num(quote?.dp),
+      dayHigh: nonZero(quote?.h),
+      dayLow: nonZero(quote?.l),
+    };
+    const time = nonZero(quote?.t);
+    if (time && time * 1000 > (snapshot.asOf ?? 0)) snapshot.asOf = time * 1000;
+  });
+
+  return snapshot;
 }
