@@ -526,11 +526,13 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
                 type="button"
                 onClick={() => openSearch()}
                 aria-keyshortcuts="Control+K Meta+K"
-                className="hidden h-9 w-44 cursor-pointer items-center gap-2 rounded-full border border-gray-600 px-3.5 text-sm text-gray-500 transition-colors hover:border-gray-500 hover:text-gray-400 sm:flex md:w-64 lg:w-52 xl:w-72"
+                className="hidden h-9 w-40 cursor-pointer items-center gap-2 rounded-full border border-gray-600 px-3.5 text-sm text-gray-500 transition-colors hover:border-gray-500 hover:text-gray-400 sm:flex md:w-60 lg:w-40 xl:w-80"
             >
                 <Search className="size-4 shrink-0" />
-                <span className="truncate">Search symbol or company</span>
-                <span className="ml-auto hidden items-center gap-1 md:flex lg:hidden xl:flex" aria-hidden>
+                {/* The full hint where the box is wide enough, otherwise just "Search" */}
+                <span className="hidden truncate md:inline lg:hidden xl:inline">Search symbol or company</span>
+                <span className="md:hidden lg:inline xl:hidden">Search</span>
+                <span className="ml-auto hidden items-center gap-1 xl:flex" aria-hidden>
                     <Kbd>{modifierKey}</Kbd>
                     <Kbd>K</Kbd>
                 </span>
