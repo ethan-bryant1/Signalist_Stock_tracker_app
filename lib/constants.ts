@@ -135,7 +135,10 @@ export const MARKET_DATA_WIDGET_CONFIG = {
     locale: 'en',
     showSymbolLogo: true,
     colorTheme: 'dark',
-    isTransparent: true, // blends into the dashboard panel in both themes
+    // A solid background, so the column and group headers that stay put while the list scrolls
+    // hide the rows passing under them. Matches the dashboard panel (light mode swaps it in useTradingViewWidget).
+    isTransparent: false,
+    backgroundColor: '#141414',
     symbolsGroups: [
         {
             name: 'Financial',
