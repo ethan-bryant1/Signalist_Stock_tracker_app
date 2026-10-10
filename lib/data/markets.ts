@@ -8,6 +8,13 @@ export const INDEX_ETFS = [
     { symbol: "IWM", label: "Russell 2000" },
 ] as const;
 
+// Funds that follow gold, oil and long-term US government bonds, shown after the indexes in the header
+export const MACRO_ETFS = [
+    { symbol: "GLD", label: "Gold" },
+    { symbol: "USO", label: "Crude oil" },
+    { symbol: "TLT", label: "Treasuries" },
+] as const;
+
 // The SPDR fund that tracks each S&P 500 sector, so a sector's move is its fund's move
 export const SECTOR_ETFS: { sector: MarketSector; label: string; symbol: string }[] = [
     { sector: "Information Technology", label: "Technology", symbol: "XLK" },

@@ -2,7 +2,7 @@
 
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
-import { INDEX_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
+import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { cache } from 'react';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -448,10 +448,11 @@ const sessionFromClock = (date = new Date()): MarketSession => {
   return 'closed';
 };
 
-// Index fund prices, plus the sector funds when the page shows sector performance
+// Index, gold, oil and bond fund prices, plus the sector funds when the page shows sector performance
 export async function getMarketSnapshot(includeSectors = false): Promise<MarketSnapshot> {
   const symbols: string[] = [
     ...INDEX_ETFS.map(({ symbol }) => symbol),
+    ...MACRO_ETFS.map(({ symbol }) => symbol),
     ...(includeSectors ? SECTOR_ETFS.map(({ symbol }) => symbol) : []),
   ];
   const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;

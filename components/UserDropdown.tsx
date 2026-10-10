@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import NavItems from "@/components/NavItems";
 import { signOut } from "@/lib/actions/auth.actions";
 import { toast } from "sonner";
@@ -38,7 +38,7 @@ const UserDropdown = ({ user }: { user: User }) => {
                 render={
                     <Button
                         variant="ghost"
-                        className="flex items-center gap-3 text-gray-400 hover:text-gray-100"
+                        className="flex h-10 items-center gap-2 px-1.5 text-gray-400 hover:bg-gray-700 hover:text-gray-100"
                     />
                 }
             >
@@ -49,11 +49,10 @@ const UserDropdown = ({ user }: { user: User }) => {
                     </AvatarFallback>
                 </Avatar>
 
-                <div className="hidden flex-col items-start md:flex">
-          <span className="text-base font-medium text-gray-400">
-            {user.name}
-          </span>
-                </div>
+                <span className="hidden max-w-36 truncate text-sm font-medium text-gray-400 xl:block">
+                    {user.name}
+                </span>
+                <ChevronDown className="hidden h-4 w-4 text-gray-500 sm:block" />
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-auto min-w-(--anchor-width) text-gray-400">
@@ -90,11 +89,11 @@ const UserDropdown = ({ user }: { user: User }) => {
                     </DropdownMenuItem>
                 </DropdownMenuGroup>
 
-                {/* Only on phones, where the nav links follow below */}
-                <DropdownMenuSeparator className="bg-gray-600 sm:hidden" />
+                {/* Below large screens the header has no room for the menu, so it's listed here */}
+                <DropdownMenuSeparator className="bg-gray-600 lg:hidden" />
 
-                <nav className="sm:hidden">
-                    <NavItems />
+                <nav aria-label="Main" className="lg:hidden">
+                    <NavItems variant="menu" />
                 </nav>
             </DropdownMenuContent>
         </DropdownMenu>

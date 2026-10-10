@@ -172,12 +172,6 @@
   .home-section {
     @apply w-full gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3;
   }
-  .header {
-    @apply z-50 w-full h-[70px] bg-gray-800;
-  }
-  .header-wrapper {
-    @apply flex justify-between items-center h-full px-6 text-gray-500;
-  }
   .auth-layout {
     @apply flex flex-col justify-between lg:flex-row h-screen bg-gray-900 relative overflow-hidden;
   }
