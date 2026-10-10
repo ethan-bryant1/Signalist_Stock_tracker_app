@@ -20,7 +20,7 @@ const ThemeToggle = () => {
             onClick={toggle}
             aria-label={`Switch to ${next} theme`}
             title={`Switch to ${next} theme`}
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-100"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-100"
         >
             {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>

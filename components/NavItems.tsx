@@ -35,13 +35,13 @@ const NavItems = ({ variant = "bar" }: { variant?: "bar" | "menu" }) => {
                             href={href}
                             aria-current={active ? "page" : undefined}
                             className={cn(
-                                "relative flex items-center px-3 text-sm font-medium transition-colors",
+                                "relative flex items-center px-3 text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors xl:px-4",
                                 active ? "text-gray-100" : "text-gray-500 hover:text-gray-100"
                             )}
                         >
                             {label}
-                            {/* The open page's tab is underlined, like a trading platform's menu */}
-                            {active && <span aria-hidden className="absolute inset-x-3 bottom-0 h-0.5 rounded-t-full bg-gray-100" />}
+                            {/* The open page's tab is underlined with a hairline */}
+                            {active && <span aria-hidden className="absolute inset-x-3 bottom-0 h-px bg-gray-100 xl:inset-x-4" />}
                         </Link>
                     </li>
                 );

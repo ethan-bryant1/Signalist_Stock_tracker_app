@@ -70,7 +70,7 @@ const MarketStrip = () => {
     const label = session === "closed" && holiday ? `Closed for ${holiday}` : SESSION_LABELS[session];
 
     return (
-        <div className="border-b border-gray-600 bg-gray-900">
+        <div className="border-b border-gray-600/70">
             <div className="container flex h-9 items-center gap-4 text-xs">
                 <ul
                     aria-label="Market prices"

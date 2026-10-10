@@ -526,7 +526,7 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
                 type="button"
                 onClick={() => openSearch()}
                 aria-keyshortcuts="Control+K Meta+K"
-                className="hidden h-9 w-44 cursor-pointer items-center gap-2 rounded-lg border border-gray-600 bg-gray-900 px-3 text-sm text-gray-500 transition-colors hover:border-gray-500 hover:text-gray-400 sm:flex md:w-64 lg:w-56 xl:w-72"
+                className="hidden h-9 w-44 cursor-pointer items-center gap-2 rounded-full border border-gray-600 px-3.5 text-sm text-gray-500 transition-colors hover:border-gray-500 hover:text-gray-400 sm:flex md:w-64 lg:w-52 xl:w-72"
             >
                 <Search className="size-4 shrink-0" />
                 <span className="truncate">Search symbol or company</span>
@@ -539,7 +539,7 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
                 type="button"
                 onClick={() => openSearch()}
                 aria-label="Search stocks"
-                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-100 sm:hidden"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-100 sm:hidden"
             >
                 <Search className="size-5" />
             </button>

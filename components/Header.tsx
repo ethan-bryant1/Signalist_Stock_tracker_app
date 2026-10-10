@@ -8,15 +8,15 @@ import MarketStrip from "@/components/MarketStrip";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 
 // Two rows, like a trading platform: the menu bar with search and the account menu,
-// then a strip of live market prices
+// then a strip of live market prices. Both sit on one frosted surface divided by hairlines.
 const Header = async ({ user }: { user: User }) => {
     const initialStocks = await searchStocks();
 
     return (
-        <header className="sticky top-0 z-50 w-full">
-            <div className="border-b border-gray-600 bg-gray-800">
+        <header className="sticky top-0 z-50 w-full bg-gray-900/85 backdrop-blur-xl">
+            <div className="border-b border-gray-600/70">
                 <div className="container flex h-16 items-center justify-between gap-6">
-                    <div className="flex h-full min-w-0 items-center gap-5">
+                    <div className="flex h-full min-w-0 items-center gap-4 xl:gap-6">
                         <Link href="/" aria-label="Loops Watch dashboard" className="shrink-0">
                             <Logo className="h-11" />
                         </Link>
