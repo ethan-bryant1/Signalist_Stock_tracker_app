@@ -16,7 +16,11 @@ const NavItems = ({ variant = "bar" }: { variant?: "bar" | "menu" }) => {
             <ul className="flex flex-col gap-3 p-2 font-medium">
                 {NAV_ITEMS.map(({ href, label }) => (
                     <li key={href}>
-                        <Link href={href} className={cn("transition-colors hover:text-gray-100", isActive(href) && "text-gray-100")}>
+                        <Link
+                            href={href}
+                            aria-current={isActive(href) ? "page" : undefined}
+                            className={cn("transition-colors hover:text-gray-100", isActive(href) && "text-gray-100")}
+                        >
                             {label}
                         </Link>
                     </li>

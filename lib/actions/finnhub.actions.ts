@@ -4,6 +4,8 @@ import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { cache } from 'react';
+import { headers } from 'next/headers';
+import { getAuth } from '@/lib/better-auth/auth';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
@@ -99,6 +101,20 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
 
 type FinnhubProfile = { name?: string; ticker?: string; exchange?: string };
 
+// The search window's searches and quotes are server actions anyone could call with any text,
+// so they only answer signed-in users. That keeps strangers from using up the Finnhub plan's 60 requests a minute.
+const isSignedIn = cache(async (): Promise<boolean> => {
+  try {
+    const requestHeaders = await headers();
+    const auth = await getAuth();
+    const session = await auth.api.getSession({ headers: requestHeaders });
+    return !!session?.user;
+  } catch (e) {
+    console.error('Error checking the session:', e);
+    return false;
+  }
+});
+
 // Up to 20 US stocks and funds matching a symbol or company name, or the popular stocks when there's no search text
 export const searchStocks = cache(async (query?: string): Promise<StockWithWatchlistStatus[]> => {
   try {
@@ -108,6 +124,8 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
       console.error('Error in stock search:', new Error('FINNHUB API key is not configured'));
       return [];
     }
+
+    if (!(await isSignedIn())) return [];
 
     const trimmed = typeof query === 'string' ? query.trim().slice(0, 50) : '';
 
@@ -367,7 +385,7 @@ const fetchQuote = async (sym: string, token: string): Promise<StockQuote> => {
 export async function getStockQuote(symbol: string): Promise<StockQuote> {
   const sym = String(symbol ?? '').trim().toUpperCase();
   const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-  if (!token || !isValidSymbol(sym)) {
+  if (!token || !isValidSymbol(sym) || !(await isSignedIn())) {
     if (!token) console.error('getStockQuote:', new Error('FINNHUB API key is not configured'));
     return { symbol: sym, tradingViewSymbol: sym, currency: 'USD' };
   }

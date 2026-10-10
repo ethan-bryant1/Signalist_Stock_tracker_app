@@ -311,7 +311,7 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
             .catch(() => setWatchlist(null));
     };
 
-    // Ctrl+K (⌘K on a Mac) or / opens the search, and typing a letter anywhere starts a search with it
+    // Ctrl+K (⌘K on a Mac) or / opens the search
     const onShortcut = useEffectEvent((event: KeyboardEvent) => {
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
             event.preventDefault();
@@ -324,9 +324,6 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
         if (event.key === "/") {
             event.preventDefault();
             openSearch();
-        } else if (/^[a-z]$/i.test(event.key)) {
-            event.preventDefault();
-            openSearch(event.key);
         }
     });
 
