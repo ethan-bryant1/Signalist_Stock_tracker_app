@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import DayRange from "@/components/DayRange";
 import { useLiveMarket } from "@/components/LiveMarket";
 import { INDEX_ETFS } from "@/lib/data/markets";
 import type { MarketQuote } from "@/lib/actions/finnhub.actions";
@@ -24,27 +25,6 @@ const FlashingPrice = ({ value }: { value: number }) => {
         >
             {formatCurrency(value)}
         </span>
-    );
-};
-
-// Where today's price sits between the day's low and high
-const DayRange = ({ low, high, price }: { low: number; high: number; price: number }) => {
-    const position = high > low ? Math.min(Math.max((price - low) / (high - low), 0), 1) : 0.5;
-
-    return (
-        <div className="mt-4" title={`Day range ${formatCurrency(low)} – ${formatCurrency(high)}`}>
-            <div className="relative h-1 rounded-full bg-gray-700">
-                <span
-                    aria-hidden
-                    className="absolute top-1/2 h-2.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-100"
-                    style={{ left: `${position * 100}%` }}
-                />
-            </div>
-            <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-gray-500">
-                <span><span className="sr-only">Day low </span>{formatCurrency(low)}</span>
-                <span><span className="sr-only">Day high </span>{formatCurrency(high)}</span>
-            </div>
-        </div>
     );
 };
 

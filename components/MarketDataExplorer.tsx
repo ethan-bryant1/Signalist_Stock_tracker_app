@@ -5,8 +5,9 @@ import { Search, X } from "lucide-react";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import { OPEN_SEARCH_EVENT } from "@/components/SearchCommand";
 import { useDebounce } from "@/hooks/useDebounce";
-import { MARKET_SECTORS, SP500_COMPANIES, type MarketSector, type SectorCompany } from "@/lib/data/sp500";
+import { MARKET_SECTORS, SP500_COMPANIES, type MarketSector } from "@/lib/data/sp500";
 import { MARKET_DATA_LIST_WIDGET_CONFIG, MARKET_DATA_PAGE_WIDGET_CONFIG, TRADINGVIEW_SCRIPT_URL } from "@/lib/constants";
+import { createMatcher } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
 type SectorFilter = MarketSector | "All";
@@ -16,30 +17,6 @@ const COMPANY_BY_SYMBOL = new Map(SP500_COMPANIES.map((company) => [company.symb
 // Sizes of TradingView's quotes list (column headings, then one row per stock), in pixels
 const QUOTES_HEADER_HEIGHT = 60;
 const QUOTES_ROW_HEIGHT = 36;
-
-// Lets a ticker like BRK.B be typed as "brk b" or "brkb"
-const normalizeSymbol = (value: string) => value.toLowerCase().replace(/[\s.-]/g, "");
-
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-// Scores how well a company matches the search (lower is better), or -1 when it doesn't match.
-// Names and industries match from the start of a word, so "nv" finds Nvidia but not Invesco.
-const createMatcher = (query: string) => {
-    const typedSymbol = normalizeSymbol(query);
-    const typedName = query.toLowerCase();
-    const wordStart = new RegExp(`\\b${escapeRegExp(query)}`, "i");
-
-    return (company: SectorCompany) => {
-        const symbol = normalizeSymbol(company.symbol);
-
-        if (typedSymbol && symbol === typedSymbol) return 0;
-        if (typedSymbol && symbol.startsWith(typedSymbol)) return 1;
-        if (company.name.toLowerCase().startsWith(typedName)) return 2;
-        if (wordStart.test(company.name)) return 3;
-        if (wordStart.test(company.industry)) return 4;
-        return -1;
-    };
-};
 
 const SectorChip = ({ label, count, active, onClick }: { label: string; count?: number; active: boolean; onClick: () => void }) => (
     <button
