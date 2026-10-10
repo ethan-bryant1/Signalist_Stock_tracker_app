@@ -1,52 +1,12 @@
 'use client';
 
-import { useState } from "react";
 import Link from "next/link";
+import DayRange from "@/components/DayRange";
+import FlashingPrice from "@/components/FlashingPrice";
 import { useLiveMarket } from "@/components/LiveMarket";
 import { INDEX_ETFS } from "@/lib/data/markets";
 import type { MarketQuote } from "@/lib/actions/finnhub.actions";
-import { cn, formatChangePercent, formatCurrency, formatSignedNumber, getChangeColorClass } from "@/lib/utils";
-
-// Briefly tints a price green or red when a refresh moves it, like a trading screen does
-const FlashingPrice = ({ value }: { value: number }) => {
-    const [tracked, setTracked] = useState<{ value: number; direction?: "up" | "down" }>({ value });
-    if (tracked.value !== value) setTracked({ value, direction: value > tracked.value ? "up" : "down" });
-
-    return (
-        <span
-            // A new key restarts the animation on every change
-            key={value}
-            className={cn(
-                "-mx-1 rounded px-1",
-                tracked.direction === "up" && "price-flash-up",
-                tracked.direction === "down" && "price-flash-down"
-            )}
-        >
-            {formatCurrency(value)}
-        </span>
-    );
-};
-
-// Where today's price sits between the day's low and high
-const DayRange = ({ low, high, price }: { low: number; high: number; price: number }) => {
-    const position = high > low ? Math.min(Math.max((price - low) / (high - low), 0), 1) : 0.5;
-
-    return (
-        <div className="mt-4" title={`Day range ${formatCurrency(low)} – ${formatCurrency(high)}`}>
-            <div className="relative h-1 rounded-full bg-gray-700">
-                <span
-                    aria-hidden
-                    className="absolute top-1/2 h-2.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-100"
-                    style={{ left: `${position * 100}%` }}
-                />
-            </div>
-            <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-gray-500">
-                <span><span className="sr-only">Day low </span>{formatCurrency(low)}</span>
-                <span><span className="sr-only">Day high </span>{formatCurrency(high)}</span>
-            </div>
-        </div>
-    );
-};
+import { cn, formatChangePercent, formatSignedNumber, getChangeColorClass } from "@/lib/utils";
 
 const IndexTile = ({ symbol, label, quote }: { symbol: string; label: string; quote?: MarketQuote }) => {
     const { price, change, changePercent, dayLow, dayHigh } = quote ?? {};

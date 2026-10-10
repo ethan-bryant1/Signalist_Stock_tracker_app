@@ -5,7 +5,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 // Company logo on a white tile, or the ticker's first letters when there's no logo or it fails to load
-const StockLogo = ({ symbol, logo }: { symbol: string; logo?: string }) => {
+const StockLogo = ({ symbol, logo, className }: { symbol: string; logo?: string; className?: string }) => {
     const [failed, setFailed] = useState(false);
     const showLogo = !!logo?.startsWith("https://") && !failed;
 
@@ -13,7 +13,8 @@ const StockLogo = ({ symbol, logo }: { symbol: string; logo?: string }) => {
         <span
             className={cn(
                 "flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl",
-                showLogo ? "bg-white p-2" : "bg-gray-700 text-lg font-semibold text-gray-100"
+                showLogo ? "bg-white p-2" : "bg-gray-700 text-lg font-semibold text-gray-100",
+                className
             )}
         >
             {showLogo ? (

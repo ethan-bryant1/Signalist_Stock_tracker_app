@@ -2,8 +2,10 @@
 
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
-import { INDEX_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
+import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { cache } from 'react';
+import { headers } from 'next/headers';
+import { getAuth } from '@/lib/better-auth/auth';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
@@ -99,6 +101,21 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
 
 type FinnhubProfile = { name?: string; ticker?: string; exchange?: string };
 
+// The search window's searches and quotes are server actions anyone could call with any text,
+// so they only answer signed-in users. That keeps strangers from using up the Finnhub plan's 60 requests a minute.
+const isSignedIn = cache(async (): Promise<boolean> => {
+  try {
+    const requestHeaders = await headers();
+    const auth = await getAuth();
+    const session = await auth.api.getSession({ headers: requestHeaders });
+    return !!session?.user;
+  } catch (e) {
+    console.error('Error checking the session:', e);
+    return false;
+  }
+});
+
+// Up to 20 US stocks and funds matching a symbol or company name, or the popular stocks when there's no search text
 export const searchStocks = cache(async (query?: string): Promise<StockWithWatchlistStatus[]> => {
   try {
     const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
@@ -108,9 +125,11 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
       return [];
     }
 
-    const trimmed = typeof query === 'string' ? query.trim() : '';
+    if (!(await isSignedIn())) return [];
 
-    let results: (FinnhubSearchResult & { exchange?: string })[] = [];
+    const trimmed = typeof query === 'string' ? query.trim().slice(0, 50) : '';
+
+    let results: { symbol: string; name: string; exchange?: string; type?: string }[] = [];
 
     if (!trimmed) {
       // Fetch top 10 popular symbols' profiles
@@ -130,35 +149,41 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
       );
 
       results = profiles.flatMap(({ sym, profile }) => {
-        const symbol = sym.toUpperCase();
         const name = profile?.name || profile?.ticker;
         if (!name) return [];
         return [{
-          symbol,
-          description: name,
-          displaySymbol: symbol,
+          symbol: sym.toUpperCase(),
+          name,
           type: 'Common Stock',
-          exchange: profile?.exchange,
+          exchange: toTradingViewExchange(profile?.exchange) ?? profile?.exchange,
         }];
       });
     } else {
-      const url = `${FINNHUB_BASE_URL}/search?q=${encodeURIComponent(trimmed)}&token=${token}`;
+      // Only US listings, since those are the ones Finnhub's free plan has prices for
+      const url = `${FINNHUB_BASE_URL}/search?q=${encodeURIComponent(trimmed)}&exchange=US&token=${token}`;
       const data = await fetchJSON<FinnhubSearchResponse>(url, 1800);
-      results = Array.isArray(data?.result) ? data.result : [];
+      results = (Array.isArray(data?.result) ? data.result : []).map((r) => ({
+        symbol: r.symbol,
+        name: r.description,
+        type: r.type,
+      }));
     }
 
+    const seen = new Set<string>();
     return results
-      .map((r) => {
+      .flatMap((r) => {
         const upper = (r.symbol || '').toUpperCase();
-        return {
+        if (!upper || seen.has(upper)) return [];
+        seen.add(upper);
+        return [{
           symbol: upper,
-          name: r.description || upper,
-          exchange: r.exchange || r.displaySymbol || 'US',
-          type: r.type || 'Stock',
+          name: r.name || upper,
+          exchange: r.exchange || 'US',
+          type: r.type || 'Common Stock',
           isInWatchlist: false,
-        };
+        }];
       })
-      .slice(0, 15);
+      .slice(0, 20);
   } catch (err) {
     console.error('Error in stock search:', err);
     return [];
@@ -312,18 +337,16 @@ export type StockOverview = {
 const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
 const nonZero = (value: unknown) => num(value) || undefined;
 
-// Everything the top of a stock's page shows: name, logo, price and key figures.
-// Pieces that fail to load are left out, so the page still renders.
-export async function getStockOverview(symbol: string): Promise<StockOverview> {
-  const sym = symbol.toUpperCase();
-  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-  if (!token) {
-    console.error('getStockOverview:', new Error('FINNHUB API key is not configured'));
-    return { symbol: sym, tradingViewSymbol: sym, currency: 'USD' };
-  }
+// A stock's price today with its name, logo and exchange: what the search window previews
+export type StockQuote = Omit<StockOverview, 'peRatio' | 'eps' | 'dividendYield' | 'beta' | 'week52High' | 'week52Low'>;
 
+// Tickers are letters and digits, sometimes with a dot or dash (BRK.B)
+const isValidSymbol = (symbol: string) => /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(symbol);
+
+// The quote is kept for a minute and the profile for an hour, shared by every page that asks
+const fetchQuote = async (sym: string, token: string): Promise<StockQuote> => {
   const q = encodeURIComponent(sym);
-  const [quote, profile, metrics] = await Promise.all([
+  const [quote, profile] = await Promise.all([
     fetchJSON<FinnhubFullQuote>(`${FINNHUB_BASE_URL}/quote?symbol=${q}&token=${token}`, 60).catch((e) => {
       console.error('Error fetching quote for', sym, e);
       return null;
@@ -332,13 +355,8 @@ export async function getStockOverview(symbol: string): Promise<StockOverview> {
       console.error('Error fetching profile2 for', sym, e);
       return null;
     }),
-    fetchJSON<FinnhubAllMetrics>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${q}&metric=all&token=${token}`, 3600).catch((e) => {
-      console.error('Error fetching metrics for', sym, e);
-      return null;
-    }),
   ]);
 
-  const m = metrics?.metric ?? {};
   // Finnhub returns a price of 0 for symbols it has no quote for
   const hasQuote = !!nonZero(quote?.c);
   const prefix = toTradingViewExchange(profile?.exchange);
@@ -359,7 +377,45 @@ export async function getStockOverview(symbol: string): Promise<StockOverview> {
     previousClose: nonZero(quote?.pc),
     dayHigh: hasQuote ? nonZero(quote?.h) : undefined,
     dayLow: hasQuote ? nonZero(quote?.l) : undefined,
-    marketCap: nonZero(profile?.marketCapitalization) ?? nonZero(m.marketCapitalization),
+    marketCap: nonZero(profile?.marketCapitalization),
+  };
+};
+
+// The price and company details the search window shows for the highlighted stock
+export async function getStockQuote(symbol: string): Promise<StockQuote> {
+  const sym = String(symbol ?? '').trim().toUpperCase();
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token || !isValidSymbol(sym) || !(await isSignedIn())) {
+    if (!token) console.error('getStockQuote:', new Error('FINNHUB API key is not configured'));
+    return { symbol: sym, tradingViewSymbol: sym, currency: 'USD' };
+  }
+
+  return fetchQuote(sym, token);
+}
+
+// Everything the top of a stock's page shows: name, logo, price and key figures.
+// Pieces that fail to load are left out, so the page still renders.
+export async function getStockOverview(symbol: string): Promise<StockOverview> {
+  const sym = symbol.toUpperCase();
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getStockOverview:', new Error('FINNHUB API key is not configured'));
+    return { symbol: sym, tradingViewSymbol: sym, currency: 'USD' };
+  }
+
+  const [quote, metrics] = await Promise.all([
+    fetchQuote(sym, token),
+    fetchJSON<FinnhubAllMetrics>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(sym)}&metric=all&token=${token}`, 3600).catch((e) => {
+      console.error('Error fetching metrics for', sym, e);
+      return null;
+    }),
+  ]);
+
+  const m = metrics?.metric ?? {};
+
+  return {
+    ...quote,
+    marketCap: quote.marketCap ?? nonZero(m.marketCapitalization),
     peRatio: num(m.peTTM) ?? num(m.peBasicExclExtraTTM),
     eps: num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM),
     dividendYield: num(m.dividendYieldIndicatedAnnual) ?? num(m.currentDividendYieldTTM),
@@ -410,10 +466,11 @@ const sessionFromClock = (date = new Date()): MarketSession => {
   return 'closed';
 };
 
-// Index fund prices, plus the sector funds when the page shows sector performance
+// Index, gold, oil and bond fund prices, plus the sector funds when the page shows sector performance
 export async function getMarketSnapshot(includeSectors = false): Promise<MarketSnapshot> {
   const symbols: string[] = [
     ...INDEX_ETFS.map(({ symbol }) => symbol),
+    ...MACRO_ETFS.map(({ symbol }) => symbol),
     ...(includeSectors ? SECTOR_ETFS.map(({ symbol }) => symbol) : []),
   ];
   const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;

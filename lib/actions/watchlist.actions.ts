@@ -54,6 +54,21 @@ export async function isStockInWatchlist(symbol: string): Promise<boolean> {
   }
 }
 
+// The signed-in user's saved stocks, newest first, without prices (for the search window's stars)
+export async function getWatchlistSymbols(): Promise<{ symbol: string; company: string }[]> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return [];
+
+    await connectToDatabase();
+    const items = await Watchlist.find({ userId }, { symbol: 1, company: 1 }).sort({ addedAt: -1 }).lean();
+    return items.map((item) => ({ symbol: String(item.symbol), company: String(item.company || item.symbol) }));
+  } catch (err) {
+    console.error('getWatchlistSymbols error:', err);
+    throw new Error('Could not load the watchlist');
+  }
+}
+
 export async function addToWatchlist(symbol: string, company: string): Promise<{ success: boolean }> {
   try {
     const userId = await getCurrentUserId();

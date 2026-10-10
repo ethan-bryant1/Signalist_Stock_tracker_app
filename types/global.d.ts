@@ -86,12 +86,6 @@ declare global {
         onWatchlistChange?: (symbol: string, isAdded: boolean) => void;
     };
 
-    type SearchCommandProps = {
-        renderAs?: 'button' | 'text';
-        label?: string;
-        initialStocks: StockWithWatchlistStatus[];
-    };
-
     type AlertFormData = {
         alertName: string;
         alertType: 'price' | 'volume';
