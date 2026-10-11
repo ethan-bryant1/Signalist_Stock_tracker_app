@@ -1,74 +1,43 @@
 'use client';
 
 import { memo, useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import HeatmapCard, { type InspectSource } from "@/components/HeatmapCard";
-import { getHeatmapData, type HeatmapStock } from "@/lib/actions/finnhub.actions";
-import { MARKET_SECTORS } from "@/lib/data/sp500";
-import { ARROW_DIRECTIONS, FULL_COLOR_AT, nearestInDirection, placeBesideRect, placeNearPoint, tileBackground } from "@/lib/heatmap";
-import { layoutGroups, type Placed, type TreemapGroup } from "@/lib/treemap";
+import { useTextMeasure } from "@/hooks/useTextMeasure";
+import { SECTOR_BY_NAME } from "@/lib/data/markets";
+import {
+    ARROW_DIRECTIONS,
+    HEADING_FONT_SIZE,
+    LINE_HEIGHT,
+    fitHeading,
+    fitTileContent,
+    nearestInDirection,
+    placeBesideRect,
+    placeNearPoint,
+    tileBackground,
+    type TileContent,
+} from "@/lib/heatmap";
+import { quotePeriodPhrase, type Freshness, type HeatmapStock } from "@/lib/market-data";
+import { layoutGroups, type Placed, type Rect, type TreemapGroup } from "@/lib/treemap";
 import { cn, formatChangePercent, formatCurrency, formatMarketCapValue } from "@/lib/utils";
 
-// Prices refresh on the server every two to three minutes; checking each minute shows them soon after
-const REFRESH_MS = 60_000;
-// Space between sectors, and the height of each sector's name above its stocks
+// Space between sectors, and the height of each sector's name above its stocks. A name that can be clicked gets a
+// strip 24px tall, the smallest comfortable touch target, since the stocks start right below it.
 const SECTOR_GAP = 3;
 const LABEL_HEIGHT = 18;
-const LEGEND_STEPS = [-FULL_COLOR_AT, -2, -1, 0, 1, 2, FULL_COLOR_AT];
+const INTERACTIVE_LABEL_HEIGHT = 24;
 
-const SECTOR_LABELS = new Map<string, string>(MARKET_SECTORS.map(({ value, label }) => [value, label]));
-
-const NEW_YORK_TIME = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+export type SizeMetric = "cap" | "equal";
 
 type Inspect = { symbol: string; source: InspectSource };
 type Tile = Placed<HeatmapStock>;
 type Size = { width: number; height: number };
 
-// A refresh only replaces the figures that came back, so a stock whose price failed to load keeps its last one
-const mergeStocks = (previous: HeatmapStock[], next: HeatmapStock[]) => {
-    const bySymbol = new Map(previous.map((stock) => [stock.symbol, stock]));
-    for (const stock of next) {
-        const received = Object.fromEntries(Object.entries(stock).filter(([, value]) => value !== undefined));
-        bySymbol.set(stock.symbol, { ...bySymbol.get(stock.symbol), ...received } as HeatmapStock);
-    }
-    return [...bySymbol.values()];
-};
-
-// Keeps the map's figures up to date while the tab is open
-const useHeatmapStocks = (initial: HeatmapStock[]) => {
-    const [stocks, setStocks] = useState(initial);
-
-    useEffect(() => {
-        let cancelled = false;
-        let lastRefresh = Date.now();
-
-        const refresh = async () => {
-            if (document.visibilityState !== "visible") return;
-            lastRefresh = Date.now();
-            try {
-                const next = await getHeatmapData();
-                if (!cancelled && next.length) setStocks((previous) => mergeStocks(previous, next));
-            } catch (e) {
-                console.error("Couldn't refresh the heatmap", e);
-            }
-        };
-
-        // Catch up straight away when coming back to a tab that sat in the background
-        const onVisibilityChange = () => {
-            if (document.visibilityState === "visible" && Date.now() - lastRefresh >= REFRESH_MS) refresh();
-        };
-
-        const timer = window.setInterval(refresh, REFRESH_MS);
-        document.addEventListener("visibilitychange", onVisibilityChange);
-        return () => {
-            cancelled = true;
-            window.clearInterval(timer);
-            document.removeEventListener("visibilitychange", onVisibilityChange);
-        };
-    }, []);
-
-    return stocks;
-};
+// The stocks a market-cap map can't place because Finnhub sent no market cap for them. They're listed under
+// the map rather than drawn at a made-up size.
+export const unplacedStocks = (stocks: readonly HeatmapStock[], sizeBy: SizeMetric) =>
+    sizeBy === "cap" ? stocks.filter((stock) => !stock.marketCap) : [];
 
 // The map's size in whole pixels, measured before the browser paints
 const useElementSize = (ref: React.RefObject<HTMLElement | null>) => {
@@ -89,106 +58,260 @@ const useElementSize = (ref: React.RefObject<HTMLElement | null>) => {
     return size;
 };
 
-// What fits on a tile: nothing on slivers, the ticker on small ones, the ticker and move on the rest
-const labelSize = ({ width, height }: Size) =>
-    width >= 150 && height >= 100 ? "xl" : width >= 84 && height >= 52 ? "lg" : width >= 46 && height >= 32 ? "md" : width >= 28 && height >= 15 ? "sm" : null;
+const FRESHNESS_TEXT: Record<Freshness, string> = { fresh: "", stale: "price may be out of date", missing: "price unavailable" };
 
-const TICKER_CLASSES = { xl: "text-2xl", lg: "text-[15px]", md: "text-[11px]", sm: "text-[9px]" } as const;
-const MOVE_CLASSES = { xl: "mt-0.5 text-base", lg: "text-xs", md: "text-[10px]" } as const;
-
-// What a screen reader announces for a tile, which also covers the card's main figures
-const describeStock = ({ name, symbol, price, currency, changePercent, marketCap, sector }: HeatmapStock) =>
-    [
+// What a screen reader announces for a tile, which covers the hover card's figures. The change is described by
+// the stock's own price time, so a stock that hasn't refreshed yet isn't said to have moved "today".
+const describeStock = (stock: HeatmapStock, freshness: Freshness, periodText: string, now: number) => {
+    const { name, symbol, quote, marketCap, sector } = stock;
+    const change = quote?.changePercent;
+    const rounded = change !== undefined ? Math.round(change * 100) / 100 : undefined;
+    const when = quotePeriodPhrase(quote?.time, now, periodText);
+    return [
         `${name} (${symbol})`,
-        price !== undefined ? formatCurrency(price, currency) : "price unavailable",
-        changePercent !== undefined ? `${changePercent > 0 ? "up" : changePercent < 0 ? "down" : "unchanged"} ${Math.abs(changePercent).toFixed(2)}% today` : undefined,
+        quote ? formatCurrency(quote.price) : undefined,
+        rounded !== undefined ? `${rounded > 0 ? "up" : rounded < 0 ? "down" : "unchanged"} ${Math.abs(rounded).toFixed(2)}% ${when}` : undefined,
         marketCap ? `market cap ${formatMarketCapValue(marketCap)}` : undefined,
-        SECTOR_LABELS.get(sector) ?? sector,
+        sector,
+        FRESHNESS_TEXT[freshness] || undefined,
     ].filter(Boolean).join(", ");
+};
 
-// The sector names and stock tiles. Memoized, so moving the mouse between tiles only updates the card;
-// the hover outline is plain CSS.
-const HeatmapTiles = memo(function HeatmapTiles({
-    groups,
-    tabbableSymbol,
-    selectedSymbol,
-    onTileClick,
-    onTileFocus,
-}: {
+// Diagonal stripes over a tile whose price is old or missing, so it never passes for a current price. They're dark,
+// so the white text over them only gains contrast (tests/heatmap-colors.test.ts checks the striped colors too).
+// Keep these in step with the patterns below (Tailwind needs the classes written out in full).
+export const STALE_STRIPE_ALPHA = 0.3;
+export const MISSING_STRIPE_ALPHA = 0.26;
+const FRESHNESS_PATTERN: Record<Freshness, string | undefined> = {
+    fresh: undefined,
+    stale: "bg-[repeating-linear-gradient(135deg,transparent_0_5px,rgb(0_0_0/0.3)_5px_7px)]",
+    missing: "bg-[repeating-linear-gradient(135deg,transparent_0_4px,rgb(0_0_0/0.26)_4px_8px)]",
+};
+
+// A logo on a tile. It stays invisible until it has loaded (so no empty white square shows while it loads) and
+// is left out, not replaced by initials, when it fails, since the ticker is right below it.
+const TileLogo = ({ src, size }: { src: string; size: number }) => {
+    const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+    if (state === "failed") return null;
+    return (
+        <span
+            className={cn("mb-[5px] flex shrink-0 items-center justify-center overflow-hidden rounded-[5px] p-[3px]", state === "loaded" ? "bg-white" : "opacity-0")}
+            style={{ width: size, height: size }}
+        >
+            <Image src={src} alt="" width={size} height={size} unoptimized loading="eager" onLoad={() => setState("loaded")} onError={() => setState("failed")} className="h-full w-full object-contain" />
+        </span>
+    );
+};
+
+type TileProps = {
+    stock: HeatmapStock;
+    rect: Rect;
+    content: TileContent | null;
+    freshness: Freshness;
+    tabbable: boolean;
+    selected: boolean;
+    action: "open" | "select";
+    showLogo: boolean;
+    label: string;
+    onLinkClick: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+};
+
+// Layout and label fitting make new objects on every refresh, so tiles compare them by value
+const sameRect = (a: Rect, b: Rect) => a === b || (a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height);
+const sameContent = (a: TileContent | null, b: TileContent | null) =>
+    a === b || (!!a && !!b && a.logo === b.logo && a.tickerSize === b.tickerSize && a.valueSize === b.valueSize);
+const sameTile = (a: TileProps, b: TileProps) =>
+    a.stock === b.stock && sameRect(a.rect, b.rect) && sameContent(a.content, b.content) && a.freshness === b.freshness && a.tabbable === b.tabbable
+    && a.selected === b.selected && a.action === b.action && a.showLogo === b.showLogo && a.label === b.label && a.onLinkClick === b.onLinkClick;
+
+// One stock's rectangle. Memoized, so a quote refresh or a moving cursor only redraws the tiles that changed.
+const HeatmapTile = memo(function HeatmapTile({ stock, rect, content, freshness, tabbable, selected, action, showLogo, label, onLinkClick }: TileProps) {
+    const change = stock.quote?.changePercent;
+    const value = change !== undefined ? formatChangePercent(change) : "—";
+    const className = cn(
+        "absolute flex flex-col items-center justify-center overflow-hidden whitespace-nowrap text-center text-white outline-none [text-shadow:0_1px_2px_rgb(0_0_0/0.3)]",
+        // A crisp outline in the theme's text color marks the stock under the cursor or keyboard
+        "hover:z-10 hover:shadow-[inset_0_0_0_2px_var(--color-gray-100)] focus-visible:z-10 focus-visible:shadow-[inset_0_0_0_2px_var(--color-gray-100),inset_0_0_0_3px_var(--color-gray-900)]",
+        action === "select" ? "cursor-pointer" : undefined,
+        FRESHNESS_PATTERN[freshness]
+    );
+    const style: React.CSSProperties = {
+        left: rect.x,
+        top: rect.y,
+        // A pixel less than the box, so the gaps between tiles show as hairlines
+        width: Math.max(rect.width - 1, 0),
+        height: Math.max(rect.height - 1, 0),
+        backgroundColor: tileBackground(freshness === "missing" ? undefined : change),
+    };
+    const body = content && (
+        <>
+            {content.logo > 0 && showLogo && stock.logo && <TileLogo src={stock.logo} size={content.logo} />}
+            <span className="font-semibold" style={{ fontSize: content.tickerSize, lineHeight: LINE_HEIGHT }}>{stock.symbol}</span>
+            {content.valueSize > 0 && (
+                <span className="mt-px font-medium tabular-nums opacity-95" style={{ fontSize: content.valueSize, lineHeight: LINE_HEIGHT }}>{value}</span>
+            )}
+        </>
+    );
+
+    if (action === "open") {
+        return (
+            <Link
+                href={`/stocks/${encodeURIComponent(stock.symbol)}`}
+                prefetch={false}
+                data-symbol={stock.symbol}
+                tabIndex={tabbable ? 0 : -1}
+                aria-label={label}
+                onClick={onLinkClick}
+                className={className}
+                style={style}
+            >
+                {body}
+            </Link>
+        );
+    }
+    return (
+        <button type="button" data-symbol={stock.symbol} tabIndex={tabbable ? 0 : -1} aria-label={label} aria-current={selected || undefined} className={className} style={style}>
+            {body}
+        </button>
+    );
+}, sameTile);
+
+type HeadingProps = {
+    group: TreemapGroup<HeatmapStock>;
+    text: string | null;
+    height: number;
+    // Clicking a heading zooms into that sector: on the Heatmap page in place, from the dashboard by opening that page
+    onFocusSector?: (sector: string) => void;
+    sectorHref?: (sector: string) => string;
+};
+
+const sameHeading = (a: HeadingProps, b: HeadingProps) =>
+    a.group.key === b.group.key && a.group.label === b.group.label && sameRect(a.group.rect, b.group.rect) && a.text === b.text && a.height === b.height
+    && a.onFocusSector === b.onFocusSector && a.sectorHref === b.sectorHref;
+
+const SectorHeading = memo(function SectorHeading({ group, text, height, onFocusSector, sectorHref }: HeadingProps) {
+    const style: React.CSSProperties = { left: group.rect.x, top: group.rect.y, width: group.rect.width, height, fontSize: HEADING_FONT_SIZE };
+    const className = "absolute flex items-center overflow-hidden whitespace-nowrap px-1.5 font-semibold uppercase tracking-[0.08em] text-gray-500";
+    const interactive = "cursor-pointer rounded-sm text-left transition-colors hover:bg-gray-700/70 hover:text-gray-100";
+    // Sectors can also be focused from the Sector ETFs list and the selected stock's panel, so headings stay out of
+    // the Tab order and the map remains one stop for keyboard users
+    if (onFocusSector) {
+        return (
+            <button type="button" tabIndex={-1} title={`Focus ${group.label}`} aria-label={`Focus ${group.label}`} onClick={() => onFocusSector(group.key)} className={cn(className, interactive)} style={style}>
+                {text}
+            </button>
+        );
+    }
+    if (sectorHref) {
+        return (
+            <Link href={sectorHref(group.key)} prefetch={false} tabIndex={-1} title={`Open ${group.label} on the Heatmap page`} className={cn(className, interactive)} style={style}>
+                {text}
+            </Link>
+        );
+    }
+    return <div aria-hidden title={group.label} className={className} style={style}>{text}</div>;
+}, sameHeading);
+
+type TileLayerProps = {
     groups: TreemapGroup<HeatmapStock>[];
+    tiles: Tile[];
+    contents: ReadonlyMap<string, TileContent | null>;
+    headings: ReadonlyMap<string, string | null>;
+    labels: ReadonlyMap<string, string>;
+    freshness: ReadonlyMap<string, Freshness>;
     tabbableSymbol?: string;
     selectedSymbol?: string;
-    onTileClick: (event: React.MouseEvent<HTMLAnchorElement>) => void;
-    onTileFocus: (event: React.FocusEvent<HTMLAnchorElement>) => void;
-}) {
+    headingHeight: number;
+    action: "open" | "select";
+    showLogos: boolean;
+    onLinkClick: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+    onFocusSector?: (sector: string) => void;
+    sectorHref?: (sector: string) => string;
+};
+
+// All the headings and tiles. Memoized as a whole, so moving the cursor (which only changes the card) skips them.
+// Tiles are in the DOM in the order they were given (not their place on the map), so a refresh that moves a tile
+// never re-inserts it, which would take keyboard focus off it. Their positions are absolute anyway.
+const TileLayer = memo(function TileLayer({ groups, tiles, contents, headings, labels, freshness, tabbableSymbol, selectedSymbol, headingHeight, action, showLogos, onLinkClick, onFocusSector, sectorHref }: TileLayerProps) {
     return (
         <>
             {groups.map((group) =>
                 group.showLabel ? (
-                    <div
-                        key={group.key}
-                        aria-hidden
-                        className="absolute truncate px-1.5 text-[10px] font-semibold uppercase leading-[18px] tracking-[0.14em] text-gray-500"
-                        style={{ left: group.rect.x, top: group.rect.y, width: group.rect.width, height: LABEL_HEIGHT }}
-                    >
-                        {group.label}
-                    </div>
+                    <SectorHeading key={`heading-${group.key}`} group={group} text={headings.get(group.key) ?? null} height={headingHeight} onFocusSector={onFocusSector} sectorHref={sectorHref} />
                 ) : null
             )}
-            {groups.flatMap((group) =>
-                group.tiles.map(({ item: stock, rect }) => {
-                    const size = labelSize(rect);
-                    return (
-                        <Link
-                            key={stock.symbol}
-                            href={`/stocks/${stock.symbol}`}
-                            prefetch={false}
-                            data-symbol={stock.symbol}
-                            tabIndex={stock.symbol === tabbableSymbol ? 0 : -1}
-                            aria-label={describeStock(stock)}
-                            onClick={onTileClick}
-                            onFocus={onTileFocus}
-                            className={cn(
-                                "absolute flex flex-col items-center justify-center overflow-hidden text-center leading-tight text-white outline-none [text-shadow:0_1px_2px_rgb(0_0_0/0.35)]",
-                                // A crisp outline in the theme's text color marks the stock being looked at
-                                "hover:z-10 hover:shadow-[inset_0_0_0_2px_var(--color-gray-100)] focus-visible:z-10 focus-visible:shadow-[inset_0_0_0_2px_var(--color-gray-100)]",
-                                stock.symbol === selectedSymbol && "z-10 shadow-[inset_0_0_0_2px_var(--color-gray-100)]",
-                                stock.changePercent === undefined && "bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgb(255_255_255/0.06)_6px_12px)]"
-                            )}
-                            style={{
-                                left: rect.x,
-                                top: rect.y,
-                                // A pixel less than the box, so the gaps between tiles show as hairlines
-                                width: Math.max(rect.width - 1, 0),
-                                height: Math.max(rect.height - 1, 0),
-                                backgroundColor: tileBackground(stock.changePercent),
-                            }}
-                        >
-                            {size && (
-                                <>
-                                    <span className={cn("max-w-full truncate px-1 font-semibold tracking-tight", TICKER_CLASSES[size])}>{stock.symbol}</span>
-                                    {size !== "sm" && (
-                                        <span className={cn("max-w-full truncate px-1 font-medium tabular-nums opacity-90", MOVE_CLASSES[size])}>
-                                            {stock.changePercent !== undefined ? formatChangePercent(stock.changePercent) : "—"}
-                                        </span>
-                                    )}
-                                </>
-                            )}
-                        </Link>
-                    );
-                })
-            )}
+            {tiles.map(({ item: stock, rect }) => (
+                <HeatmapTile
+                    key={stock.symbol}
+                    stock={stock}
+                    rect={rect}
+                    content={contents.get(stock.symbol) ?? null}
+                    freshness={freshness.get(stock.symbol) ?? "missing"}
+                    tabbable={stock.symbol === tabbableSymbol}
+                    selected={stock.symbol === selectedSymbol}
+                    action={action}
+                    showLogo={showLogos}
+                    label={labels.get(stock.symbol) ?? stock.symbol}
+                    onLinkClick={onLinkClick}
+                />
+            ))}
         </>
     );
 });
 
-// Our own S&P 500 heatmap, so the details card can be designed for this app: it follows the mouse,
-// stays inside the window, pins to the bottom of the screen on a tap, and follows the arrow keys.
-const StockHeatmap = ({ initial }: { initial: HeatmapStock[] }) => {
-    const stocks = useHeatmapStocks(initial);
+type StockHeatmapProps = {
+    stocks: readonly HeatmapStock[];
+    freshness: ReadonlyMap<string, Freshness>;
+    now: number;
+    sizeBy: SizeMetric;
+    groupBy: "sector" | "none";
+    // What clicking a stock does: open its page (the dashboard) or select it (the Heatmap page)
+    action: "open" | "select";
+    showLogos: boolean;
+    // How a screen reader describes the period of the change, like "today"
+    periodText: string;
+    // The map's accessible name
+    label: string;
+    selectedSymbol?: string;
+    // A sector to spotlight (from hovering its row in the Sector ETFs list)
+    highlightSector?: string;
+    onSelect?: (symbol: string) => void;
+    onFocusSector?: (sector: string) => void;
+    sectorHref?: (sector: string) => string;
+    // Overrides what an empty map says (like when the server has no API key)
+    emptyMessage?: string;
+    // Added when a market-cap map has stocks but none with a market cap, like "Size by Equal shows them."
+    noCapHint?: string;
+    className?: string;
+};
+
+// The stock heatmap shared by the dashboard and the Heatmap page: squarified rectangles sized by market cap
+// (or equally), grouped by sector, colored by the 1-day change on one fixed scale (lib/heatmap.ts).
+// Hovering shows a small quote card that follows the mouse, stays inside the window and never covers the cursor.
+// The arrow keys move between stocks; on a touch screen a tap docks the card at the bottom of the screen.
+const StockHeatmap = ({
+    stocks,
+    freshness,
+    now,
+    sizeBy,
+    groupBy,
+    action,
+    showLogos,
+    periodText,
+    label,
+    selectedSymbol,
+    highlightSector,
+    onSelect,
+    onFocusSector,
+    sectorHref,
+    emptyMessage,
+    noCapHint,
+    className,
+}: StockHeatmapProps) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const size = useElementSize(mapRef);
+    const measure = useTextMeasure(mapRef);
     const hintId = useId();
 
     const [inspect, setInspect] = useState<Inspect | null>(null);
@@ -205,30 +328,72 @@ const StockHeatmap = ({ initial }: { initial: HeatmapStock[] }) => {
         setInspect(next);
     }, []);
 
+    const labelHeight = onFocusSector || sectorHref ? INTERACTIVE_LABEL_HEIGHT : LABEL_HEIGHT;
     const groups = useMemo(() => {
         if (!size) return [];
-        const bySector = new Map<string, HeatmapStock[]>();
-        for (const stock of stocks) {
-            // A stock is sized by its market cap, so it waits off the map until that loads
-            if (!stock.marketCap) continue;
-            bySector.set(stock.sector, [...(bySector.get(stock.sector) ?? []), stock]);
+        const valueOf = sizeBy === "equal" ? () => 1 : (stock: HeatmapStock) => stock.marketCap ?? 0;
+        // Biggest first, so equal-size tiles still read in market-cap order like the market-cap map
+        const ordered = [...stocks].sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0));
+        const box = { x: 0, y: 0, width: size.width, height: size.height };
+        if (groupBy === "none") {
+            return layoutGroups([{ key: "all", label: "All stocks", items: ordered }], valueOf, box);
         }
+        const bySector = new Map<string, HeatmapStock[]>();
+        for (const stock of ordered) bySector.set(stock.sector, [...(bySector.get(stock.sector) ?? []), stock]);
         return layoutGroups(
-            [...bySector].map(([sector, items]) => ({ key: sector, label: SECTOR_LABELS.get(sector) ?? sector, items })),
-            (stock) => stock.marketCap ?? 0,
-            { x: 0, y: 0, width: size.width, height: size.height },
-            { gap: SECTOR_GAP, labelHeight: LABEL_HEIGHT }
+            [...bySector].map(([sector, items]) => ({ key: sector, label: sector, items })),
+            valueOf,
+            box,
+            { gap: SECTOR_GAP, labelHeight }
         );
-    }, [stocks, size]);
+    }, [stocks, size, sizeBy, groupBy, labelHeight]);
 
-    const tiles = useMemo(() => groups.flatMap((group) => group.tiles), [groups]);
+    // In the order the stocks were given, which stays the same from one refresh to the next
+    const tiles = useMemo(() => {
+        const order = new Map(stocks.map((stock, index) => [stock.symbol, index]));
+        return groups.flatMap((group) => group.tiles).sort((a, b) => (order.get(a.item.symbol) ?? 0) - (order.get(b.item.symbol) ?? 0));
+    }, [groups, stocks]);
     const tileBySymbol = useMemo(() => new Map<string, Tile>(tiles.map((tile) => [tile.item.symbol, tile])), [tiles]);
     const tabbableSymbol = focusSymbol && tileBySymbol.has(focusSymbol) ? focusSymbol : tiles[0]?.item.symbol;
-    const inspected = inspect ? tileBySymbol.get(inspect.symbol)?.item : undefined;
 
-    const latest = useMemo(() => stocks.reduce<number | undefined>((max, stock) => (stock.time && stock.time > (max ?? 0) ? stock.time : max), undefined), [stocks]);
-    // Counted from the data rather than the tiles, which only exist once the map has been measured
-    const mappedCount = useMemo(() => stocks.filter((stock) => stock.marketCap).length, [stocks]);
+    // What fits on each tile, from its measured size and the measured width of its text
+    const contents = useMemo(() => {
+        const result = new Map<string, TileContent | null>();
+        for (const { item, rect } of tiles) {
+            const change = item.quote?.changePercent;
+            result.set(
+                item.symbol,
+                fitTileContent({ width: rect.width - 1, height: rect.height - 1 }, item.symbol, change !== undefined ? formatChangePercent(change) : "—", measure, {
+                    logo: showLogos && !!item.logo,
+                })
+            );
+        }
+        return result;
+    }, [tiles, measure, showLogos]);
+
+    const headings = useMemo(
+        () =>
+            new Map(
+                groups.map((group) => {
+                    const names = SECTOR_BY_NAME.get(group.key);
+                    return [group.key, group.showLabel ? fitHeading(group.rect.width, { full: group.label, short: names?.short ?? group.label }, measure) : null];
+                })
+            ),
+        [groups, measure]
+    );
+
+    const labels = useMemo(
+        () => new Map(tiles.map(({ item }) => [item.symbol, describeStock(item, freshness.get(item.symbol) ?? "missing", periodText, now)])),
+        [tiles, freshness, periodText, now]
+    );
+
+    // The card shows nothing for a stock that has left the map (a refresh or filter), and never stands in for the
+    // selected stock, whose panel already shows it
+    const inspectedTile = inspect ? tileBySymbol.get(inspect.symbol) : undefined;
+    const shown = inspect && inspectedTile && !(action === "select" && inspect.symbol === selectedSymbol) ? inspect : null;
+    const inspected = shown ? inspectedTile?.item : undefined;
+    const selectedTile = selectedSymbol ? tileBySymbol.get(selectedSymbol) : undefined;
+    const highlightGroup = highlightSector ? groups.find((group) => group.key === highlightSector) : undefined;
 
     // Moves the card with a transform, outside React, so following the mouse costs no re-render
     const positionCard = useCallback(() => {
@@ -258,24 +423,42 @@ const StockHeatmap = ({ initial }: { initial: HeatmapStock[] }) => {
 
     // A new stock can change the card's height, so place it again before the browser paints
     useLayoutEffect(() => {
-        if (!inspect || inspect.source === "touch") return;
+        if (!shown || shown.source === "touch") return;
         cancelAnimationFrame(frame.current);
         positionCard();
-    }, [inspect, inspected, positionCard]);
+    }, [shown, inspected, positionCard]);
 
     useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
+    // Shows the card for a stock, except the selected one
+    const quickLook = useCallback(
+        (symbol: string, source: InspectSource) => {
+            if (action === "select" && symbol === selectedSymbol) {
+                if (inspectRef.current) show(null);
+                return;
+            }
+            const current = inspectRef.current;
+            if (current?.symbol !== symbol || current.source !== source) show({ symbol, source });
+            else if (source === "pointer") schedulePosition();
+        },
+        [action, selectedSymbol, show, schedulePosition]
+    );
+
     const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-        // Touch screens use taps instead (onTileClick)
+        // Touch screens use taps instead
         if (event.pointerType === "touch") return;
         lastInput.current = event.pointerType === "pen" ? "pen" : "mouse";
         pointer.current = { x: event.clientX, y: event.clientY };
 
-        // Over the hairlines between tiles there's no tile, so the card keeps the last stock instead of flickering
-        const symbol = (event.target as Element).closest<HTMLElement>("[data-symbol]")?.dataset.symbol;
-        const current = inspectRef.current;
-        if (symbol && (current?.symbol !== symbol || current.source !== "pointer")) show({ symbol, source: "pointer" });
-        else if (current?.source === "pointer") schedulePosition();
+        // Over the hairlines between tiles there's no tile, so the card keeps the last stock instead of flickering.
+        // Over a sector name it hides, since a click there opens the sector, not the stock.
+        const target = event.target as Element;
+        const symbol = target.closest<HTMLElement>("[data-symbol]")?.dataset.symbol;
+        if (symbol) quickLook(symbol, "pointer");
+        else if (inspectRef.current?.source === "pointer") {
+            if (target.closest("a, button")) show(null);
+            else schedulePosition();
+        }
     };
 
     const onPointerLeave = () => {
@@ -286,32 +469,48 @@ const StockHeatmap = ({ initial }: { initial: HeatmapStock[] }) => {
         lastInput.current = event.pointerType === "touch" ? "touch" : event.pointerType === "pen" ? "pen" : "mouse";
     };
 
-    // On a touch screen the first tap shows the stock's details and a second tap (or the card's button) opens it.
-    // Mouse and keyboard users open the stock's page straight away, as before.
-    const onTileClick = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
-        if (lastInput.current !== "touch") return;
-        const symbol = event.currentTarget.dataset.symbol;
+    // Dashboard, touch screen: the first tap shows the stock's details and a second tap (or the card's button)
+    // opens it. Mouse and keyboard users open the stock's page straight away.
+    const onLinkClick = useCallback(
+        (event: React.MouseEvent<HTMLAnchorElement>) => {
+            if (lastInput.current !== "touch") return;
+            const symbol = event.currentTarget.dataset.symbol;
+            if (!symbol) return;
+            const current = inspectRef.current;
+            if (current?.source === "touch" && current.symbol === symbol) return;
+            event.preventDefault();
+            setFocusSymbol(symbol);
+            show({ symbol, source: "touch" });
+        },
+        [show]
+    );
+
+    // Heatmap page: a click, tap, Enter or Space selects the stock
+    const onClick = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (action !== "select") return;
+        const symbol = (event.target as Element).closest<HTMLElement>("button[data-symbol]")?.dataset.symbol;
         if (!symbol) return;
-        const current = inspectRef.current;
-        if (current?.source === "touch" && current.symbol === symbol) return;
-        event.preventDefault();
         setFocusSymbol(symbol);
-        show({ symbol, source: "touch" });
-    }, [show]);
+        if (inspectRef.current) show(null);
+        onSelect?.(symbol);
+    };
 
     // Keyboard focus shows the card beside the tile; a mouse click's focus doesn't
-    const onTileFocus = useCallback((event: React.FocusEvent<HTMLAnchorElement>) => {
-        const symbol = event.currentTarget.dataset.symbol;
+    const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
+        const target = event.target as HTMLElement;
+        const symbol = target.dataset.symbol;
         if (!symbol) return;
         setFocusSymbol(symbol);
-        if (event.currentTarget.matches(":focus-visible")) show({ symbol, source: "keyboard" });
-    }, [show]);
+        if (target.matches(":focus-visible")) quickLook(symbol, "keyboard");
+    };
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         lastInput.current = "keyboard";
         if (event.key === "Escape") {
+            // The first Escape closes the quick look; the next one reaches the page (which clears the selection)
             if (inspectRef.current) {
                 event.preventDefault();
+                event.stopPropagation();
                 show(null);
             }
             return;
@@ -370,78 +569,132 @@ const StockHeatmap = ({ initial }: { initial: HeatmapStock[] }) => {
         };
     }, [active]);
 
+    // Why the map is empty: no stocks, nothing from Finnhub yet, or (sizing by market cap) no market caps
+    const anyPriced = stocks.some((stock) => stock.quote);
+    const emptyText =
+        emptyMessage ??
+        (stocks.length === 0
+            ? "No stocks to show."
+            : sizeBy === "cap" && anyPriced
+                ? `Finnhub sent no market caps for these stocks, so the map can't size them.${noCapHint ? ` ${noCapHint}` : ""}`
+                : "No prices or market caps from Finnhub right now. The map fills in as soon as they load.");
+
+    const hint =
+        action === "select"
+            ? "Use the arrow keys to move between stocks, and Enter to select one."
+            : "Use the arrow keys to move between stocks, and Enter to open one.";
+
     return (
-        <div className="flex h-[600px] flex-col">
+        <>
             <div
                 ref={mapRef}
                 role="group"
-                aria-label="Heatmap of the largest S&P 500 companies"
+                aria-label={label}
                 aria-describedby={hintId}
                 onPointerMove={onPointerMove}
                 onPointerLeave={onPointerLeave}
                 onPointerDown={onPointerDown}
+                onClick={onClick}
+                onFocus={onFocus}
                 onKeyDown={onKeyDown}
                 onBlur={onBlur}
-                className="relative min-h-0 flex-1 touch-manipulation overflow-hidden"
+                className={cn("relative touch-manipulation select-none overflow-hidden", className)}
             >
                 {size && (
-                    <HeatmapTiles
+                    <TileLayer
                         groups={groups}
+                        tiles={tiles}
+                        contents={contents}
+                        headings={headings}
+                        labels={labels}
+                        freshness={freshness}
                         tabbableSymbol={tabbableSymbol}
-                        selectedSymbol={inspect?.source === "touch" ? inspect.symbol : undefined}
-                        onTileClick={onTileClick}
-                        onTileFocus={onTileFocus}
+                        selectedSymbol={action === "select" ? selectedSymbol : undefined}
+                        headingHeight={labelHeight}
+                        action={action}
+                        showLogos={showLogos}
+                        onLinkClick={onLinkClick}
+                        onFocusSector={onFocusSector}
+                        sectorHref={sectorHref}
                     />
                 )}
+
+                {/* The sector being pointed at in the Sector ETFs list stays bright while the rest of the map dims */}
+                {highlightGroup && (
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute z-20 shadow-[inset_0_0_0_1px_var(--color-gray-100)]"
+                        style={{
+                            left: highlightGroup.rect.x - 1,
+                            top: highlightGroup.rect.y - 1,
+                            width: highlightGroup.rect.width + 2,
+                            height: highlightGroup.rect.height + 2,
+                            boxShadow: "0 0 0 9999px color-mix(in oklab, var(--color-gray-900) 55%, transparent), inset 0 0 0 1px var(--color-gray-100)",
+                        }}
+                    />
+                )}
+                {/* The selected stock keeps a heavier outline wherever the cursor goes */}
+                {selectedTile && (
+                    <div
+                        aria-hidden
+                        data-selected-outline
+                        className="pointer-events-none absolute z-30 shadow-[inset_0_0_0_2px_var(--color-gray-100),inset_0_0_0_4px_var(--color-gray-900)]"
+                        style={{
+                            left: selectedTile.rect.x,
+                            top: selectedTile.rect.y,
+                            width: Math.max(selectedTile.rect.width - 1, 0),
+                            height: Math.max(selectedTile.rect.height - 1, 0),
+                        }}
+                    />
+                )}
+
                 {/* Until the map is measured in the browser, keep the loading look so tiles don't pop into an empty box */}
                 {!size && <div aria-hidden className="absolute inset-0 animate-pulse bg-gray-700/40 motion-reduce:animate-none" />}
                 {size && tiles.length === 0 && (
-                    <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-gray-500">
-                        Prices aren&apos;t available right now. The map fills in as soon as they load.
-                    </p>
+                    <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-gray-500">{emptyText}</p>
                 )}
             </div>
-            <p id={hintId} className="sr-only">Use the arrow keys to move between stocks and Enter to open one.</p>
+            <p id={hintId} className="sr-only">{hint}</p>
 
-            <div className="flex h-10 shrink-0 items-center justify-between gap-4 border-t border-gray-600 px-4 text-[11px] text-gray-500">
-                <div className="flex items-center gap-px" role="img" aria-label={`Color scale from down ${FULL_COLOR_AT}% or more in red to up ${FULL_COLOR_AT}% or more in green`}>
-                    {LEGEND_STEPS.map((step) => (
-                        <span
-                            key={step}
-                            className="flex h-5 w-9 items-center justify-center font-medium tabular-nums text-white [text-shadow:0_1px_1px_rgb(0_0_0/0.3)]"
-                            style={{ backgroundColor: tileBackground(step) }}
-                        >
-                            {step > 0 ? "+" : ""}{step}%
-                        </span>
-                    ))}
-                </div>
-                <span className="hidden truncate tabular-nums sm:inline">
-                    {mappedCount} stocks{latest ? ` · Prices as of ${NEW_YORK_TIME.format(latest)} ET` : ""}
-                </span>
-            </div>
-
-            {inspect && inspected && (
-                inspect.source === "touch" ? (
+            {shown && inspected && (
+                shown.source === "touch" ? (
                     <div
+                        // A new key when the card switches between docked and floating, so React never reuses one as the other
+                        key="touch-card"
                         ref={cardRef}
                         role="dialog"
                         aria-label={`${inspected.symbol} details`}
                         className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-sm"
                     >
-                        <HeatmapCard stock={inspected} source="touch" onClose={() => show(null)} />
+                        <HeatmapCard
+                            stock={inspected}
+                            freshness={freshness.get(inspected.symbol) ?? "missing"}
+                            now={now}
+                            source="touch"
+                            action={action}
+                            onClose={() => show(null)}
+                        />
                     </div>
                 ) : (
                     // The tile's label already tells screen readers about the stock, so this copy is for the eyes only
                     <div
+                        key="hover-card"
                         ref={cardRef}
                         aria-hidden
-                        className="pointer-events-none fixed left-0 top-0 z-[60] w-72 opacity-0 transition-opacity duration-100 will-change-transform motion-reduce:transition-none"
+                        data-heatmap-hud
+                        className="pointer-events-none fixed left-0 top-0 z-[60] w-64 opacity-0 transition-opacity duration-100 will-change-transform motion-reduce:transition-none"
                     >
-                        <HeatmapCard stock={inspected} source={inspect.source} />
+                        <HeatmapCard
+                            stock={inspected}
+                            freshness={freshness.get(inspected.symbol) ?? "missing"}
+                            now={now}
+                            source={shown.source}
+                            action={action}
+                        />
                     </div>
                 )
             )}
-        </div>
+        </>
     );
 };
 

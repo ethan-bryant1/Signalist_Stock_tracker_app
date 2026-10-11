@@ -13,11 +13,19 @@ const WatchlistButton = ({
   onWatchlistChange,
 }: WatchlistButtonProps) => {
   const [added, setAdded] = useState<boolean>(!!isInWatchlist);
+  // Follows the saved state when the parent's isInWatchlist changes (React's "adjust state when a prop changes")
+  const [savedState, setSavedState] = useState<boolean>(!!isInWatchlist);
+  if (!!isInWatchlist !== savedState) {
+    setSavedState(!!isInWatchlist);
+    setAdded(!!isInWatchlist);
+  }
   const [isPending, startTransition] = useTransition();
 
   const label = added ? "Remove from Watchlist" : "Add to Watchlist";
 
   const handleClick = () => {
+    // Ignored while saving. The button isn't `disabled` then, since disabling it would drop keyboard focus.
+    if (isPending) return;
     const next = !added;
     setAdded(next);
 
@@ -39,7 +47,7 @@ const WatchlistButton = ({
         aria-label={added ? `Remove ${symbol} from watchlist` : `Add ${symbol} to watchlist`}
         className={`watchlist-icon-btn ${added ? "watchlist-icon-added" : ""}`}
         onClick={handleClick}
-        disabled={isPending}
+        aria-disabled={isPending || undefined}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -64,7 +72,7 @@ const WatchlistButton = ({
       type="button"
       className={`watchlist-btn ${added ? "watchlist-remove" : ""}`}
       onClick={handleClick}
-      disabled={isPending}
+      aria-disabled={isPending || undefined}
     >
       {showTrashIcon && added ? (
         <svg

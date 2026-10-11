@@ -3,8 +3,9 @@ import { headers } from "next/headers";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import Panel from "@/components/Panel";
 import IndexTiles from "@/components/IndexTiles";
-import StockHeatmap from "@/components/StockHeatmap";
-import { getHeatmapData } from "@/lib/actions/finnhub.actions";
+import DashboardHeatmap from "@/components/DashboardHeatmap";
+import { HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/data/heatmap";
+import { getHeatmapData } from "@/lib/heatmap-data";
 import { getAuth } from "@/lib/better-auth/auth";
 import {
     MARKET_DATA_WIDGET_CONFIG,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/constants";
 
 // Loads the heatmap's prices without holding up the rest of the dashboard
-const DashboardHeatmap = async () => <StockHeatmap initial={await getHeatmapData()} />;
+const HeatmapWithData = async () => <DashboardHeatmap initial={await getHeatmapData()} />;
 
 // Each panel's "Open" link shows that widget on its own, larger page
 const Home = async () => {
@@ -50,13 +51,17 @@ const Home = async () => {
                 </Panel>
                 <Panel
                     title="Stock heatmap"
-                    description="The largest S&P 500 companies, sized by market cap and colored by today's move"
+                    description={`${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}, sized by market cap, colored by 1-day change`}
                     href="/heatmap"
                     className="xl:col-span-2"
                 >
-                    <Suspense fallback={<div className="h-[600px] animate-pulse bg-gray-700/40 motion-reduce:animate-none" />}>
-                        <DashboardHeatmap />
-                    </Suspense>
+                    {/* Only for a signed-in viewer: the layout's check renders alongside this page, and an empty price cache
+                        costs over 100 Finnhub requests */}
+                    {session?.user && (
+                        <Suspense fallback={<div className="h-[632px] animate-pulse bg-gray-700/40 motion-reduce:animate-none" />}>
+                            <HeatmapWithData />
+                        </Suspense>
+                    )}
                 </Panel>
             </div>
 

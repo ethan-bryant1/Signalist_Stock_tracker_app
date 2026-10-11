@@ -78,25 +78,63 @@ export type TreemapGroup<T> = {
     tiles: Placed<T>[];
 };
 
+type GroupInput<T> = { key: string; label: string; items: readonly T[] };
+
+// One group's box split into its label strip and the part its items fill
+const splitGroupBox = (box: Rect, gap: number, labelHeight: number, minLabelWidth: number) => {
+    const inner = {
+        x: box.x + gap / 2,
+        y: box.y + gap / 2,
+        width: Math.max(box.width - gap, 0),
+        height: Math.max(box.height - gap, 0),
+    };
+    const showLabel = labelHeight > 0 && inner.height >= labelHeight * 2.5 && inner.width >= minLabelWidth;
+    const body = showLabel ? { x: inner.x, y: inner.y + labelHeight, width: inner.width, height: inner.height - labelHeight } : inner;
+    return { inner, body, showLabel };
+};
+
 // Lays out groups (like market sectors) first, then each group's items inside its box.
-// Groups are split by `gap` pixels; a group gets a `labelHeight` strip for its name when there's room.
+// Groups are split by `gap` pixels, and a group gets a `labelHeight` strip for its name when there's room.
+// The gaps and labels take space, which would leave small groups with less area per unit of value than big ones,
+// so the group boxes are re-weighted a few times until every group's items get the same area per unit
+// (within half a percent where the space allows it).
 export const layoutGroups = <T>(
-    groups: readonly { key: string; label: string; items: readonly T[] }[],
+    groups: readonly GroupInput<T>[],
     valueOf: (item: T) => number,
     rect: Rect,
-    { gap = 0, labelHeight = 0 }: { gap?: number; labelHeight?: number } = {}
-): TreemapGroup<T>[] =>
-    squarify(groups, (group) => group.items.reduce((sum, item) => sum + Math.max(valueOf(item), 0), 0), rect).map(({ item: group, rect: box }) => {
-        const inner = {
-            x: box.x + gap / 2,
-            y: box.y + gap / 2,
-            width: Math.max(box.width - gap, 0),
-            height: Math.max(box.height - gap, 0),
-        };
-        const showLabel = labelHeight > 0 && inner.height >= labelHeight * 3 && inner.width >= 72;
-        const body = showLabel
-            ? { x: inner.x, y: inner.y + labelHeight, width: inner.width, height: inner.height - labelHeight }
-            : inner;
+    { gap = 0, labelHeight = 0, minLabelWidth = 72 }: { gap?: number; labelHeight?: number; minLabelWidth?: number } = {}
+): TreemapGroup<T>[] => {
+    const totals = groups.map((group) => group.items.reduce((sum, item) => sum + Math.max(valueOf(item), 0), 0));
+    const indexes = groups.map((_, index) => index).filter((index) => totals[index] > 0);
+    const weights = [...totals];
 
+    let boxes: Placed<number>[] = [];
+    for (let pass = 0; pass < 8; pass++) {
+        boxes = squarify(indexes, (index) => weights[index], rect);
+        if (gap === 0 && labelHeight === 0) break;
+
+        const bodyAreas = new Map(boxes.map(({ item, rect: box }) => {
+            const { body } = splitGroupBox(box, gap, labelHeight, minLabelWidth);
+            return [item, body.width * body.height];
+        }));
+        const totalArea = [...bodyAreas.values()].reduce((sum, area) => sum + area, 0);
+        const totalValue = indexes.reduce((sum, index) => sum + totals[index], 0);
+        if (!totalArea || !totalValue) break;
+        const areaPerValue = totalArea / totalValue;
+
+        let worst = 0;
+        for (const index of indexes) {
+            const wanted = totals[index] * areaPerValue;
+            const got = bodyAreas.get(index) ?? 0;
+            worst = Math.max(worst, Math.abs(got / wanted - 1));
+            weights[index] *= got > 0 ? wanted / got : 2;
+        }
+        if (worst < 0.005) break;
+    }
+
+    return boxes.map(({ item: index, rect: box }) => {
+        const group = groups[index];
+        const { inner, body, showLabel } = splitGroupBox(box, gap, labelHeight, minLabelWidth);
         return { key: group.key, label: group.label, rect: inner, showLabel, tiles: squarify(group.items, valueOf, body) };
     });
+};

@@ -3,28 +3,11 @@
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
-import { HEATMAP_SYMBOLS } from '@/lib/data/heatmap';
-import { SP500_COMPANIES } from '@/lib/data/sp500';
+import { FINNHUB_BASE_URL, fetchJSON } from '@/lib/finnhub';
+import { normalizeQuote, sessionFromClock, type MarketSession } from '@/lib/market-data';
 import { cache } from 'react';
 import { headers } from 'next/headers';
 import { getAuth } from '@/lib/better-auth/auth';
-
-const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
-
-async function fetchJSON<T>(url: string, revalidateSeconds?: number): Promise<T> {
-  const options: RequestInit & { next?: { revalidate?: number } } = revalidateSeconds
-    ? { cache: 'force-cache', next: { revalidate: revalidateSeconds } }
-    : { cache: 'no-store' };
-
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Fetch failed ${res.status}: ${text}`);
-  }
-  return (await res.json()) as T;
-}
-
-export { fetchJSON };
 
 export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> {
   try {
@@ -307,7 +290,7 @@ type FinnhubFullProfile = {
   currency?: string;
   weburl?: string;
 };
-type FinnhubAllMetrics = { metric?: Record<string, unknown> };
+type FinnhubAllMetrics = { symbol?: string; metric?: Record<string, unknown> };
 
 export type StockOverview = {
   symbol: string;
@@ -342,6 +325,9 @@ const nonZero = (value: unknown) => num(value) || undefined;
 // A stock's price today with its name, logo and exchange: what the search window previews
 export type StockQuote = Omit<StockOverview, 'peRatio' | 'eps' | 'dividendYield' | 'beta' | 'week52High' | 'week52Low'>;
 
+// BRK.B, BRK-B and BRK/B are the same listing written three ways
+const sameTicker = (a: string, b: string) => a.toUpperCase().replace(/[-/]/g, '.') === b.toUpperCase().replace(/[-/]/g, '.');
+
 // Tickers are letters and digits, sometimes with a dot or dash (BRK.B)
 const isValidSymbol = (symbol: string) => /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(symbol);
 
@@ -359,8 +345,8 @@ const fetchQuote = async (sym: string, token: string): Promise<StockQuote> => {
     }),
   ]);
 
-  // Finnhub returns a price of 0 for symbols it has no quote for
-  const hasQuote = !!nonZero(quote?.c);
+  // Finnhub returns a price of 0 for symbols it has no quote for, which normalizeQuote drops
+  const latest = normalizeQuote(quote);
   const prefix = toTradingViewExchange(profile?.exchange);
 
   return {
@@ -370,16 +356,19 @@ const fetchQuote = async (sym: string, token: string): Promise<StockQuote> => {
     logo: profile?.logo || undefined,
     exchange: prefix ?? (profile?.exchange || undefined),
     industry: profile?.finnhubIndustry || undefined,
-    currency: profile?.currency || 'USD',
+    // Finnhub's free plan only prices US listings, which trade in dollars. Its profile currency is the currency the
+    // company reports in (TWD for Taiwan Semiconductor's ADR), so it isn't used for prices, and a market cap
+    // in another currency is left out rather than shown as dollars.
+    currency: 'USD',
     website: profile?.weburl && /^https?:\/\//i.test(profile.weburl) ? profile.weburl : undefined,
-    price: hasQuote ? num(quote?.c) : undefined,
-    change: hasQuote ? num(quote?.d) : undefined,
-    changePercent: hasQuote ? num(quote?.dp) : undefined,
-    open: hasQuote ? nonZero(quote?.o) : undefined,
-    previousClose: nonZero(quote?.pc),
-    dayHigh: hasQuote ? nonZero(quote?.h) : undefined,
-    dayLow: hasQuote ? nonZero(quote?.l) : undefined,
-    marketCap: nonZero(profile?.marketCapitalization),
+    price: latest?.price,
+    change: latest?.change,
+    changePercent: latest?.changePercent,
+    open: latest?.open,
+    previousClose: latest?.previousClose ?? nonZero(quote?.pc),
+    dayHigh: latest?.dayHigh,
+    dayLow: latest?.dayLow,
+    marketCap: !profile?.currency || profile.currency === 'USD' ? nonZero(profile?.marketCapitalization) : undefined,
   };
 };
 
@@ -414,20 +403,23 @@ export async function getStockOverview(symbol: string): Promise<StockOverview> {
   ]);
 
   const m = metrics?.metric ?? {};
+  // Finnhub can answer a share-class ticker with another class's figures (BRK.A's for BRK.B, about 1,500 times
+  // larger per share). Per-share figures from a different listing are left out; ratios are the same for both.
+  const sameListing = !metrics?.symbol || sameTicker(metrics.symbol, sym);
 
   return {
     ...quote,
-    marketCap: quote.marketCap ?? nonZero(m.marketCapitalization),
+    marketCap: quote.marketCap ?? (sameListing ? nonZero(m.marketCapitalization) : undefined),
     peRatio: num(m.peTTM) ?? num(m.peBasicExclExtraTTM),
-    eps: num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM),
+    eps: sameListing ? num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM) : undefined,
     dividendYield: num(m.dividendYieldIndicatedAnnual) ?? num(m.currentDividendYieldTTM),
     beta: num(m.beta),
-    week52High: nonZero(m['52WeekHigh']),
-    week52Low: nonZero(m['52WeekLow']),
+    week52High: sameListing ? nonZero(m['52WeekHigh']) : undefined,
+    week52Low: sameListing ? nonZero(m['52WeekLow']) : undefined,
   };
 }
 
-export type MarketSession = 'pre-market' | 'regular' | 'post-market' | 'closed';
+export type { MarketSession };
 
 export type MarketQuote = {
   price?: number;
@@ -435,6 +427,8 @@ export type MarketQuote = {
   changePercent?: number;
   dayHigh?: number;
   dayLow?: number;
+  // Time of this price, in milliseconds (Finnhub's t)
+  time?: number;
 };
 
 // Live figures for the dashboard and heatmap: whether the market is open, and prices for the index and sector funds
@@ -448,26 +442,6 @@ export type MarketSnapshot = {
 
 type FinnhubMarketStatus = { isOpen?: boolean; session?: string | null; holiday?: string | null };
 
-// The US trading session from the New York clock: pre-market 4:00, open 9:30, close 16:00, after hours until 20:00.
-// Used when Finnhub's market status can't load; it doesn't know about holidays.
-const sessionFromClock = (date = new Date()): MarketSession => {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    weekday: 'short',
-    hour: 'numeric',
-    minute: 'numeric',
-    hourCycle: 'h23',
-  }).formatToParts(date);
-  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  if (part('weekday') === 'Sat' || part('weekday') === 'Sun') return 'closed';
-
-  const minutes = Number(part('hour')) * 60 + Number(part('minute'));
-  if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
-  if (minutes >= 9 * 60 + 30 && minutes < 16 * 60) return 'regular';
-  if (minutes >= 16 * 60 && minutes < 20 * 60) return 'post-market';
-  return 'closed';
-};
-
 // Index, gold, oil and bond fund prices, plus the sector funds when the page shows sector performance
 export async function getMarketSnapshot(includeSectors = false): Promise<MarketSnapshot> {
   const symbols: string[] = [
@@ -478,7 +452,7 @@ export async function getMarketSnapshot(includeSectors = false): Promise<MarketS
   const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
   if (!token) {
     console.error('getMarketSnapshot:', new Error('FINNHUB API key is not configured'));
-    return { session: sessionFromClock(), quotes: {} };
+    return { session: sessionFromClock(Date.now()), quotes: {} };
   }
 
   const [status, quotes] = await Promise.all([
@@ -496,7 +470,7 @@ export async function getMarketSnapshot(includeSectors = false): Promise<MarketS
     ),
   ]);
 
-  const snapshot: MarketSnapshot = { session: sessionFromClock(), quotes: {} };
+  const snapshot: MarketSnapshot = { session: sessionFromClock(Date.now()), quotes: {} };
   if (status) {
     const session = status.session;
     snapshot.session = session === 'pre-market' || session === 'regular' || session === 'post-market'
@@ -506,116 +480,19 @@ export async function getMarketSnapshot(includeSectors = false): Promise<MarketS
   }
 
   symbols.forEach((symbol, i) => {
-    const quote = quotes[i];
-    // Finnhub returns a price of 0 for symbols it has no quote for
-    if (!nonZero(quote?.c)) return;
+    // Finnhub returns a price of 0 for symbols it has no quote for, which normalizeQuote drops
+    const quote = normalizeQuote(quotes[i]);
+    if (!quote) return;
     snapshot.quotes[symbol] = {
-      price: num(quote?.c),
-      change: num(quote?.d),
-      changePercent: num(quote?.dp),
-      dayHigh: nonZero(quote?.h),
-      dayLow: nonZero(quote?.l),
+      price: quote.price,
+      change: quote.change,
+      changePercent: quote.changePercent,
+      dayHigh: quote.dayHigh,
+      dayLow: quote.dayLow,
+      time: quote.time,
     };
-    const time = nonZero(quote?.t);
-    if (time && time * 1000 > (snapshot.asOf ?? 0)) snapshot.asOf = time * 1000;
+    if (quote.time && quote.time > (snapshot.asOf ?? 0)) snapshot.asOf = quote.time;
   });
 
   return snapshot;
-}
-
-// A company on the dashboard heatmap, with whatever Finnhub had for it. Missing figures stay undefined, never zero.
-export type HeatmapStock = {
-  symbol: string;
-  name: string;
-  // GICS sector and industry, from the bundled S&P 500 list
-  sector: string;
-  industry: string;
-  exchange?: string;
-  logo?: string;
-  currency: string;
-  marketCap?: number; // in millions, as Finnhub returns it
-  price?: number;
-  change?: number;
-  changePercent?: number;
-  open?: number;
-  previousClose?: number;
-  dayHigh?: number;
-  dayLow?: number;
-  // Time of the price, in milliseconds
-  time?: number;
-};
-
-// Runs fn on every item with at most `limit` at a time, keeping the order
-const mapWithLimit = async <T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> => {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index], index);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-};
-
-const SP500_BY_SYMBOL = new Map(SP500_COMPANIES.map((company) => [company.symbol, company]));
-
-// Prices and market caps for the dashboard heatmap, shared by everyone who views it.
-// Prices are kept for two to three minutes and profiles for an hour. Each price's keep time is staggered
-// so Finnhub (60 requests a minute on the free plan) is asked for a few at a time rather than all at once,
-// and a price that fails to refresh keeps its last value.
-export async function getHeatmapData(): Promise<HeatmapStock[]> {
-  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-  if (!token) {
-    console.error('getHeatmapData:', new Error('FINNHUB API key is not configured'));
-    return [];
-  }
-  // An empty cache costs over 100 Finnhub requests, so strangers can't trigger it
-  if (!(await isSignedIn())) return [];
-
-  let failures = 0;
-  const stocks = await mapWithLimit(HEATMAP_SYMBOLS, 6, async (symbol, index): Promise<HeatmapStock | null> => {
-    const company = SP500_BY_SYMBOL.get(symbol);
-    if (!company) return null;
-
-    const q = encodeURIComponent(symbol);
-    const [quote, profile] = await Promise.all([
-      fetchJSON<FinnhubFullQuote & { t?: number }>(`${FINNHUB_BASE_URL}/quote?symbol=${q}&token=${token}`, 120 + (index % 6) * 15).catch(() => {
-        failures++;
-        return null;
-      }),
-      fetchJSON<FinnhubFullProfile>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${q}&token=${token}`, 3600).catch(() => {
-        failures++;
-        return null;
-      }),
-    ]);
-
-    // Finnhub returns a price of 0 for symbols it has no quote for
-    const hasQuote = !!nonZero(quote?.c);
-    const time = nonZero(quote?.t);
-
-    return {
-      symbol,
-      name: profile?.name || company.name,
-      sector: company.sector,
-      industry: company.industry,
-      exchange: toTradingViewExchange(profile?.exchange) ?? (profile?.exchange || undefined),
-      logo: profile?.logo || undefined,
-      currency: profile?.currency || 'USD',
-      marketCap: nonZero(profile?.marketCapitalization),
-      price: hasQuote ? num(quote?.c) : undefined,
-      change: hasQuote ? num(quote?.d) : undefined,
-      changePercent: hasQuote ? num(quote?.dp) : undefined,
-      open: hasQuote ? nonZero(quote?.o) : undefined,
-      previousClose: nonZero(quote?.pc),
-      dayHigh: hasQuote ? nonZero(quote?.h) : undefined,
-      dayLow: hasQuote ? nonZero(quote?.l) : undefined,
-      time: hasQuote && time ? time * 1000 : undefined,
-    };
-  });
-
-  // One line instead of one per stock, since a cold start can briefly run into Finnhub's rate limit
-  if (failures) console.error(`getHeatmapData: ${failures} Finnhub requests failed; those stocks keep their last figures`);
-  return stocks.filter((stock): stock is HeatmapStock => stock !== null);
 }

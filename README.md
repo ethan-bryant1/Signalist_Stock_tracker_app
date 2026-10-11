@@ -6,8 +6,8 @@ Built with Next.js 16, Better Auth, MongoDB, Inngest, Finnhub and TradingView wi
 
 ## Features
 
-- **Dashboard:** live S&P 500, Nasdaq 100, Dow 30 and Russell 2000 prices that refresh every minute, a market open/closed badge, a market overview, a heatmap of the largest S&P 500 companies (hover, tap or use the arrow keys for each stock's price, day range, market cap and sector), top stories and quotes.
-- **Stock heatmap:** the whole S&P 500 colored by any time frame from 1 hour to 1 year (or pre-market and after hours), sized by market cap or volume, with full screen mode and live sector performance.
+- **Dashboard:** live S&P 500, Nasdaq 100, Dow 30 and Russell 2000 prices that refresh every minute, a market open/closed badge, a market overview, a heatmap of 54 large S&P 500 companies (hover, tap or use the arrow keys for each stock's quote, with the price time and a stale-price warning), top stories and quotes.
+- **Stock heatmap:** two views. The interactive map of the same 54 companies lets you select a stock and keep its details beside the map, focus a sector from its heading or the Sector ETFs list, and come back to the same view with the browser's Back button. The Full S&P 500 view is TradingView's map of every company, colored by any period from 1 hour to 1 year (or pre-market and after hours) and sized by market cap, volume or dollar volume. See [docs/heatmap.md](docs/heatmap.md) for where every figure comes from.
 - **Market data:** every US stock in a screener, plus search and sector filters for the S&P 500.
 - **Stock pages:** price, key figures (P/E, EPS, market cap, 52-week range and more), a full chart, the company's latest news, profile, technical analysis and financials.
 - **Search:** press Ctrl+K (Cmd+K on a Mac) to find any US stock.
@@ -33,6 +33,13 @@ Built with Next.js 16, Better Auth, MongoDB, Inngest, Finnhub and TradingView wi
    npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
    ```
 
+6. Optional checks:
+
+   ```bash
+   npm test                     # unit tests for the market-data rules, heatmap layout and colors
+   npm run check:market-data    # checks the real Finnhub data behind the heatmaps with your key (about 3 minutes)
+   ```
+
 ## Deploy to Vercel
 
 You need the same accounts as for running locally (MongoDB Atlas, Finnhub, Gemini, a Gmail App Password), plus free [Vercel](https://vercel.com) and [Inngest](https://www.inngest.com) accounts.
@@ -55,4 +62,5 @@ Every push to `main` deploys again automatically.
 - `app/api/inngest`: background jobs for emails
 - `components`: the page building blocks
 - `lib/actions`: server code for Finnhub, the watchlist and auth
-- `lib/data`: the bundled S&P 500 list and the index and sector funds
+- `lib/data`: the bundled S&P 500 list, the heatmap's stocks, and the index and sector funds
+- `lib/market-data.ts`, `lib/heatmap.ts`, `lib/treemap.ts`: the heatmaps' rules for prices, freshness, colors and layout (tested in `tests`)
