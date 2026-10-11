@@ -13,6 +13,8 @@ import {
   periodPhrase,
   quotePeriodPhrase,
   quoteFreshness,
+  sameCompany,
+  sameListing,
   sessionFromClock,
   type HeatmapStock,
 } from '@/lib/market-data';
@@ -76,6 +78,26 @@ describe('normalizeQuote', () => {
     expect(normalizeQuote({ c: 1, t: 1_791_576_000_000 }, FRI_1600_ET + 1)!.time).toBe(1_791_576_000_000);
     expect(normalizeQuote({ c: 1, t: (FRI_1600_ET + 60 * 60_000) / 1000 }, FRI_1600_ET)!.time).toBeUndefined();
     expect(normalizeQuote({ c: 1 }, FRI_1600_ET)!.time).toBeUndefined();
+  });
+});
+
+describe('which listing an answer is for', () => {
+  it('treats the ways of writing a share class as one listing', () => {
+    expect(sameListing('BRK.B', 'brk-b')).toBe(true);
+    expect(sameListing('BRK/B', 'BRK.B')).toBe(true);
+    expect(sameListing('BRK.A', 'BRK.B')).toBe(false);
+  });
+
+  it("accepts another share class's profile as the same company, as Finnhub answers BRK.B with BRK.A's", () => {
+    expect(sameCompany('BRK.A', 'BRK.B')).toBe(true);
+    expect(sameCompany('BF-B', 'BF.A')).toBe(true);
+    expect(sameCompany('AAPL', 'AAPL')).toBe(true);
+  });
+
+  it('rejects a profile for a different company', () => {
+    expect(sameCompany('BRKR', 'BRK.B')).toBe(false);
+    expect(sameCompany('GOOG', 'GOOGL')).toBe(false);
+    expect(sameCompany('2330.TW', 'TSM')).toBe(false);
   });
 });
 

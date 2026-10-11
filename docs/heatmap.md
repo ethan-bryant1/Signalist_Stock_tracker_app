@@ -31,6 +31,7 @@ browser, and error messages and logs never include request URLs.
 | 1-day change | Calculated: `price − previous close`, and that ÷ previous close × 100 | So the dollar and percent figures always agree. Finnhub's own `d`/`dp` are used only when the previous close is missing. Relative to the previous regular-session close, unadjusted, as Finnhub reports it. |
 | Market cap | Finnhub `/stock/profile2` `marketCapitalization` | US dollar millions, updated daily by Finnhub, cached for 24 hours. Left out (never converted or guessed) if the profile's currency isn't USD. |
 | Name, exchange, logo | Finnhub `/stock/profile2` | Only `https` logos are shown. A missing or broken logo leaves the ticker on its own. |
+| Which listing a profile is for | `/stock/profile2` `ticker` | Finnhub answers BRK.B with BRK.A's profile (seen with real data, 2026-10-11). Only company-wide figures (name, logo, exchange, total market cap) come from a profile, so another share class's is used; a different company's is ignored, and that stock is listed as having no market cap. |
 | Sector and industry | GICS, from `lib/data/sp500.ts` | A copy of [datasets/s-and-p-500-companies](https://github.com/datasets/s-and-p-500-companies) (sourced from Wikipedia, public domain), 503 listings. Refresh it by copying the CSV again. |
 | Market session | Finnhub `/stock/market-status` (the header's live prices), falling back to the New York clock | The fallback doesn't know holidays or early closes. |
 | Sector ETF moves | Finnhub `/quote` for XLK, XLF, XLV, XLY, XLC, XLI, XLP, XLE, XLU, XLRE, XLB | |

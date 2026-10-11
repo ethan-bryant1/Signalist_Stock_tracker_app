@@ -4,7 +4,7 @@ import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { FINNHUB_BASE_URL, fetchJSON } from '@/lib/finnhub';
-import { normalizeQuote, sessionFromClock, type MarketSession } from '@/lib/market-data';
+import { normalizeQuote, sameListing, sessionFromClock, type MarketSession } from '@/lib/market-data';
 import { cache } from 'react';
 import { headers } from 'next/headers';
 import { getAuth } from '@/lib/better-auth/auth';
@@ -325,9 +325,6 @@ const nonZero = (value: unknown) => num(value) || undefined;
 // A stock's price today with its name, logo and exchange: what the search window previews
 export type StockQuote = Omit<StockOverview, 'peRatio' | 'eps' | 'dividendYield' | 'beta' | 'week52High' | 'week52Low'>;
 
-// BRK.B, BRK-B and BRK/B are the same listing written three ways
-const sameTicker = (a: string, b: string) => a.toUpperCase().replace(/[-/]/g, '.') === b.toUpperCase().replace(/[-/]/g, '.');
-
 // Tickers are letters and digits, sometimes with a dot or dash (BRK.B)
 const isValidSymbol = (symbol: string) => /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(symbol);
 
@@ -405,17 +402,17 @@ export async function getStockOverview(symbol: string): Promise<StockOverview> {
   const m = metrics?.metric ?? {};
   // Finnhub can answer a share-class ticker with another class's figures (BRK.A's for BRK.B, about 1,500 times
   // larger per share). Per-share figures from a different listing are left out; ratios are the same for both.
-  const sameListing = !metrics?.symbol || sameTicker(metrics.symbol, sym);
+  const ownListing = !metrics?.symbol || sameListing(metrics.symbol, sym);
 
   return {
     ...quote,
-    marketCap: quote.marketCap ?? (sameListing ? nonZero(m.marketCapitalization) : undefined),
+    marketCap: quote.marketCap ?? (ownListing ? nonZero(m.marketCapitalization) : undefined),
     peRatio: num(m.peTTM) ?? num(m.peBasicExclExtraTTM),
-    eps: sameListing ? num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM) : undefined,
+    eps: ownListing ? num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM) : undefined,
     dividendYield: num(m.dividendYieldIndicatedAnnual) ?? num(m.currentDividendYieldTTM),
     beta: num(m.beta),
-    week52High: sameListing ? nonZero(m['52WeekHigh']) : undefined,
-    week52Low: sameListing ? nonZero(m['52WeekLow']) : undefined,
+    week52High: ownListing ? nonZero(m['52WeekHigh']) : undefined,
+    week52Low: ownListing ? nonZero(m['52WeekLow']) : undefined,
   };
 }
 

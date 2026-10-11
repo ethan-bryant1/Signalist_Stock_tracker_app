@@ -3,7 +3,7 @@ import 'server-only';
 import { HEATMAP_SYMBOLS } from '@/lib/data/heatmap';
 import { SP500_COMPANIES } from '@/lib/data/sp500';
 import { FINNHUB_BASE_URL, FinnhubError, fetchFinnhub, getFinnhubToken, mapWithLimit, worstIssue } from '@/lib/finnhub';
-import { normalizeQuote, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
+import { normalizeQuote, sameCompany, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
 
 const SP500_BY_SYMBOL = new Map(SP500_COMPANIES.map((company) => [company.symbol, company]));
 
@@ -58,7 +58,9 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
     ]);
 
     const normalized = normalizeQuote(quote?.data, generatedAt);
-    const p = profile?.data;
+    // Only company-wide figures come from the profile, so another share class's profile is fine (BRK.A's for BRK.B),
+    // but a profile for a different company is ignored rather than shown under this ticker
+    const p = profile?.data && (!profile.data.ticker || sameCompany(profile.data.ticker, stock.symbol)) ? profile.data : undefined;
     // Every S&P 500 listing trades in dollars. A profile in another currency would put its market cap in that
     // currency, so it is left out rather than shown as dollars.
     const capInDollars = !p?.currency || p.currency === 'USD';

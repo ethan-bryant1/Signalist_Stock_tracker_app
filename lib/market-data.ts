@@ -89,6 +89,21 @@ export function normalizeQuote(raw: unknown, now = Date.now()): Quote | undefine
     return { price, previousClose, change, changePercent, open: positive(q.o), dayHigh, dayLow, time };
 }
 
+// ---------- Which listing an answer is for ----------
+//
+// Finnhub can answer one share class with another class's profile: BRK.B gets BRK.A's (checked with real data on
+// 2026-10-11). Company-wide figures (name, logo, exchange, total market cap) are the same for every class; per-share
+// figures (EPS, 52-week range, shares outstanding) are not.
+
+const canonicalTicker = (ticker: string) => ticker.trim().toUpperCase().replace(/[-/]/g, ".");
+
+// The same listing, however the class is written: BRK.B, BRK-B and BRK/B
+export const sameListing = (a: string, b: string) => canonicalTicker(a) === canonicalTicker(b);
+
+// The same company, possibly another share class: BRK.A and BRK.B. GOOG and GOOGL have no class suffix in their
+// tickers, so they never match each other here (Finnhub answers each with its own profile).
+export const sameCompany = (a: string, b: string) => canonicalTicker(a).split(".")[0] === canonicalTicker(b).split(".")[0];
+
 // ---------- The New York clock ----------
 
 const NEW_YORK = "America/New_York";

@@ -11,8 +11,9 @@
 // as a disagreement with the other. What it checks for each stock:
 //   quote:   a positive price and previous close; Finnhub's own change (d, dp) matches price − previous close;
 //            day high ≥ low; a timestamp that isn't in the future, and how old it is for the current session
-//   profile: the profile is for this exact ticker (not another share class); figures in US dollars; a positive
-//            market cap that roughly equals price × shares outstanding; a known US exchange; an https logo
+//   profile: the profile is for this company (another share class's is fine, since the map only uses company-wide
+//            figures); in US dollars; a positive market cap that roughly equals price × shares outstanding; a known
+//            US exchange; an https logo
 import dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
 
@@ -137,10 +138,18 @@ async function checkProfile(symbol, price) {
   if (p.error) return note(symbol, 'FAIL', `profile: ${p.error}`);
   const profile = p.data ?? {};
   if (!profile.ticker) return note(symbol, 'FAIL', 'profile: empty (no company profile for this symbol)');
-  if (profile.ticker.toUpperCase() !== symbol) note(symbol, 'FAIL', `profile: is for ${profile.ticker}, not ${symbol} (another share class?); the app would show the wrong company figures`);
+  // BRK.B, BRK-B and BRK/B are one listing; BRK.A and BRK.B are two classes of one company
+  const listing = (t) => t.trim().toUpperCase().replace(/[-/]/g, '.');
+  const otherClass = listing(profile.ticker) !== listing(symbol);
+  if (otherClass && listing(profile.ticker).split('.')[0] !== listing(symbol).split('.')[0]) {
+    return note(symbol, 'FAIL', `profile: is for ${profile.ticker}, a different company; the app ignores it, so ${symbol} has no market cap, logo or exchange`);
+  }
+  // The map only takes company-wide figures from a profile (name, logo, exchange, total market cap), which are the
+  // same for every share class; shares outstanding are counted in the other class, so they can't be cross-checked
+  if (otherClass) note(symbol, 'INFO', `profile: Finnhub answers with ${profile.ticker}'s profile (same company, other share class). The map uses only its company-wide figures, so the market cap is the whole company's; shares outstanding can't be cross-checked`);
   if (profile.currency && profile.currency !== 'USD') note(symbol, 'WARN', `profile: figures in ${profile.currency}; the app leaves this market cap out`);
   if (!(profile.marketCapitalization > 0)) note(symbol, 'FAIL', 'profile: no market cap, so the market-cap map leaves this stock out (listed under the map)');
-  else if (price && profile.shareOutstanding > 0) {
+  else if (price && profile.shareOutstanding > 0 && !otherClass) {
     const implied = price * profile.shareOutstanding;
     const ratio = profile.marketCapitalization / implied;
     if (ratio < 0.8 || ratio > 1.25) note(symbol, 'WARN', `profile: market cap $${(profile.marketCapitalization / 1000).toFixed(1)}B is ${ratio.toFixed(2)}× price × shares ($${(implied / 1000).toFixed(1)}B)`);

@@ -34,10 +34,8 @@ const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className }
             {title && <h3 className="font-semibold text-2xl text-gray-100 mb-5">{title}</h3>}
             {/* At least the widget's height plus its attribution, so a failure message has room before the widget loads */}
             <div className="relative" style={{ minHeight: height + TRADINGVIEW_ATTRIBUTION_HEIGHT }}>
-                <div className={cn('tradingview-widget-container', className)} ref={containerRef}>
-                    <div className="tradingview-widget-container__widget" style={{ height, width: "100%" }} />
-                    <div style={{ height: TRADINGVIEW_ATTRIBUTION_HEIGHT }} />
-                </div>
+                {/* Left empty: the hook writes the widget and its attribution into it */}
+                <div className={cn('tradingview-widget-container', className)} ref={containerRef} />
                 {status === 'failed' && <WidgetFailed name="widget" onRetry={retry} />}
             </div>
         </div>

@@ -58,7 +58,8 @@ export async function fetchJSON<T>(url: string, revalidateSeconds?: number): Pro
   return (await fetchFinnhub<T>(url, revalidateSeconds)).data;
 }
 
-// Runs fn on every item with at most `limit` at a time, keeping the order
+// Runs fn on every item with at most `limit` at a time, keeping the order. fn must not throw: one rejection rejects
+// the whole call and the other results are lost, so callers catch inside fn (as getHeatmapData does).
 export const mapWithLimit = async <T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> => {
   const results = new Array<R>(items.length);
   let next = 0;

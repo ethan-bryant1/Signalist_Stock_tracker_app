@@ -339,7 +339,11 @@ const StockHeatmap = ({
             return layoutGroups([{ key: "all", label: "All stocks", items: ordered }], valueOf, box);
         }
         const bySector = new Map<string, HeatmapStock[]>();
-        for (const stock of ordered) bySector.set(stock.sector, [...(bySector.get(stock.sector) ?? []), stock]);
+        for (const stock of ordered) {
+            const sector = bySector.get(stock.sector);
+            if (sector) sector.push(stock);
+            else bySector.set(stock.sector, [stock]);
+        }
         return layoutGroups(
             [...bySector].map(([sector, items]) => ({ key: sector, label: sector, items })),
             valueOf,
