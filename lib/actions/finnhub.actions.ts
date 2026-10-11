@@ -3,6 +3,8 @@
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
+import { HEATMAP_SYMBOLS } from '@/lib/data/heatmap';
+import { SP500_COMPANIES } from '@/lib/data/sp500';
 import { cache } from 'react';
 import { headers } from 'next/headers';
 import { getAuth } from '@/lib/better-auth/auth';
@@ -519,4 +521,101 @@ export async function getMarketSnapshot(includeSectors = false): Promise<MarketS
   });
 
   return snapshot;
+}
+
+// A company on the dashboard heatmap, with whatever Finnhub had for it. Missing figures stay undefined, never zero.
+export type HeatmapStock = {
+  symbol: string;
+  name: string;
+  // GICS sector and industry, from the bundled S&P 500 list
+  sector: string;
+  industry: string;
+  exchange?: string;
+  logo?: string;
+  currency: string;
+  marketCap?: number; // in millions, as Finnhub returns it
+  price?: number;
+  change?: number;
+  changePercent?: number;
+  open?: number;
+  previousClose?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  // Time of the price, in milliseconds
+  time?: number;
+};
+
+// Runs fn on every item with at most `limit` at a time, keeping the order
+const mapWithLimit = async <T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+};
+
+const SP500_BY_SYMBOL = new Map(SP500_COMPANIES.map((company) => [company.symbol, company]));
+
+// Prices and market caps for the dashboard heatmap, shared by everyone who views it.
+// Prices are kept for two to three minutes and profiles for an hour. Each price's keep time is staggered
+// so Finnhub (60 requests a minute on the free plan) is asked for a few at a time rather than all at once,
+// and a price that fails to refresh keeps its last value.
+export async function getHeatmapData(): Promise<HeatmapStock[]> {
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) {
+    console.error('getHeatmapData:', new Error('FINNHUB API key is not configured'));
+    return [];
+  }
+  // An empty cache costs over 100 Finnhub requests, so strangers can't trigger it
+  if (!(await isSignedIn())) return [];
+
+  let failures = 0;
+  const stocks = await mapWithLimit(HEATMAP_SYMBOLS, 6, async (symbol, index): Promise<HeatmapStock | null> => {
+    const company = SP500_BY_SYMBOL.get(symbol);
+    if (!company) return null;
+
+    const q = encodeURIComponent(symbol);
+    const [quote, profile] = await Promise.all([
+      fetchJSON<FinnhubFullQuote & { t?: number }>(`${FINNHUB_BASE_URL}/quote?symbol=${q}&token=${token}`, 120 + (index % 6) * 15).catch(() => {
+        failures++;
+        return null;
+      }),
+      fetchJSON<FinnhubFullProfile>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${q}&token=${token}`, 3600).catch(() => {
+        failures++;
+        return null;
+      }),
+    ]);
+
+    // Finnhub returns a price of 0 for symbols it has no quote for
+    const hasQuote = !!nonZero(quote?.c);
+    const time = nonZero(quote?.t);
+
+    return {
+      symbol,
+      name: profile?.name || company.name,
+      sector: company.sector,
+      industry: company.industry,
+      exchange: toTradingViewExchange(profile?.exchange) ?? (profile?.exchange || undefined),
+      logo: profile?.logo || undefined,
+      currency: profile?.currency || 'USD',
+      marketCap: nonZero(profile?.marketCapitalization),
+      price: hasQuote ? num(quote?.c) : undefined,
+      change: hasQuote ? num(quote?.d) : undefined,
+      changePercent: hasQuote ? num(quote?.dp) : undefined,
+      open: hasQuote ? nonZero(quote?.o) : undefined,
+      previousClose: nonZero(quote?.pc),
+      dayHigh: hasQuote ? nonZero(quote?.h) : undefined,
+      dayLow: hasQuote ? nonZero(quote?.l) : undefined,
+      time: hasQuote && time ? time * 1000 : undefined,
+    };
+  });
+
+  // One line instead of one per stock, since a cold start can briefly run into Finnhub's rate limit
+  if (failures) console.error(`getHeatmapData: ${failures} Finnhub requests failed; those stocks keep their last figures`);
+  return stocks.filter((stock): stock is HeatmapStock => stock !== null);
 }

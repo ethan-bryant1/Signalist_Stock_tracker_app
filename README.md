@@ -6,7 +6,7 @@ Built with Next.js 16, Better Auth, MongoDB, Inngest, Finnhub and TradingView wi
 
 ## Features
 
-- **Dashboard:** live S&P 500, Nasdaq 100, Dow 30 and Russell 2000 prices that refresh every minute, a market open/closed badge, a market overview, a heatmap, top stories and quotes.
+- **Dashboard:** live S&P 500, Nasdaq 100, Dow 30 and Russell 2000 prices that refresh every minute, a market open/closed badge, a market overview, a heatmap of the largest S&P 500 companies (hover, tap or use the arrow keys for each stock's price, day range, market cap and sector), top stories and quotes.
 - **Stock heatmap:** the whole S&P 500 colored by any time frame from 1 hour to 1 year (or pre-market and after hours), sized by market cap or volume, with full screen mode and live sector performance.
 - **Market data:** every US stock in a screener, plus search and sector filters for the S&P 500.
 - **Stock pages:** price, key figures (P/E, EPS, market cap, 52-week range and more), a full chart, the company's latest news, profile, technical analysis and financials.

@@ -147,6 +147,19 @@
   --color-gray-100: #0A0A0A;
 }
 
+/* Stock heatmap tiles (components/StockHeatmap.tsx): flat gray for no change, mixed toward green or red
+   as the move grows. White labels stay readable on every shade in both themes. */
+:root {
+  --heat-flat: #71717A;
+  --heat-up: #15803D;
+  --heat-down: #C62828;
+}
+.dark {
+  --heat-flat: #2A2D34;
+  --heat-up: #178A4C;
+  --heat-down: #D23442;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
