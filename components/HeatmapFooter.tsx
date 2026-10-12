@@ -59,8 +59,16 @@ export const HeatmapLegend = ({ className, palette = "classic" }: { className?: 
 // How many stocks left off the map are named inline before the list moves into a disclosure
 const UNPLACED_INLINE = 4;
 
+// Why the live trade stream isn't running, for the status line's tooltip
+const STREAM_OFF_TEXT: Record<string, string> = {
+    "not-configured": "The server has no Finnhub API key.",
+    unsupported: "The server's Node.js is older than version 22, which the live stream needs.",
+    refused: "Finnhub turned the stream down: another tab or computer may already be streaming with this key. Trying again shortly.",
+    dropped: "The connection dropped. Trying again shortly.",
+};
+
 type HeatmapStatusProps = {
-    feed: Pick<HeatmapFeed, "refreshError" | "failingSince" | "issue" | "failedRequests" | "lastSuccessAt">;
+    feed: Pick<HeatmapFeed, "refreshError" | "failingSince" | "issue" | "failedRequests" | "lastSuccessAt" | "live">;
     assessment: FeedAssessment;
     total: number;
     unplaced: readonly HeatmapStock[];
@@ -91,6 +99,28 @@ export const HeatmapStatus = ({ feed, assessment, total, unplaced, now, classNam
                     </span>
                 )}
             </span>
+            {feed.live.state === "live" && (
+                <>
+                    <span
+                        data-live-badge
+                        className="inline-flex items-center gap-1.5 font-semibold text-gray-100"
+                        title={`Every trade moves the ${feed.live.symbols.length} largest stocks within a second or two${total > feed.live.symbols.length ? `; the other ${total - feed.live.symbols.length} update every minute` : ""}`}
+                    >
+                        <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-100 motion-reduce:animate-none" />
+                        Live
+                        <span className="sr-only">: {feed.live.symbols.length} of {total} stocks update with every trade</span>
+                    </span>
+                    <span aria-hidden>·</span>
+                </>
+            )}
+            {feed.live.state === "off" && feed.live.reason && !feed.refreshError && (
+                <>
+                    <span className="text-gray-400" title={STREAM_OFF_TEXT[feed.live.reason] ?? STREAM_OFF_TEXT.dropped}>
+                        Live stream off · updating every minute
+                    </span>
+                    <span aria-hidden>·</span>
+                </>
+            )}
             <span className="font-medium text-gray-400">
                 1D · {period.label}
                 {period.day ? ` (${period.day})` : ""}

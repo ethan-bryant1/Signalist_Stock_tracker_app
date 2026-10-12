@@ -15,8 +15,9 @@ const sectorHref = (sector: string) => `/heatmap?sector=${encodeURIComponent(sec
 // and a sector heading opens that sector on the Heatmap page. The figures, colors and status line are the same
 // as on the Heatmap page's interactive view.
 const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
-    const feed = useHeatmapFeed(initial);
     const { session } = useLiveMarket();
+    // Trades stream in only while the regular session trades; otherwise prices refresh once a minute
+    const feed = useHeatmapFeed(initial, { stream: session === "regular" });
     const now = useNow(initial.generatedAt);
     const [settings] = useHeatmapSettings();
 

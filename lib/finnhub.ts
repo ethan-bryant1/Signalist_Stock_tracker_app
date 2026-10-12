@@ -5,6 +5,8 @@ import type { FeedIssue } from '@/lib/market-data';
 // Talking to Finnhub. Server only: the API key must never reach the browser.
 
 export const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+// Finnhub's live trade stream (see app/api/heatmap/stream/route.ts)
+export const FINNHUB_STREAM_URL = 'wss://ws.finnhub.io';
 
 export const getFinnhubToken = () => process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
 

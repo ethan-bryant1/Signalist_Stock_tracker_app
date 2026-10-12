@@ -19,13 +19,11 @@ import {
     INTERACTIVE_SUPPORTS,
     PERIOD_OPTIONS,
     SIZE_OPTIONS,
-    UNSUPPORTED_REASON,
     focusSector,
     interactiveSettings,
     parseHeatmapState,
     selectStock,
     serializeHeatmapState,
-    type ColorBy,
     type HeatmapState,
     type HeatmapView,
     type Option,
@@ -33,46 +31,35 @@ import {
 import { assessStocks, capWeightedChange, periodPhrase, type HeatmapPayload, type MarketSession } from "@/lib/market-data";
 import { cn, formatChangePercent, getChangeColorClass } from "@/lib/utils";
 
-type ToolbarOption<T extends string> = Option<T> & { unavailable?: string };
-
-// A row of buttons where one is selected, like a trading platform's toolbar. An unavailable option stays visible
-// but dimmed, says why on hover, and explains itself when chosen instead of quietly showing something else.
+// A row of buttons where one is selected, like a trading platform's toolbar
 const Segmented = <T extends string>({
     label,
     options,
     value,
     onChange,
-    onUnavailable,
     className,
 }: {
     className?: string;
     label: string;
-    options: ToolbarOption<T>[];
+    options: Option<T>[];
     value?: T;
     onChange: (value: T) => void;
-    onUnavailable: (option: ToolbarOption<T>) => void;
 }) => (
     <div className={cn("flex min-w-0 max-w-full flex-col gap-1.5", className)}>
         <span className="text-[11px] font-medium uppercase tracking-wider text-gray-500">{label}</span>
         <div role="group" aria-label={label} className="flex w-fit max-w-full overflow-x-auto scrollbar-hide rounded-lg border border-gray-600 bg-gray-900 p-0.5">
             {options.map((option) => {
                 const active = option.value === value;
-                const description = option.description[0].toUpperCase() + option.description.slice(1);
                 return (
                     <button
                         key={option.value}
                         type="button"
                         aria-pressed={active}
-                        aria-disabled={option.unavailable ? true : undefined}
-                        title={option.unavailable ? `${description}: ${option.unavailable}` : description}
-                        onClick={() => (option.unavailable ? onUnavailable(option) : onChange(option.value))}
+                        title={option.description[0].toUpperCase() + option.description.slice(1)}
+                        onClick={() => onChange(option.value)}
                         className={cn(
                             "h-7 shrink-0 cursor-pointer whitespace-nowrap rounded-md px-2 text-xs font-semibold tabular-nums transition-colors",
-                            active
-                                ? "bg-gray-100 text-gray-900"
-                                : option.unavailable
-                                    ? "cursor-not-allowed text-gray-500/60 line-through decoration-gray-500/40"
-                                    : "text-gray-500 hover:bg-gray-700 hover:text-gray-100"
+                            active ? "bg-gray-100 text-gray-900" : "text-gray-500 hover:bg-gray-700 hover:text-gray-100"
                         )}
                     >
                         {option.label}
@@ -211,12 +198,11 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     }
     const [showMapControls, setShowMapControls] = useState(false);
     const [highlight, setHighlight] = useState<string>();
-    // Why an option the interactive view can't show was refused, until the next change
-    const [notice, setNotice] = useState<string>();
     const [watchlist, setWatchlist] = useState(() => new Set(initialWatchlist));
 
-    const feed = useHeatmapFeed(initial);
     const { session } = useLiveMarket();
+    // Trades stream in only while the regular session trades; otherwise prices refresh once a minute
+    const feed = useHeatmapFeed(initial, { stream: session === "regular" });
     const now = useNow(initial.generatedAt);
     const [settings] = useHeatmapSettings();
 
@@ -260,7 +246,6 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     }, []);
 
     const change = useCallback((next: (previous: HeatmapState) => HeatmapState) => {
-        setNotice(undefined);
         setState(next);
     }, []);
 
@@ -354,24 +339,10 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
         }
     };
 
-    const unavailable = (option: ToolbarOption<string>) => {
-        const text = `${option.description[0].toUpperCase()}${option.description.slice(1)}: ${option.unavailable}`;
-        setNotice(text);
-        announce(text);
-    };
-
-    const periodOptions: ToolbarOption<ColorBy>[] = PERIOD_OPTIONS.map((option) => ({
-        ...option,
-        unavailable: interactive && !INTERACTIVE_SUPPORTS.color.has(option.value) ? UNSUPPORTED_REASON.color : undefined,
-    }));
-    const extendedOptions: ToolbarOption<ColorBy>[] = EXTENDED_HOURS_OPTIONS.map((option) => ({
-        ...option,
-        unavailable: interactive ? UNSUPPORTED_REASON.extended : undefined,
-    }));
-    const sizeOptions = SIZE_OPTIONS.map((option) => ({
-        ...option,
-        unavailable: interactive && !INTERACTIVE_SUPPORTS.size.has(option.value) ? UNSUPPORTED_REASON.size : undefined,
-    }));
+    // The interactive view offers only what Finnhub's free plan can back: today's move, sized by market cap or
+    // equally. Every period, extended hours and volume are in the Full S&P 500 view.
+    const periodOptions = interactive ? PERIOD_OPTIONS.filter((option) => INTERACTIVE_SUPPORTS.color.has(option.value)) : PERIOD_OPTIONS;
+    const sizeOptions = interactive ? SIZE_OPTIONS.filter((option) => INTERACTIVE_SUPPORTS.size.has(option.value)) : SIZE_OPTIONS;
 
     const shownColor = interactive ? effective.color : state.color;
     const shownSize = interactive ? effective.size : state.size;
@@ -451,24 +422,24 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                         options={periodOptions}
                         value={PERIOD_OPTIONS.some((option) => option.value === shownColor) ? shownColor : undefined}
                         onChange={(color) => change((previous) => ({ ...previous, color }))}
-                        onUnavailable={unavailable}
                     />
-                    <Segmented
-                        className="order-2"
-                        label="Extended hours"
-                        options={extendedOptions}
-                        value={EXTENDED_HOURS_OPTIONS.some((option) => option.value === shownColor) ? shownColor : undefined}
-                        onChange={(color) => change((previous) => ({ ...previous, color }))}
-                        onUnavailable={unavailable}
-                    />
-                    <Segmented className="order-4 sm:order-3" label="Size by" options={sizeOptions} value={shownSize} onChange={(size) => change((previous) => ({ ...previous, size }))} onUnavailable={unavailable} />
-                    <Segmented className="order-3 sm:order-4" label="Group" options={GROUP_OPTIONS} value={state.group} onChange={(group) => change((previous) => ({ ...previous, group }))} onUnavailable={unavailable} />
+                    {!interactive && (
+                        <Segmented
+                            className="order-2"
+                            label="Extended hours"
+                            options={EXTENDED_HOURS_OPTIONS}
+                            value={EXTENDED_HOURS_OPTIONS.some((option) => option.value === shownColor) ? shownColor : undefined}
+                            onChange={(color) => change((previous) => ({ ...previous, color }))}
+                        />
+                    )}
+                    <Segmented className="order-4 sm:order-3" label="Size by" options={sizeOptions} value={shownSize} onChange={(size) => change((previous) => ({ ...previous, size }))} />
+                    <Segmented className="order-3 sm:order-4" label="Group" options={GROUP_OPTIONS} value={state.group} onChange={(group) => change((previous) => ({ ...previous, group }))} />
                 </div>
 
                 {/* Screen readers hear this through the page's announcement, not as a live region added already filled */}
-                {interactive && (notice || fellBack) && (
+                {fellBack && (
                     <div data-heatmap-notice className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-gray-600 bg-gray-900/40 px-4 py-2 text-xs text-gray-400">
-                        <span>{notice ?? fallbackText(state)}</span>
+                        <span>{fallbackText(state)}</span>
                         <button
                             type="button"
                             onClick={() => switchView("tradingview")}

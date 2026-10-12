@@ -39,8 +39,11 @@ browser, and error messages and logs never include request URLs.
 ### What Finnhub's free plan doesn't have
 
 No price history (`/stock/candle` is a paid endpoint), no pre-market or after-hours prices, no trading volume on
-`/quote`, no batch quotes. That is why the interactive map shows only the 1-day change and sizes only by market cap
-or equally. `/stock/metric` has period returns, but without an as-of date, so the app doesn't use them.
+`/quote`, no batch quotes. That is why the interactive map offers only the 1-day change and sizing by market cap or
+equally; the other periods, extended hours and volume aren't shown there at all (the Full S&P 500 view has them). A
+link that asks the interactive view for one of them gets the 1-day change by market cap, with a note saying so.
+Free real-time data for the whole market doesn't exist elsewhere either: the exchanges charge for it, so free plans
+are 15 minutes delayed (Alpaca, checked 2026-10-12) or cover one exchange. `/stock/metric` has period returns, but without an as-of date, so the app doesn't use them.
 
 ### Requests, caching and refresh
 
@@ -57,6 +60,29 @@ or equally. `/stock/metric` has period returns, but without an as-of date, so th
 - A cold cache costs about 108 requests, more than the free plan's 60 a minute. Finnhub then answers some with 429,
   those stocks show as missing, and the status line says "Finnhub's rate limit was hit". They fill in on the next
   refreshes as the cache warms.
+
+### Live trades
+
+During the regular session the map also follows Finnhub's free trade stream (`wss://ws.finnhub.io`), so the largest
+stocks move within a second or two of each trade instead of once a minute.
+
+- **Key stays on the server.** `GET /api/heatmap/stream` (signed-in users only) opens the socket to Finnhub with the
+  key and passes trades on to the page as server-sent events. The page never sees the key.
+- **50 symbols.** The free stream allows 50 symbols, so the 50 largest map stocks by market cap stream; the other 4
+  keep the once-a-minute refresh. `npm run check:stream` checks the limit and the connection with your key.
+- **Batches.** The server sends at most two batches a second, with only each stock's newest trade, since the busiest
+  stocks trade hundreds of times a second.
+- **Regular session only.** Only trades between 9:30 AM and 4:00 PM ET move a tile, since the 1-day change is a
+  regular-session figure (Finnhub's quote is too). A trade only replaces a price it is newer than and from the same
+  New York day; a stock waits for its first refresh of the day, which brings the previous close the change needs.
+  The page doesn't open the stream outside the regular session or while the tab is hidden.
+- **Refreshes don't undo it.** A refresh can bring a price cached on the server a minute or two ago; the page keeps
+  whichever price is newer.
+- **Connections.** Each connection lasts about 4½ minutes (inside Vercel's 5-minute limit for one request on the
+  free plan) and the page opens the next straight away. If the stream fails (Finnhub refuses a second stream on the
+  same key, the server's Node.js is older than 22, the connection drops), the status line says "Live stream off ·
+  updating every minute" and the page tries again after 30 seconds, then 1, 2 and 5 minutes.
+- **Status line.** "Live" with a pulsing dot while trades stream in; hovering it says how many stocks stream.
 
 ## Colors
 
@@ -156,5 +182,7 @@ card moves by `transform` at most once per frame. Measured on 2026-10-11 (Chromi
 
 - `npm test`: unit tests for quote normalization, sessions and freshness, the color scale and contrast, treemap
   layout, label fitting, card placement, arrow keys, URL state and the sector mapping.
+- `npm run check:stream`: connects to Finnhub's trade stream with your key, subscribes to 50 symbols and reports
+  whether Finnhub accepted it and how many trades arrived in 20 seconds (none outside market hours is normal).
 - `npm run check:market-data`: checks the real Finnhub answers for every map stock and sector ETF with your key
   (pacing itself under the rate limit, never printing the key) and prints PASS, PASS WITH WARNINGS or FAIL.

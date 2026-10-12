@@ -39,16 +39,11 @@ export const GROUP_OPTIONS: Option<GroupBy>[] = [
     { value: "none", label: "None", description: "not grouped" },
 ];
 
-// What the interactive view can show with Finnhub's free plan: today's quote and a daily market cap.
-// It has no price history (for other periods), no extended-hours prices and no volume.
+// What the interactive view can show with Finnhub's free plan: today's quote and a daily market cap. It has no
+// price history (for other periods), no extended-hours prices and no volume, so it offers only these options.
 export const INTERACTIVE_SUPPORTS = {
     color: new Set<ColorBy>(["1d"]),
     size: new Set<SizeBy>(["cap", "equal"]),
-};
-export const UNSUPPORTED_REASON = {
-    color: "Needs price history, which Finnhub's free plan doesn't include. Available in the Full S&P 500 view.",
-    extended: "Needs pre-market and after-hours prices, which Finnhub's free plan doesn't include. Available in the Full S&P 500 view.",
-    size: "Needs trading volume, which Finnhub's free plan doesn't include. Available in the Full S&P 500 view.",
 };
 
 // TradingView's own names for each setting (its stock heatmap widget's blockColor and blockSize values)
