@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { nextCookies } from "better-auth/next-js";
 import { connectToDatabase } from "@/database/mongoose";
+import { isAllowedEmail, PRIVATE_SITE_MESSAGE } from "@/lib/owner-access";
 
 type Db = Parameters<typeof mongodbAdapter>[0];
 
@@ -16,6 +17,21 @@ const createAuth = (db: Db) => betterAuth({
         minPasswordLength: 8,
         maxPasswordLength: 128,
         autoSignIn: true,
+    },
+    // The sign-up and sign-in actions check ALLOWED_EMAILS first to give a clear message. These hooks are the
+    // backstop that holds for every way into Better Auth.
+    user: {
+        validateUserInfo: ({ user }) => isAllowedEmail(user.email) ? undefined : { error: "private_site", errorDescription: PRIVATE_SITE_MESSAGE },
+    },
+    databaseHooks: {
+        session: {
+            create: {
+                before: async (session, ctx) => {
+                    const user = await ctx?.context.internalAdapter.findUserById(session.userId);
+                    return isAllowedEmail(user?.email);
+                },
+            },
+        },
     },
     plugins: [nextCookies()],
 });
@@ -40,4 +56,12 @@ export const getAuth = async () => {
     authInstance = createAuth(db as unknown as Db);
 
     return authInstance;
+}
+
+// The signed-in user's session, or null. Use this rather than auth.api.getSession: it also turns away sessions
+// whose email has since been taken off ALLOWED_EMAILS (or that were created before the list existed).
+export const getSession = async (requestHeaders: Headers) => {
+    const auth = await getAuth();
+    const session = await auth.api.getSession({ headers: requestHeaders });
+    return session?.user && isAllowedEmail(session.user.email) ? session : null;
 }

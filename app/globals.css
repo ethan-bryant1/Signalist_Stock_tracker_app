@@ -147,6 +147,28 @@
   --color-gray-100: #0A0A0A;
 }
 
+/* Stock heatmap tiles (components/StockHeatmap.tsx, scale in lib/heatmap.ts): flat gray for no change, mixed
+   toward green or red as the move grows. White labels pass the 4.5:1 contrast rule on every shade in both themes
+   (tests/heatmap-colors.test.ts checks it). data-heat-palette="cvd" swaps in blue and orange for red-green color blindness. */
+:root {
+  --heat-flat: #71717A;
+  --heat-up: #11803B;
+  --heat-down: #B3302B;
+}
+.dark {
+  --heat-flat: #2A2D34;
+  --heat-up: #128245;
+  --heat-down: #BE3B3B;
+}
+[data-heat-palette="cvd"] {
+  --heat-up: #1D5FA8;
+  --heat-down: #964D09;
+}
+.dark [data-heat-palette="cvd"] {
+  --heat-up: #2070C8;
+  --heat-down: #A75B1C;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -227,7 +249,7 @@
     @apply w-full grid-cols-1 gap-6 xl:grid-cols-3 space-y-6 sm:space-y-8;
   }
   .watchlist-btn {
-    @apply bg-gray-100 text-base hover:opacity-85 text-gray-900 w-full rounded h-11 font-semibold cursor-pointer transition-opacity disabled:opacity-60;
+    @apply bg-gray-100 text-base hover:opacity-85 text-gray-900 w-full rounded h-11 font-semibold cursor-pointer transition-opacity disabled:opacity-60 aria-disabled:opacity-60;
   }
   .watchlist-remove {
     @apply bg-transparent! border! border-gray-600! text-gray-100! hover:border-gray-500!
@@ -375,8 +397,11 @@
 
 .tradingview-widget-container__widget {
   background-color: var(--color-gray-800) !important;
-  height: 100% !important;
+}
 
+/* A widget filling its box (the Heatmap page's map) leaves the bottom 32px for TradingView's attribution line */
+.tradingview-widget-container--fill .tradingview-widget-container__widget {
+  height: calc(100% - 32px) !important;
 }
 
 .widget-stock-heatmap-container .screenerMapWrapper-BBVfGP0b {
@@ -394,23 +419,19 @@
   background-color: transparent !important;
 }
 
+/* TradingView's attribution line (hooks/useTradingViewWidget.ts). TradingView's script styles it; these rules only
+   match that design until the script has loaded, since its terms ask for the attribution to stay as designed. */
 .tradingview-widget-copyright {
-  font-size: 11px;
-  color: #9ca3af;
+  height: 32px;
+  font-size: 13px;
+  line-height: 32px;
   text-align: center;
-  padding: 4px 0;
-  background-color: transparent;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
-.tradingview-widget-copyright a {
-  color: #60a5fa;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.tradingview-widget-copyright a:hover {
-  color: #93c5fd;
-  text-decoration: underline;
+.tradingview-widget-copyright .blue-text {
+  color: #2962FF;
 }
 
 .tv-embed-widget-wrapper .tv-embed-widget-wrapper__body {

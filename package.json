@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:db": "node scripts/test-db.mjs"
+    "test:db": "node scripts/test-db.mjs",
+    "test": "vitest run",
+    "check:market-data": "node scripts/check-market-data.mjs",
+    "check:stream": "node scripts/check-stream.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -41,6 +44,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "4.1.11"
   }
 }

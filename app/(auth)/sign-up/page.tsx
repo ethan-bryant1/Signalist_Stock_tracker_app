@@ -49,7 +49,8 @@ const SignUp = () => {
 
     return (
         <>
-            <h1 className="form-title">Sign Up & Personalize</h1>
+            <h1 className="form-title !mb-3">Sign Up & Personalize</h1>
+            <p className="mb-10 text-sm text-gray-500">Loops Watch is private, so only the owner&apos;s email can create an account.</p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <InputField

@@ -96,41 +96,51 @@ export const formatArticle = (
   related: isCompanyNews ? symbol! : article.related || '',
 });
 
+// Rounded to cents first, so a tiny negative move shows as 0.00, never "-0.00"
+const roundToCents = (value: number) => {
+  const rounded = Math.round(value * 100) / 100;
+  return rounded === 0 ? 0 : rounded;
+};
+
 export const formatChangePercent = (changePercent?: number) => {
-  if (changePercent === undefined || changePercent === null) return '';
-  const sign = changePercent > 0 ? '+' : '';
-  return `${sign}${changePercent.toFixed(2)}%`;
+  if (changePercent === undefined || changePercent === null || !Number.isFinite(changePercent)) return '';
+  const value = roundToCents(changePercent);
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
 };
 
+// Green for a gain and red for a loss, judged on the rounded figure so the color matches the text.
+// The light theme uses green 800 and red 700, which pass the 4.5:1 contrast rule on white, light gray and the
+// highlighted rows of light panels.
 export const getChangeColorClass = (changePercent?: number) => {
-  if (!changePercent) return 'text-gray-400';
-  return changePercent > 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500';
+  const value = changePercent === undefined || changePercent === null || !Number.isFinite(changePercent) ? 0 : roundToCents(changePercent);
+  if (!value) return 'text-gray-400';
+  return value > 0 ? 'text-green-800 dark:text-green-500' : 'text-red-700 dark:text-red-500';
 };
 
-export const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(price);
-};
+export const formatPrice = (price: number) => formatCurrency(price, 'USD');
+
+// Number formats are slow to create, so each currency's is made once
+const CURRENCY_FORMATS = new Map<string, Intl.NumberFormat>();
 
 // A price in the stock's own currency (dollars when the currency code is unknown)
 export const formatCurrency = (value: number, currency = 'USD') => {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return formatPrice(value);
+  let format = CURRENCY_FORMATS.get(currency);
+  if (!format) {
+    try {
+      format = new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch {
+      format = CURRENCY_FORMATS.get('USD') ?? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    CURRENCY_FORMATS.set(currency, format);
   }
+  return format.format(value);
 };
 
-// A price change with its sign, like +1.23 or -0.45
-export const formatSignedNumber = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
+// A price change with its sign, like +1.23 or -0.45 (and 0.00 rather than -0.00)
+export const formatSignedNumber = (value: number) => {
+  const rounded = roundToCents(value);
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(2)}`;
+};
 
 // A function so a long-running server gets today's date, not the date it started
 export const formatDateToday = () => new Date().toLocaleDateString('en-US', {

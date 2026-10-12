@@ -15,17 +15,22 @@ export const MACRO_ETFS = [
     { symbol: "TLT", label: "Treasuries" },
 ] as const;
 
-// The SPDR fund that tracks each S&P 500 sector, so a sector's move is its fund's move
-export const SECTOR_ETFS: { sector: MarketSector; label: string; symbol: string }[] = [
-    { sector: "Information Technology", label: "Technology", symbol: "XLK" },
-    { sector: "Financials", label: "Financials", symbol: "XLF" },
-    { sector: "Health Care", label: "Health Care", symbol: "XLV" },
-    { sector: "Consumer Discretionary", label: "Consumer Discretionary", symbol: "XLY" },
-    { sector: "Communication Services", label: "Communication", symbol: "XLC" },
-    { sector: "Industrials", label: "Industrials", symbol: "XLI" },
-    { sector: "Consumer Staples", label: "Consumer Staples", symbol: "XLP" },
-    { sector: "Energy", label: "Energy", symbol: "XLE" },
-    { sector: "Utilities", label: "Utilities", symbol: "XLU" },
-    { sector: "Real Estate", label: "Real Estate", symbol: "XLRE" },
-    { sector: "Materials", label: "Materials", symbol: "XLB" },
+// The 11 GICS sectors of the S&P 500, each with the SPDR Select Sector ETF that holds that sector's stocks.
+// An ETF's move is not the same as its sector's stocks' combined move: S&P caps the biggest holdings in each
+// Select Sector index (no company above roughly 23%), so the ETF weights its stocks differently.
+// `short` is the heading used when the full name doesn't fit.
+export const SECTOR_ETFS: { sector: MarketSector; short: string; symbol: string }[] = [
+    { sector: "Information Technology", short: "Info Tech", symbol: "XLK" },
+    { sector: "Financials", short: "Financials", symbol: "XLF" },
+    { sector: "Health Care", short: "Health Care", symbol: "XLV" },
+    { sector: "Consumer Discretionary", short: "Cons. Discretionary", symbol: "XLY" },
+    { sector: "Communication Services", short: "Comm. Services", symbol: "XLC" },
+    { sector: "Industrials", short: "Industrials", symbol: "XLI" },
+    { sector: "Consumer Staples", short: "Cons. Staples", symbol: "XLP" },
+    { sector: "Energy", short: "Energy", symbol: "XLE" },
+    { sector: "Utilities", short: "Utilities", symbol: "XLU" },
+    { sector: "Real Estate", short: "Real Estate", symbol: "XLRE" },
+    { sector: "Materials", short: "Materials", symbol: "XLB" },
 ];
+
+export const SECTOR_BY_NAME = new Map(SECTOR_ETFS.map((entry) => [entry.sector as string, entry]));

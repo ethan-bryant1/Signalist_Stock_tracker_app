@@ -4,6 +4,7 @@ import {getAuth} from "@/lib/better-auth/auth";
 import {inngest} from "@/lib/inngest/client";
 import {headers} from "next/headers";
 import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from "@/lib/constants";
+import {accessDeniedMessage, isAllowedEmail} from "@/lib/owner-access";
 
 const isOption = (options: { value: string }[], value: string) => options.some((option) => option.value === value);
 
@@ -15,6 +16,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         && isOption(PREFERRED_INDUSTRIES, preferredIndustry);
 
     if(!validProfile) return { success: false, error: 'Please choose your country and preferences from the lists' }
+    if(!isAllowedEmail(email)) return { success: false, error: accessDeniedMessage() }
 
     try {
         const auth = await getAuth();
@@ -40,6 +42,8 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 }
 
 export const signInWithEmail = async ({ email, password }: SignInFormData) => {
+    if(!isAllowedEmail(email)) return { success: false, error: accessDeniedMessage() }
+
     try {
         const auth = await getAuth();
         const response = await auth.api.signInEmail({ body: { email, password }, headers: await headers() })

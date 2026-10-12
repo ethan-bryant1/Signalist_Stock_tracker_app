@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import CompanyNews from "@/components/CompanyNews";
 import StockHeader from "@/components/StockHeader";
@@ -13,6 +15,7 @@ import {
 } from "@/lib/constants";
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
 import { getCompanyNews, getStockOverview } from "@/lib/actions/finnhub.actions";
+import { getSession } from "@/lib/better-auth/auth";
 import { cn, formatTimeAgo } from "@/lib/utils";
 
 export async function generateMetadata({ params }: StockDetailsPageProps): Promise<Metadata> {
@@ -51,6 +54,10 @@ const NewsLoading = () => (
 );
 
 export default async function StockDetails({ params }: StockDetailsPageProps) {
+  // The layout checks the session too, but it renders alongside this page, so check before asking Finnhub
+  const session = await getSession(await headers());
+  if (!session?.user) redirect("/sign-in");
+
   const { symbol: rawSymbol } = await params;
   const symbol = rawSymbol.toUpperCase();
   const [overview, isInWatchlist] = await Promise.all([getStockOverview(symbol), isStockInWatchlist(symbol)]);

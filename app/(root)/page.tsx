@@ -1,20 +1,25 @@
+import { Suspense } from "react";
 import { headers } from "next/headers";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import Panel from "@/components/Panel";
 import IndexTiles from "@/components/IndexTiles";
-import { getAuth } from "@/lib/better-auth/auth";
+import DashboardHeatmap from "@/components/DashboardHeatmap";
+import { HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/data/heatmap";
+import { getHeatmapData } from "@/lib/heatmap-data";
+import { getSession } from "@/lib/better-auth/auth";
 import {
-    HEATMAP_WIDGET_CONFIG,
     MARKET_DATA_WIDGET_CONFIG,
     MARKET_OVERVIEW_WIDGET_CONFIG,
     TOP_STORIES_WIDGET_CONFIG,
     TRADINGVIEW_SCRIPT_URL,
 } from "@/lib/constants";
 
+// Loads the heatmap's prices without holding up the rest of the dashboard
+const HeatmapWithData = async () => <DashboardHeatmap initial={await getHeatmapData()} />;
+
 // Each panel's "Open" link shows that widget on its own, larger page
 const Home = async () => {
-    const auth = await getAuth();
-    const session = await auth.api.getSession({ headers: await headers() });
+    const session = await getSession(await headers());
     const firstName = session?.user.name?.trim().split(/\s+/)[0];
     // The market's date, which is what matters for prices
     const today = new Date().toLocaleDateString("en-US", {
@@ -43,12 +48,19 @@ const Home = async () => {
                         height={600}
                     />
                 </Panel>
-                <Panel title="Stock heatmap" description="S&P 500 by market cap, colored by today's move" href="/heatmap" className="xl:col-span-2">
-                    <TradingViewWidget
-                        scriptUrl={`${TRADINGVIEW_SCRIPT_URL}stock-heatmap.js`}
-                        config={HEATMAP_WIDGET_CONFIG}
-                        height={600}
-                    />
+                <Panel
+                    title="Stock heatmap"
+                    description={`${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}, sized by market cap, colored by 1-day change`}
+                    href="/heatmap"
+                    className="xl:col-span-2"
+                >
+                    {/* Only for a signed-in viewer: the layout's check renders alongside this page, and an empty price cache
+                        costs over 100 Finnhub requests */}
+                    {session?.user && (
+                        <Suspense fallback={<div className="h-[632px] animate-pulse bg-gray-700/40 motion-reduce:animate-none" />}>
+                            <HeatmapWithData />
+                        </Suspense>
+                    )}
                 </Panel>
             </div>
 

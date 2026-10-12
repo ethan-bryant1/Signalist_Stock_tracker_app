@@ -1,7 +1,7 @@
 import { cn, formatCurrency } from "@/lib/utils";
 
-// Where today's price sits between the day's low and high
-const DayRange = ({ low, high, price, currency, className }: { low: number; high: number; price: number; currency?: string; className?: string }) => {
+// Where today's price sits between the day's low and high, with the low and high written underneath unless showLabels is false
+const DayRange = ({ low, high, price, currency, showLabels = true, className }: { low: number; high: number; price: number; currency?: string; showLabels?: boolean; className?: string }) => {
     const position = high > low ? Math.min(Math.max((price - low) / (high - low), 0), 1) : 0.5;
 
     return (
@@ -13,10 +13,12 @@ const DayRange = ({ low, high, price, currency, className }: { low: number; high
                     style={{ left: `${position * 100}%` }}
                 />
             </div>
-            <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-gray-500">
-                <span><span className="sr-only">Day low </span>{formatCurrency(low, currency)}</span>
-                <span><span className="sr-only">Day high </span>{formatCurrency(high, currency)}</span>
-            </div>
+            {showLabels && (
+                <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-gray-500">
+                    <span><span className="sr-only">Day low </span>{formatCurrency(low, currency)}</span>
+                    <span><span className="sr-only">Day high </span>{formatCurrency(high, currency)}</span>
+                </div>
+            )}
         </div>
     );
 };
