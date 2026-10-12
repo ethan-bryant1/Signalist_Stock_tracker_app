@@ -70,7 +70,8 @@ const STREAM_OFF_TEXT: Record<string, string> = {
 type HeatmapStatusProps = {
     feed: Pick<HeatmapFeed, "refreshError" | "failingSince" | "issue" | "failedRequests" | "lastSuccessAt" | "live">;
     assessment: FeedAssessment;
-    total: number;
+    // The stocks on this map, which can be one focused sector
+    stocks: readonly Pick<HeatmapStock, "symbol">[];
     unplaced: readonly HeatmapStock[];
     now: number;
     className?: string;
@@ -78,8 +79,11 @@ type HeatmapStatusProps = {
 
 // What the map shows and how current it is: the period, how many stocks have prices, how many are stale,
 // any left off the map, the time of the newest price and the source. Problems come first.
-export const HeatmapStatus = ({ feed, assessment, total, unplaced, now, className }: HeatmapStatusProps) => {
+export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, className }: HeatmapStatusProps) => {
     const { period, priced, stale, newestQuoteTime } = assessment;
+    const total = stocks.length;
+    const streaming = new Set(feed.live.symbols);
+    const streamed = stocks.filter((stock) => streaming.has(stock.symbol)).length;
     const problem =
         feed.refreshError === "signed-out"
             ? "Signed out: sign in again to refresh prices"
@@ -99,16 +103,16 @@ export const HeatmapStatus = ({ feed, assessment, total, unplaced, now, classNam
                     </span>
                 )}
             </span>
-            {feed.live.state === "live" && (
+            {feed.live.state === "live" && streamed > 0 && (
                 <>
                     <span
                         data-live-badge
                         className="inline-flex items-center gap-1.5 font-semibold text-gray-100"
-                        title={`Every trade moves the ${feed.live.symbols.length} largest stocks within a second or two${total > feed.live.symbols.length ? `; the other ${total - feed.live.symbols.length} update every minute` : ""}`}
+                        title={`Every trade moves ${streamed === total ? "these stocks" : `${streamed} of these stocks`} within a second or two${total > streamed ? `; the other ${total - streamed} ${total - streamed === 1 ? "updates" : "update"} every minute` : ""}`}
                     >
                         <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-100 motion-reduce:animate-none" />
                         Live
-                        <span className="sr-only">: {feed.live.symbols.length} of {total} stocks update with every trade</span>
+                        <span className="sr-only">: {streamed} of {total} stocks update with every trade</span>
                     </span>
                     <span aria-hidden>·</span>
                 </>

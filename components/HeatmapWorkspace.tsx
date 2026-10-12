@@ -516,7 +516,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                 {interactive ? (
                     <div className="flex shrink-0 flex-col gap-1.5 border-t border-gray-600 px-4 py-2 md:flex-row md:items-center md:justify-between md:gap-4">
                         <HeatmapLegend palette={settings.palette} />
-                        <HeatmapStatus feed={feed} assessment={mapAssessment} total={mapStocks.length} unplaced={unplaced} now={now} className="md:justify-end md:text-right" />
+                        <HeatmapStatus feed={feed} assessment={mapAssessment} stocks={mapStocks} unplaced={unplaced} now={now} className="md:justify-end md:text-right" />
                     </div>
                 ) : (
                     <p className="border-t border-gray-600 px-4 py-2.5 text-xs leading-relaxed text-gray-500">

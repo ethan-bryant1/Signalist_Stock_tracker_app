@@ -45,7 +45,7 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
             </div>
             <div className="flex shrink-0 flex-col gap-1.5 border-t border-gray-600 px-4 py-2 md:flex-row md:items-center md:justify-between md:gap-4">
                 <HeatmapLegend palette={settings.palette} />
-                <HeatmapStatus feed={feed} assessment={assessment} total={feed.stocks.length} unplaced={unplaced} now={now} className="md:justify-end md:text-right" />
+                <HeatmapStatus feed={feed} assessment={assessment} stocks={feed.stocks} unplaced={unplaced} now={now} className="md:justify-end md:text-right" />
             </div>
         </div>
     );

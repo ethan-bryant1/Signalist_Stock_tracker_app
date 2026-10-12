@@ -15,8 +15,8 @@ calculated, how old they can be, and what the app does when data is missing. Rea
 | Sectors | GICS, matching the Sector ETFs list | FactSet's 20 sectors (for example GOOGL is "Technology Services") |
 | Hover, select, sector focus | Yes | TradingView's own hover card only; the page can't see inside the frame |
 
-The interactive view only offers what our data can back. The other periods, extended hours and volume sizing stay
-visible but disabled, and choosing one explains why and offers the Full S&P 500 view.
+The interactive view only offers what our data can back. The other periods, extended hours and volume sizing aren't
+shown there. A link that asks for one gets the 1-day change by market cap, with a note that offers the Full S&P 500 view.
 
 ## Data sources
 
