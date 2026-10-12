@@ -3,7 +3,8 @@ import 'server-only';
 import { HEATMAP_SYMBOLS } from '@/lib/data/heatmap';
 import { SP500_COMPANIES } from '@/lib/data/sp500';
 import { FINNHUB_BASE_URL, FinnhubError, fetchFinnhub, getFinnhubToken, mapWithLimit, worstIssue } from '@/lib/finnhub';
-import { normalizeQuote, sameCompany, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
+import { normalizeQuote, sameCompany, sameListing, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
+import { parseFinnhubStats, periodStarts, statsAnchor } from '@/lib/period-change';
 
 const SP500_BY_SYMBOL = new Map(SP500_COMPANIES.map((company) => [company.symbol, company]));
 
@@ -24,6 +25,9 @@ const shortExchange = (exchange?: string) => {
 // Company profiles (name, logo, market cap) change slowly and are cached for a day.
 const QUOTE_SECONDS = (index: number) => 120 + (index % 6) * 15;
 const PROFILE_SECONDS = 24 * 60 * 60;
+// Company stats (period returns, average volume) are worked out from daily closes. They're cached for 6 to 8
+// hours, staggered, so a recompute after the close reaches the map overnight and they don't all reload at once.
+const STATS_SECONDS = (index: number) => 6 * 60 * 60 + (index % 8) * 15 * 60;
 // Finnhub's free plan allows 60 requests a minute, so only a few go out at once
 const CONCURRENCY = 4;
 
@@ -50,11 +54,17 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
     return null;
   };
 
+  let statsFailed = 0;
   const stocks = await mapWithLimit(base, CONCURRENCY, async (stock, index): Promise<HeatmapStock> => {
     const q = encodeURIComponent(stock.symbol);
-    const [quote, profile] = await Promise.all([
+    const [quote, profile, stats] = await Promise.all([
       fetchFinnhub<unknown>(`${FINNHUB_BASE_URL}/quote?symbol=${q}&token=${token}`, QUOTE_SECONDS(index)).catch(failed),
       fetchFinnhub<FinnhubProfile>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${q}&token=${token}`, PROFILE_SECONDS).catch(failed),
+      // A missing stat only hides that stock's longer-period change, so it isn't counted as a price failure
+      fetchFinnhub<unknown>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${q}&metric=all&token=${token}`, STATS_SECONDS(index)).catch(() => {
+        statsFailed++;
+        return null;
+      }),
     ]);
 
     const normalized = normalizeQuote(quote?.data, generatedAt);
@@ -68,6 +78,10 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
       ? p.marketCapitalization
       : undefined;
 
+    // Per-share stats from another share class's answer would be wrong for this one, so they need this exact listing
+    const ownStats = stats?.data && typeof stats.data === 'object' && (!(stats.data as { symbol?: unknown }).symbol || sameListing(String((stats.data as { symbol?: unknown }).symbol), stock.symbol));
+    const parsed = ownStats ? parseFinnhubStats(stats.data) : undefined;
+
     return {
       ...stock,
       name: p?.name || stock.name,
@@ -76,10 +90,13 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
       marketCap: cap,
       quote: normalized,
       fetchedAt: normalized ? quote?.fetchedAt : undefined,
+      periodStart: parsed ? periodStarts(parsed, statsAnchor(normalized, generatedAt)) : undefined,
+      averageVolume: parsed?.averageVolume,
     };
   });
 
   // One line instead of one per stock, without URLs (they carry the key)
+  if (statsFailed) console.error(`getHeatmapData: ${statsFailed} Finnhub stats requests failed`);
   if (issues.length) console.error(`getHeatmapData: ${issues.length} Finnhub requests failed (${[...new Set(issues)].join(', ')})`);
   return { provider: 'Finnhub', stocks, generatedAt, failedRequests: issues.length, issue: worstIssue(issues) };
 }

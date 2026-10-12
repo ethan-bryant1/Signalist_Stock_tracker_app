@@ -16,9 +16,11 @@ import { HEATMAP_LINK_VALUES, HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/da
 import {
     EXTENDED_HOURS_OPTIONS,
     GROUP_OPTIONS,
+    INTERACTIVE_SIZE_OPTIONS,
     INTERACTIVE_SUPPORTS,
     PERIOD_OPTIONS,
     SIZE_OPTIONS,
+    TRADINGVIEW_COLOR,
     focusSector,
     interactiveSettings,
     parseHeatmapState,
@@ -28,7 +30,8 @@ import {
     type HeatmapView,
     type Option,
 } from "@/lib/heatmap-state";
-import { assessStocks, capWeightedChange, periodPhrase, type HeatmapPayload, type MarketSession } from "@/lib/market-data";
+import { assessStocks, capWeightedChange, periodPhrase, type HeatmapPayload, type HistoryPeriod, type MarketSession } from "@/lib/market-data";
+import { PERIOD_FULL_COLOR_AT, withPeriodChange } from "@/lib/period-change";
 import { cn, formatChangePercent, getChangeColorClass } from "@/lib/utils";
 
 // A row of buttons where one is selected, like a trading platform's toolbar
@@ -114,7 +117,17 @@ const fallbackText = (state: HeatmapState) => {
         effective.colorFellBack ? describe([...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS], state.color) : undefined,
         effective.sizeFellBack ? describe(SIZE_OPTIONS, state.size) : undefined,
     ].filter(Boolean);
-    return `Showing ${describe(PERIOD_OPTIONS, effective.color)} sized by ${describe(SIZE_OPTIONS, effective.size)}: ${unsupported.join(" and ")} ${unsupported.length > 1 ? "need" : "needs"} the Full S&P 500 view.`;
+    return `Showing ${describe(PERIOD_OPTIONS, effective.color)} sized by ${describe(INTERACTIVE_SIZE_OPTIONS, effective.size)}: ${unsupported.join(" and ")} ${unsupported.length > 1 ? "need" : "needs"} the Full S&P 500 view.`;
+};
+
+// How a screen reader says what period a longer change covers
+const HISTORY_PHRASE: Record<HistoryPeriod, string> = {
+    "1w": "over the last 5 trading days",
+    mtd: "this month",
+    "3m": "over the last 13 weeks",
+    "6m": "over the last 26 weeks",
+    ytd: "this year",
+    "1y": "over the last 52 weeks",
 };
 
 const SESSION_TEXT: Record<MarketSession, string> = {
@@ -252,8 +265,16 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const assessment = useMemo(() => assessStocks(feed.stocks, { now, session }), [feed.stocks, now, session]);
     const mapStocks = useMemo(() => (state.sector ? feed.stocks.filter((stock) => stock.sector === state.sector) : feed.stocks), [feed.stocks, state.sector]);
     const unplaced = useMemo(() => unplacedStocks(mapStocks, effective.size), [mapStocks, effective.size]);
+    // For a longer period, each stock's change is its live price against where the period started
+    const colorPeriod = effective.color;
+    const displayStocks = useMemo(
+        () => (colorPeriod === "1d" ? mapStocks : mapStocks.map((stock) => withPeriodChange(stock, colorPeriod))),
+        [mapStocks, colorPeriod]
+    );
+    // Priced stocks with no starting price for the period (Finnhub's stats didn't load for them)
+    const noPeriodData = colorPeriod === "1d" ? 0 : mapStocks.filter((stock) => stock.quote && stock.periodStart?.[colorPeriod] === undefined).length;
     // Current prices only, so the figure never mixes today's moves with a stale stock's earlier one
-    const summary = useMemo(() => capWeightedChange(mapStocks, assessment.freshness), [mapStocks, assessment.freshness]);
+    const summary = useMemo(() => capWeightedChange(displayStocks, assessment.freshness), [displayStocks, assessment.freshness]);
     // The status line counts the stocks on the map, which is one sector's while a sector is focused
     const mapAssessment = useMemo(() => {
         if (!state.sector) return assessment;
@@ -339,12 +360,13 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
         }
     };
 
-    // The interactive view offers only what Finnhub's free plan can back: today's move, sized by market cap or
-    // equally. Every period, extended hours and volume are in the Full S&P 500 view.
-    const periodOptions = interactive ? PERIOD_OPTIONS.filter((option) => INTERACTIVE_SUPPORTS.color.has(option.value)) : PERIOD_OPTIONS;
-    const sizeOptions = interactive ? SIZE_OPTIONS.filter((option) => INTERACTIVE_SUPPORTS.size.has(option.value)) : SIZE_OPTIONS;
+    // The interactive view offers only what Finnhub's free plan can back (INTERACTIVE_SUPPORTS). 1H, 4H, 1M and
+    // extended hours are in the Full S&P 500 view, which has no month to date.
+    const periodOptions = PERIOD_OPTIONS.filter((option) => (interactive ? INTERACTIVE_SUPPORTS.color.has(option.value) : !!TRADINGVIEW_COLOR[option.value]));
+    const sizeOptions = interactive ? INTERACTIVE_SIZE_OPTIONS : SIZE_OPTIONS;
+    const periodLabel = PERIOD_OPTIONS.find((option) => option.value === effective.color)?.label ?? "1D";
 
-    const shownColor = interactive ? effective.color : state.color;
+    const shownColor = interactive ? effective.color : TRADINGVIEW_COLOR[state.color] ? state.color : "1d";
     const shownSize = interactive ? effective.size : state.size;
     const fellBack = interactive && (effective.colorFellBack || effective.sizeFellBack);
 
@@ -476,7 +498,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                         </ol>
                         <span
                             className="flex shrink-0 items-center gap-1.5 tabular-nums text-gray-500"
-                            title={`Market-cap-weighted 1-day change of the ${summary.counted} stocks on the map with current prices${summary.stale ? `; ${summary.stale} with stale prices left out` : ""}`}
+                            title={`Market-cap-weighted ${describe(PERIOD_OPTIONS, effective.color)} of the ${summary.counted} stocks on the map with current prices${summary.stale ? `; ${summary.stale} with stale prices left out` : ""}`}
                         >
                             <span className="hidden sm:inline">Map stocks combined</span>
                             <span className="sm:hidden">Combined</span>
@@ -491,14 +513,16 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                 <div ref={mapWrapRef} className={cn("relative", mapHeight)}>
                     {interactive ? (
                         <StockHeatmap
-                            stocks={mapStocks}
+                            stocks={displayStocks}
                             freshness={assessment.freshness}
                             now={now}
                             sizeBy={effective.size}
+                            fullColorAt={PERIOD_FULL_COLOR_AT[colorPeriod]}
                             groupBy={state.group}
                             action="select"
                             showLogos={settings.logos}
-                            periodText={periodPhrase(period)}
+                            periodText={colorPeriod === "1d" ? periodPhrase(period) : HISTORY_PHRASE[colorPeriod]}
+                            changeLabel={colorPeriod === "1d" ? undefined : periodLabel}
                             label={`Heatmap of ${state.sector ? `${state.sector} stocks among ` : ""}${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}`}
                             selectedSymbol={state.symbol}
                             highlightSector={state.sector ? undefined : highlight}
@@ -515,8 +539,18 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
 
                 {interactive ? (
                     <div className="flex shrink-0 flex-col gap-1.5 border-t border-gray-600 px-4 py-2 md:flex-row md:items-center md:justify-between md:gap-4">
-                        <HeatmapLegend palette={settings.palette} />
-                        <HeatmapStatus feed={feed} assessment={mapAssessment} stocks={mapStocks} unplaced={unplaced} now={now} className="md:justify-end md:text-right" />
+                        <HeatmapLegend palette={settings.palette} fullColorAt={PERIOD_FULL_COLOR_AT[colorPeriod]} />
+                        <HeatmapStatus
+                            feed={feed}
+                            assessment={mapAssessment}
+                            stocks={mapStocks}
+                            unplaced={unplaced}
+                            now={now}
+                            periodLabel={periodLabel}
+                            noPeriodData={noPeriodData}
+                            sizeBy={effective.size}
+                            className="md:justify-end md:text-right"
+                        />
                     </div>
                 ) : (
                     <p className="border-t border-gray-600 px-4 py-2.5 text-xs leading-relaxed text-gray-500">

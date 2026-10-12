@@ -6,6 +6,9 @@ import { cn } from "@/lib/utils";
 
 const GRADIENT = legendGradient();
 
+// "3", "2.5" or "13.3": a tick at a third of the scale, without trailing zeros
+const tickText = (value: number) => String(Math.round(Math.abs(value) * 10) / 10);
+
 const ISSUE_TEXT: Record<FeedIssue, string> = {
     "not-configured": "Prices unavailable: the server has no Finnhub API key",
     auth: "Finnhub rejected the API key, so prices couldn't load",
@@ -19,18 +22,20 @@ const PALETTE_WORDS: Record<HeatPalette, { down: string; up: string }> = {
     cvd: { down: "orange", up: "blue" },
 };
 
-// The color scale: the same mix as the tiles from −3% to +3%, with a mark at every whole percent. The colors come
-// from the CSS variables of the nearest data-heat-palette, so palette only changes the wording read to screen readers.
-export const HeatmapLegend = ({ className, palette = "classic" }: { className?: string; palette?: HeatPalette }) => {
+// The color scale: the same mix as the tiles from −3% to +3% (or the longer period's wider scale), with a mark at
+// every third. The colors come from the CSS variables of the nearest data-heat-palette, so palette only changes the
+// wording read to screen readers.
+export const HeatmapLegend = ({ className, palette = "classic", fullColorAt = FULL_COLOR_AT }: { className?: string; palette?: HeatPalette; fullColorAt?: number }) => {
     const words = PALETTE_WORDS[palette];
+    const scale = fullColorAt / FULL_COLOR_AT;
     return (
         <div
             role="img"
-            aria-label={`Color scale: gray for moves within ±0.05%, deepening to full ${words.down} at −${FULL_COLOR_AT}% or lower and full ${words.up} at +${FULL_COLOR_AT}% or higher. Striped tiles have an old or missing price.`}
+            aria-label={`Color scale: gray for moves within ±0.05%, deepening to full ${words.down} at −${fullColorAt}% or lower and full ${words.up} at +${fullColorAt}% or higher. Striped tiles have an old or missing price.`}
             className={cn("flex shrink-0 items-center gap-3 text-[10px] tabular-nums text-gray-500", className)}
         >
             <div className="flex items-center gap-1.5">
-                <span>≤−{FULL_COLOR_AT}%</span>
+                <span>≤−{fullColorAt}%</span>
                 <div className="w-32 sm:w-40">
                     <div className="h-2 rounded-[2px]" style={{ background: GRADIENT }} />
                     <div className="relative mt-0.5 h-3">
@@ -40,12 +45,12 @@ export const HeatmapLegend = ({ className, palette = "classic" }: { className?: 
                                 className="absolute top-0 -translate-x-1/2 leading-3"
                                 style={{ left: `${((tick + FULL_COLOR_AT) / (2 * FULL_COLOR_AT)) * 100}%` }}
                             >
-                                {tick > 0 ? `+${tick}` : tick < 0 ? `−${-tick}` : "0"}
+                                {tick > 0 ? `+${tickText(tick * scale)}` : tick < 0 ? `−${tickText(tick * scale)}` : "0"}
                             </span>
                         ))}
                     </div>
                 </div>
-                <span>≥+{FULL_COLOR_AT}%</span>
+                <span>≥+{fullColorAt}%</span>
             </div>
             <span className="flex items-center gap-1">
                 {/* The same dark stripes as a stale tile (STALE_STRIPE_ALPHA in StockHeatmap) */}
@@ -74,12 +79,18 @@ type HeatmapStatusProps = {
     stocks: readonly Pick<HeatmapStock, "symbol">[];
     unplaced: readonly HeatmapStock[];
     now: number;
+    // The period the colors show ("1D", "1W") and how many priced stocks have no figure for it
+    periodLabel?: string;
+    noPeriodData?: number;
+    // What the map is sized by, which says why a stock couldn't be drawn
+    sizeBy?: "cap" | "equal" | "volume" | "dollar-volume";
     className?: string;
 };
 
 // What the map shows and how current it is: the period, how many stocks have prices, how many are stale,
 // any left off the map, the time of the newest price and the source. Problems come first.
-export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, className }: HeatmapStatusProps) => {
+export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, periodLabel = "1D", noPeriodData = 0, sizeBy = "cap", className }: HeatmapStatusProps) => {
+    const unplacedReason = sizeBy === "cap" ? "no market cap" : "no volume data";
     const { period, priced, stale, newestQuoteTime } = assessment;
     const total = stocks.length;
     const streaming = new Set(feed.live.symbols);
@@ -126,7 +137,7 @@ export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, classNa
                 </>
             )}
             <span className="font-medium text-gray-400">
-                1D · {period.label}
+                {periodLabel} · {period.label}
                 {period.day ? ` (${period.day})` : ""}
             </span>
             <span aria-hidden>·</span>
@@ -139,18 +150,26 @@ export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, classNa
                     <span className="text-gray-400">{stale} stale</span>
                 </>
             )}
+            {noPeriodData > 0 && (
+                <>
+                    <span aria-hidden>·</span>
+                    <span className="text-gray-400" title={`Finnhub's daily stats didn't load for these stocks, so their tiles have no ${periodLabel} change`}>
+                        {noPeriodData} without {periodLabel} data
+                    </span>
+                </>
+            )}
             {unplaced.length > 0 && (
                 <>
                     <span aria-hidden>·</span>
                     {unplaced.length <= UNPLACED_INLINE ? (
                         <span>
-                            {unplaced.length} not drawn (no market cap): {unplaced.map((stock) => stock.symbol).join(", ")}
+                            {unplaced.length} not drawn ({unplacedReason}): {unplaced.map((stock) => stock.symbol).join(", ")}
                         </span>
                     ) : (
                         // Too many to list inline: a disclosure names every one, so none is hidden behind "…"
                         <details className="min-w-0">
                             <summary className="cursor-pointer list-none underline decoration-gray-600 underline-offset-2 hover:text-gray-400 [&::-webkit-details-marker]:hidden">
-                                {unplaced.length} not drawn (no market cap)
+                                {unplaced.length} not drawn ({unplacedReason})
                             </summary>
                             <span className="block text-gray-400">{unplaced.map((stock) => stock.symbol).join(", ")}</span>
                         </details>

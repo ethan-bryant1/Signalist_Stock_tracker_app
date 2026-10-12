@@ -6,6 +6,9 @@ import type { MarketSector } from "@/lib/data/sp500";
 
 export type MarketSession = "pre-market" | "regular" | "post-market" | "closed";
 
+// The longer periods the interactive heatmap can color by, besides the 1-day change (lib/period-change.ts)
+export type HistoryPeriod = "1w" | "mtd" | "3m" | "6m" | "ytd" | "1y";
+
 // One stock's latest price and the day's figures around it
 export type Quote = {
     price: number;
@@ -36,6 +39,11 @@ export type HeatmapStock = {
     quote?: Quote;
     // When we received the quote from Finnhub (its response's Date header), in milliseconds
     fetchedAt?: number;
+    // The price each longer period started at (1 week ago, the start of the year, ...), from Finnhub's daily stats
+    // (lib/period-change.ts). The live price against these gives the longer periods' changes.
+    periodStart?: Partial<Record<HistoryPeriod, number>>;
+    // Average daily volume over the last 10 trading days, in shares, from the same stats
+    averageVolume?: number;
 };
 
 // What went wrong when some figures couldn't be fetched, worst first

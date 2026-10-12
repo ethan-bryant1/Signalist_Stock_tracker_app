@@ -10,13 +10,13 @@ calculated, how old they can be, and what the app does when data is missing. Rea
 | Stocks | 54 of the largest S&P 500 companies in each GICS sector, 3 to 8 per sector (`lib/data/heatmap.ts`, ranked 2026-10-09) | Every S&P 500 constituent, as TradingView lists them |
 | Drawn by | Our own code (`components/StockHeatmap.tsx`) | TradingView's stock heatmap widget, a sealed frame from tradingview.com |
 | Prices | Finnhub, through our server | TradingView, delayed |
-| Color | 1-day change only | 1H, 4H, 1D, 1W, 1M, 3M, 6M, YTD, 1Y, pre-market, after hours (TradingView's calculations) |
-| Size | Market cap, or equal | Market cap, equal, volume, dollar volume (TradingView's figures) |
+| Color | 1D, 1W, MTD, 3M, 6M, YTD, 1Y (dashboard: 1D only) | 1H, 4H, 1D, 1W, 1M, 3M, 6M, YTD, 1Y, pre-market, after hours (TradingView's calculations) |
+| Size | Market cap, equal, 10-day average volume or dollar volume (dashboard: market cap) | Market cap, equal, volume, dollar volume (TradingView's figures) |
 | Sectors | GICS, matching the Sector ETFs list | FactSet's 20 sectors (for example GOOGL is "Technology Services") |
 | Hover, select, sector focus | Yes | TradingView's own hover card only; the page can't see inside the frame |
 
-The interactive view only offers what our data can back. The other periods, extended hours and volume sizing aren't
-shown there. A link that asks for one gets the 1-day change by market cap, with a note that offers the Full S&P 500 view.
+The interactive view only offers what our data can back. 1H, 4H, 1M, extended hours and today's volume aren't shown
+there. A link that asks for one gets the 1-day change (or market cap), with a note that offers the Full S&P 500 view.
 
 ## Data sources
 
@@ -34,30 +34,48 @@ browser, and error messages and logs never include request URLs.
 | Which listing a profile is for | `/stock/profile2` `ticker` | Finnhub answers BRK.B with BRK.A's profile (seen with real data, 2026-10-11). Only company-wide figures (name, logo, exchange, total market cap) come from a profile, so another share class's is used; a different company's is ignored, and that stock is listed as having no market cap. |
 | Sector and industry | GICS, from `lib/data/sp500.ts` | A copy of [datasets/s-and-p-500-companies](https://github.com/datasets/s-and-p-500-companies) (sourced from Wikipedia, public domain), 503 listings. Refresh it by copying the CSV again. |
 | Market session | Finnhub `/stock/market-status` (the header's live prices), falling back to the New York clock | The fallback doesn't know holidays or early closes. |
+| Longer-period changes | Calculated from Finnhub `/stock/metric?metric=all` returns and the live price | See "Longer periods" below. |
+| Average volume | `/stock/metric` `10DayAverageTradingVolume` (millions of shares) | Average daily shares over the last 10 trading days. Dollar volume is that × the live price. |
 | Sector ETF moves | Finnhub `/quote` for XLK, XLF, XLV, XLY, XLC, XLI, XLP, XLE, XLU, XLRE, XLB | |
 
 ### What Finnhub's free plan doesn't have
 
-No price history (`/stock/candle` is a paid endpoint), no pre-market or after-hours prices, no trading volume on
-`/quote`, no batch quotes. That is why the interactive map offers only the 1-day change and sizing by market cap or
-equally; the other periods, extended hours and volume aren't shown there at all (the Full S&P 500 view has them). A
-link that asks the interactive view for one of them gets the 1-day change by market cap, with a note saying so.
+No price history (`/stock/candle` is a paid endpoint), so no intraday periods (1H, 4H); no 1-month return (only
+month to date); no pre-market or after-hours prices; no trading volume on `/quote` (only a 10-day average in
+`/stock/metric`); no batch quotes. Those options aren't shown in the interactive view (the Full S&P 500 view has them).
 Free real-time data for the whole market doesn't exist elsewhere either: the exchanges charge for it, so free plans
-are 15 minutes delayed (Alpaca, checked 2026-10-12) or cover one exchange. `/stock/metric` has period returns, but without an as-of date, so the app doesn't use them.
+are 15 minutes delayed (Alpaca, checked 2026-10-12) or cover one exchange.
+
+### Longer periods
+
+`/stock/metric` gives each stock's return over 5 trading days (shown as 1W), month to date, 13 weeks (3M), 26 weeks
+(6M), year to date and 52 weeks (1Y), worked out from daily closes (`lib/period-change.ts`). From a return and the close
+it was measured to, the server works out the price the period started at; the page then compares the live price with
+it, so these maps move with every trade like the 1-day map.
+
+- **Which close.** Finnhub gives no as-of date for these returns. The app assumes they run through the last session
+  that finished before today: the quote's previous close once today's price is in, otherwise the quote's own price
+  (before the open, overnight, weekends). If Finnhub recomputes them in the evening, a longer-period change counts
+  that day's move twice until the next morning's quote. The stats are cached for 6 to 8 hours, staggered.
+- **Missing stats.** A stock without a starting price shows "—" and the status line counts it ("2 without 1W data");
+  it is never shown with its 1-day change instead. A failed stats request doesn't count as a price failure.
+- **Colors.** Longer periods move further, so each has a wider scale: full color at ±3% (1D), ±6% (1W), ±9% (MTD),
+  ±15% (3M), ±21% (6M), ±24% (YTD), ±30% (1Y). The legend follows the period.
+- **Requests.** The stats add one request per stock, so a cold cache costs about 162 requests.
 
 ### Requests, caching and refresh
 
-- Each stock needs two requests (quote and profile). On a cache miss at most 4 stocks are fetched at once, so at
+- Each stock needs three requests (quote, profile and stats). On a cache miss at most 4 stocks are fetched at once, so at
   most 8 requests are in flight. Next refreshes expired cache entries in the background (it serves the old answer
   straight away), and those background refreshes are not limited by this, so a page view after a long idle spell
-  can send most of the ~108 requests at once.
+  can send most of the ~162 requests at once.
 - Prices are cached on the server for 2 to 3¼ minutes, staggered so they don't all expire together. Profiles are
   cached for a day. Next's data cache only keeps successful answers, so a failed refresh leaves the last good one.
 - The page asks `/api/heatmap` (a plain GET for signed-in users) every minute while the tab is visible. The first
   ask comes a minute after the page's prices were made, which is straight away when they're older (going Back shows
   the page with the prices it had). After a failure it waits 2, 4, then 5 minutes; the first success goes back to
   every minute. A 401 stops it.
-- A cold cache costs about 108 requests, more than the free plan's 60 a minute. Finnhub then answers some with 429,
+- A cold cache costs about 162 requests, more than the free plan's 60 a minute. Finnhub then answers some with 429,
   those stocks show as missing, and the status line says "Finnhub's rate limit was hit". They fill in on the next
   refreshes as the cache warms.
 

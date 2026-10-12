@@ -23,8 +23,8 @@ export const QuoteIdentity = ({ stock, logoClassName, titleId }: { stock: Heatma
     </div>
 );
 
-// The price, with the dollar and percent change since the previous close
-export const QuotePrice = ({ stock, large = false }: { stock: HeatmapStock; large?: boolean }) => {
+// The price, with the dollar and percent change since the previous close, or over `changeLabel`'s period
+export const QuotePrice = ({ stock, large = false, changeLabel }: { stock: HeatmapStock; large?: boolean; changeLabel?: string }) => {
     const quote = stock.quote;
     const change = quote?.change;
     const changePercent = quote?.changePercent;
@@ -38,6 +38,7 @@ export const QuotePrice = ({ stock, large = false }: { stock: HeatmapStock; larg
                 <span className={cn("shrink-0 font-semibold tabular-nums", large ? "text-sm" : "text-xs", getChangeColorClass(changePercent))}>
                     {rounded !== 0 && <span aria-hidden className="mr-1 text-[10px]">{rounded > 0 ? "▲" : "▼"}</span>}
                     {formatSignedNumber(change)} ({formatChangePercent(changePercent)})
+                    {changeLabel && <span className="ml-1 font-medium text-gray-500">{changeLabel}</span>}
                 </span>
             )}
         </div>

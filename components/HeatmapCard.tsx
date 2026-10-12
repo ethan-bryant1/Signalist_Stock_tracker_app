@@ -14,6 +14,8 @@ type HeatmapCardProps = {
     source: InspectSource;
     // What a click does on this map: open the stock's page (dashboard) or select it (Heatmap page)
     action: "open" | "select";
+    // The change's period when it isn't the day's, like "1W"
+    changeLabel?: string;
     onClose?: () => void;
 };
 
@@ -25,7 +27,7 @@ const HINTS = {
 // The heatmap's quick look at a stock (level one: it comes and goes with the cursor). Kept small: who it is,
 // the price and move, its size and sector, and how current the price is. The selected-stock panel has the rest.
 // On a touch screen, where there's no hovering, a tap docks the fuller version at the bottom of the screen instead.
-const HeatmapCard = ({ stock, freshness, now, source, action, onClose }: HeatmapCardProps) => (
+const HeatmapCard = ({ stock, freshness, now, source, action, changeLabel, onClose }: HeatmapCardProps) => (
     <div className="w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-gray-400 shadow-2xl shadow-black/40">
         <div className="flex items-start gap-2">
             <QuoteIdentity stock={stock} />
@@ -42,7 +44,7 @@ const HeatmapCard = ({ stock, freshness, now, source, action, onClose }: Heatmap
         </div>
 
         <div className="mt-3">
-            <QuotePrice stock={stock} />
+            <QuotePrice stock={stock} changeLabel={changeLabel} />
         </div>
 
         {source === "touch" ? (

@@ -33,6 +33,13 @@ const sameQuote = (a?: HeatmapStock["quote"], b?: HeatmapStock["quote"]) =>
 // as one unit, with that quote's own times, so it shows as stale instead of disappearing or mixing figures from
 // two different moments. Unchanged stocks keep the same object, so their tiles don't redraw, and when nothing
 // changed at all the previous list itself comes back, so nothing computed from it is redone.
+const samePeriodStart = (a: HeatmapStock["periodStart"], b: HeatmapStock["periodStart"]) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    const keys = Object.keys(a) as (keyof typeof a)[];
+    return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
+};
+
 export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly HeatmapStock[]): HeatmapStock[] => {
     const before = new Map(previous.map((stock) => [stock.symbol, stock]));
     const merged = next.map((stock) => {
@@ -47,9 +54,12 @@ export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly Heat
             marketCap: stock.marketCap ?? old.marketCap,
             logo: stock.logo ?? old.logo,
             exchange: stock.exchange ?? old.exchange,
+            periodStart: stock.periodStart ?? old.periodStart,
+            averageVolume: stock.averageVolume ?? old.averageVolume,
         };
         const unchanged = sameQuote(merged.quote, old.quote) && merged.fetchedAt === old.fetchedAt && merged.marketCap === old.marketCap
-            && merged.logo === old.logo && merged.exchange === old.exchange && merged.name === old.name;
+            && merged.logo === old.logo && merged.exchange === old.exchange && merged.name === old.name
+            && samePeriodStart(merged.periodStart, old.periodStart) && merged.averageVolume === old.averageVolume;
         return unchanged ? old : merged;
     });
     return merged.length === previous.length && merged.every((stock, index) => stock === previous[index]) ? previous : merged;
