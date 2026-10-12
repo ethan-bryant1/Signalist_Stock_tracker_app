@@ -78,10 +78,12 @@ const useTradingViewWidget = (scriptUrl: string, config: Record<string, unknown>
         const widgetHeight = height === 'fill' ? `calc(100% - ${TRADINGVIEW_ATTRIBUTION_HEIGHT}px)` : `${height}px`;
         container.innerHTML = `<div class="tradingview-widget-container__widget" style="width: 100%; height: ${widgetHeight};"></div>${ATTRIBUTION}`;
 
-        let settled = false;
-        const settle = (status: WidgetStatus) => {
-            if (settled) return;
-            settled = true;
+        // The script's load or error is final. The timeout isn't: a script that still loads after it replaces
+        // the failure with ready, so a slow connection doesn't leave a working widget behind the failure message.
+        let finished = false;
+        const finish = (status: WidgetStatus) => {
+            if (finished) return;
+            finished = true;
             window.clearTimeout(timer);
             setResult({ key: loadKey, status });
         };
@@ -91,15 +93,15 @@ const useTradingViewWidget = (scriptUrl: string, config: Record<string, unknown>
         script.async = true;
         script.innerHTML = JSON.stringify(prepareConfig(scriptUrl, config));
         // The script draws the widget into an iframe as it runs, so one should be there once it has loaded
-        script.onload = () => settle(container.querySelector('iframe') ? 'ready' : 'failed');
-        script.onerror = () => settle('failed');
-        const timer = window.setTimeout(() => settle('failed'), LOAD_TIMEOUT_MS);
+        script.onload = () => finish(container.querySelector('iframe') ? 'ready' : 'failed');
+        script.onerror = () => finish('failed');
+        const timer = window.setTimeout(() => setResult({ key: loadKey, status: 'failed' }), LOAD_TIMEOUT_MS);
 
         container.appendChild(script);
         container.dataset.loaded = 'true';
 
         return () => {
-            settled = true;
+            finished = true;
             window.clearTimeout(timer);
             container.innerHTML = '';
             delete container.dataset.loaded;
