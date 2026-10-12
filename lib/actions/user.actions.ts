@@ -1,6 +1,7 @@
 'use server';
 
 import {connectToDatabase} from "@/database/mongoose";
+import {isAllowedEmail} from "@/lib/owner-access";
 
 export const getAllUsersForNewsEmail = async () => {
     try {
@@ -13,7 +14,8 @@ export const getAllUsersForNewsEmail = async () => {
             { projection: { _id: 1, id: 1, email: 1, name: 1, country:1 }}
         ).toArray();
 
-        return users.filter((user) => user.email && user.name).map((user) => ({
+        // Only people allowed on the site get the news, which comes from Finnhub too
+        return users.filter((user) => user.email && user.name && isAllowedEmail(user.email)).map((user) => ({
             id: user.id || user._id?.toString() || '',
             email: user.email,
             name: user.name

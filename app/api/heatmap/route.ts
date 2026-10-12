@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { getAuth } from "@/lib/better-auth/auth";
+import { getSession } from "@/lib/better-auth/auth";
 import { getHeatmapData } from "@/lib/heatmap-data";
 
 // The interactive heatmaps poll this for fresh prices. A plain GET (not a Server Action) so polling never queues
@@ -7,8 +7,7 @@ import { getHeatmapData } from "@/lib/heatmap-data";
 // costs over 100 Finnhub requests, so strangers can't trigger it.
 export async function GET() {
     try {
-        const auth = await getAuth();
-        const session = await auth.api.getSession({ headers: await headers() });
+        const session = await getSession(await headers());
         if (!session?.user) return Response.json({ error: "signed-out" }, { status: 401 });
     } catch (e) {
         console.error("GET /api/heatmap: couldn't check the session", e);

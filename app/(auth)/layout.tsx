@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import {getAuth} from "@/lib/better-auth/auth";
+import {getSession} from "@/lib/better-auth/auth";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import {Star} from "lucide-react";
@@ -9,8 +9,7 @@ import Logo from "@/components/Logo";
 const Layout = async ({ children }: { children : React.ReactNode }) => {
     // Read headers first so Next renders this per request instead of at build time
     const requestHeaders = await headers();
-    const auth = await getAuth();
-    const session = await auth.api.getSession({ headers: requestHeaders })
+    const session = await getSession(requestHeaders);
 
     if(session?.user) redirect('/')
 

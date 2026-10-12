@@ -7,7 +7,7 @@ import { FINNHUB_BASE_URL, fetchJSON } from '@/lib/finnhub';
 import { normalizeQuote, sameListing, sessionFromClock, type MarketSession } from '@/lib/market-data';
 import { cache } from 'react';
 import { headers } from 'next/headers';
-import { getAuth } from '@/lib/better-auth/auth';
+import { getSession } from '@/lib/better-auth/auth';
 
 export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> {
   try {
@@ -91,8 +91,7 @@ type FinnhubProfile = { name?: string; ticker?: string; exchange?: string };
 const isSignedIn = cache(async (): Promise<boolean> => {
   try {
     const requestHeaders = await headers();
-    const auth = await getAuth();
-    const session = await auth.api.getSession({ headers: requestHeaders });
+    const session = await getSession(requestHeaders);
     return !!session?.user;
   } catch (e) {
     console.error('Error checking the session:', e);

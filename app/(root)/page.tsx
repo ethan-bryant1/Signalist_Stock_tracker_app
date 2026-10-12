@@ -6,7 +6,7 @@ import IndexTiles from "@/components/IndexTiles";
 import DashboardHeatmap from "@/components/DashboardHeatmap";
 import { HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/data/heatmap";
 import { getHeatmapData } from "@/lib/heatmap-data";
-import { getAuth } from "@/lib/better-auth/auth";
+import { getSession } from "@/lib/better-auth/auth";
 import {
     MARKET_DATA_WIDGET_CONFIG,
     MARKET_OVERVIEW_WIDGET_CONFIG,
@@ -19,8 +19,7 @@ const HeatmapWithData = async () => <DashboardHeatmap initial={await getHeatmapD
 
 // Each panel's "Open" link shows that widget on its own, larger page
 const Home = async () => {
-    const auth = await getAuth();
-    const session = await auth.api.getSession({ headers: await headers() });
+    const session = await getSession(await headers());
     const firstName = session?.user.name?.trim().split(/\s+/)[0];
     // The market's date, which is what matters for prices
     const today = new Date().toLocaleDateString("en-US", {

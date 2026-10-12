@@ -2,7 +2,7 @@
 
 import { connectToDatabase } from '@/database/mongoose';
 import { Watchlist } from '@/database/models/watchlist.model';
-import { getAuth } from '@/lib/better-auth/auth';
+import { getSession } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { getStockMarketData } from '@/lib/actions/finnhub.actions';
 import { formatChangePercent, formatMarketCapValue, formatPrice } from '@/lib/utils';
@@ -35,8 +35,7 @@ export async function getWatchlistSymbolsByEmail(email: string): Promise<string[
 async function getCurrentUserId(): Promise<string | null> {
   // Read headers first so Next renders pages using this per request instead of at build time
   const requestHeaders = await headers();
-  const auth = await getAuth();
-  const session = await auth.api.getSession({ headers: requestHeaders });
+  const session = await getSession(requestHeaders);
   return session?.user?.id ?? null;
 }
 

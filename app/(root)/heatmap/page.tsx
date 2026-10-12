@@ -6,7 +6,7 @@ import HeatmapWorkspace from "@/components/HeatmapWorkspace";
 import { LiveMarketProvider } from "@/components/LiveMarket";
 import { getMarketSnapshot } from "@/lib/actions/finnhub.actions";
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
-import { getAuth } from "@/lib/better-auth/auth";
+import { getSession } from "@/lib/better-auth/auth";
 import { HEATMAP_LINK_VALUES, HEATMAP_SYMBOLS } from "@/lib/data/heatmap";
 import { getHeatmapData } from "@/lib/heatmap-data";
 import { parseHeatmapState } from "@/lib/heatmap-state";
@@ -15,8 +15,7 @@ export const metadata: Metadata = { title: "Stock Heatmap · Loops Watch" };
 
 export default async function HeatmapPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
     // The layout checks the session too, but it renders alongside this page, so check before asking Finnhub for prices
-    const auth = await getAuth();
-    const session = await auth.api.getSession({ headers: await headers() });
+    const session = await getSession(await headers());
     if (!session?.user) redirect("/sign-in");
 
     const params = await searchParams;

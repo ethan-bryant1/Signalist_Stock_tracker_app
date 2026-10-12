@@ -15,7 +15,7 @@ import {
 } from "@/lib/constants";
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
 import { getCompanyNews, getStockOverview } from "@/lib/actions/finnhub.actions";
-import { getAuth } from "@/lib/better-auth/auth";
+import { getSession } from "@/lib/better-auth/auth";
 import { cn, formatTimeAgo } from "@/lib/utils";
 
 export async function generateMetadata({ params }: StockDetailsPageProps): Promise<Metadata> {
@@ -55,8 +55,7 @@ const NewsLoading = () => (
 
 export default async function StockDetails({ params }: StockDetailsPageProps) {
   // The layout checks the session too, but it renders alongside this page, so check before asking Finnhub
-  const auth = await getAuth();
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession(await headers());
   if (!session?.user) redirect("/sign-in");
 
   const { symbol: rawSymbol } = await params;

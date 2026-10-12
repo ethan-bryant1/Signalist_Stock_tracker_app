@@ -15,6 +15,10 @@ Built with Next.js 16, Better Auth, MongoDB, Inngest, Finnhub and TradingView wi
 - **Emails:** a personal AI-written welcome email, and a daily summary of news about your watchlist.
 - **Light and dark themes.**
 
+## A private site
+
+Loops Watch shows Finnhub prices and news, and Finnhub's free plan is licensed for personal use. So only the emails in `ALLOWED_EMAILS` can sign up, sign in or receive the news email. Anyone else who opens the site sees the sign-in page and is told it's private. Taking an email off the list also ends that person's sessions straight away. Opening it to other people needs Finnhub's written approval or a data provider licensed for it.
+
 ## Run it on your computer
 
 1. Install [Node.js](https://nodejs.org) 20.9 or newer.
@@ -26,7 +30,7 @@ Built with Next.js 16, Better Auth, MongoDB, Inngest, Finnhub and TradingView wi
    npm run dev
    ```
 
-4. Open http://localhost:3000 and create an account.
+4. Open http://localhost:3000 and create an account with the email you put in `ALLOWED_EMAILS`.
 5. To send emails while developing, run Inngest's local server in a second terminal:
 
    ```bash
@@ -36,7 +40,7 @@ Built with Next.js 16, Better Auth, MongoDB, Inngest, Finnhub and TradingView wi
 6. Optional checks:
 
    ```bash
-   npm test                     # unit tests for the market-data rules, heatmap layout and colors
+   npm test                     # unit tests for the market-data rules, heatmap layout, colors and sign-in rules
    npm run check:market-data    # checks the real Finnhub data behind the heatmaps with your key (about 3 minutes)
    ```
 
@@ -49,9 +53,10 @@ You need the same accounts as for running locally (MongoDB Atlas, Finnhub, Gemin
 3. **Add the environment variables.** Under **Environment Variables**, paste the contents of your `.env` file into the first **Key** box. Vercel splits it into one variable per line. Then make two changes:
    - delete `NODE_ENV`, because Vercel sets it itself
    - change `BETTER_AUTH_URL` to your live address, like `https://loops-watch.vercel.app`
+   - check that `ALLOWED_EMAILS` holds your email, or nobody will be able to sign in
 4. **Deploy.** Click **Deploy** and wait for the build to finish. If the address Vercel gives you differs from the one you used for `BETTER_AUTH_URL`, update the variable under **Settings → Environment Variables** and redeploy.
 5. **Connect Inngest so emails send.** Install the [Inngest integration for Vercel](https://vercel.com/integrations/inngest) and pick this project. It adds `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` for you. Then redeploy: open **Deployments**, click **⋯** on the latest one and choose **Redeploy**. In the [Inngest dashboard](https://app.inngest.com), the app should list two functions: the welcome email and the daily news summary.
-6. **Try it.** Open your live address, sign up with a new email and check that the welcome email arrives. New senders often land in spam at first.
+6. **Try it.** Open your live address and sign in. If you use a new database, sign up with your `ALLOWED_EMAILS` email and check that the welcome email arrives. New senders often land in spam at first.
 
 Every push to `main` deploys again automatically.
 
