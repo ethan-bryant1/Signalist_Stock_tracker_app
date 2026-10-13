@@ -128,7 +128,7 @@ const WorkspaceApp = ({ initialStore, source, userId }: { initialStore: Workspac
     const sendToAccount = useCallback((next: WorkspaceStore) => {
         unsent.current = null;
         saveQueue.current = saveQueue.current.then(() =>
-            saveWorkspaceStore(next)
+            saveWorkspaceStore(next, userId)
                 .then(({ ok }) => {
                     // A newer edit keeps its own pending copy and save
                     if (storeRef.current !== next) return;
@@ -139,7 +139,7 @@ const WorkspaceApp = ({ initialStore, source, userId }: { initialStore: Workspac
                     if (storeRef.current === next) setSaveState("failed");
                 })
         );
-    }, [pendingCopyKey]);
+    }, [pendingCopyKey, userId]);
 
     // Saves after changes settle: to the account when it can, and always to this browser
     const persist = useCallback(

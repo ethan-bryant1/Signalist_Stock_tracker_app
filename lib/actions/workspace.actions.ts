@@ -30,9 +30,10 @@ export async function getWorkspaceStore(): Promise<WorkspaceStore | null | 'unav
 }
 
 // Saves the whole store after checking it field by field, so nothing a browser sends can break a later page load
-export async function saveWorkspaceStore(store: unknown): Promise<{ ok: boolean }> {
+// expectedUserId is the account the layouts were made in: a save that runs after someone else signed in is refused
+export async function saveWorkspaceStore(store: unknown, expectedUserId: unknown): Promise<{ ok: boolean }> {
   const userId = await currentUserId();
-  if (!userId) return { ok: false };
+  if (!userId || userId !== expectedUserId) return { ok: false };
   const clean = parseStore(store);
   if (!clean || JSON.stringify(clean).length > MAX_BYTES) return { ok: false };
   try {
