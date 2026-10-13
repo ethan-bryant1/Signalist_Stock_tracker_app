@@ -12,6 +12,9 @@ import TradingViewWidget from "@/components/TradingViewWidget";
 import { useNow } from "@/hooks/useHeatmapFeed";
 import { getCompanyNewsForWidget, getStockQuote, type StockQuote } from "@/lib/actions/finnhub.actions";
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
+import WatchlistGrid from "@/components/watchlist/WatchlistGrid";
+import { useWatchRows } from "@/components/watchlist/useWatchRows";
+import type { ColumnKey } from "@/lib/watchlists";
 import {
     COMPANY_FINANCIALS_WIDGET_CONFIG,
     COMPANY_PROFILE_WIDGET_CONFIG,
@@ -204,36 +207,11 @@ const NewsWidget = ({ symbol }: WidgetProps) => {
     );
 };
 
-// The watchlist's stocks with their prices (from the shared cache, loaded once). Picking one loads it into every
-// linked widget.
-const WatchlistRow = ({ symbol, company, active, onPick }: { symbol: string; company: string; active: boolean; onPick: () => void }) => {
-    const quote = useQuote(symbol);
-    return (
-        <li>
-            <button
-                type="button"
-                onClick={onPick}
-                aria-pressed={active}
-                className={cn(
-                    "grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2 text-left transition-colors hover:bg-gray-700/50 focus-visible:bg-gray-700/50 focus-visible:outline-none",
-                    active && "bg-gray-700/60"
-                )}
-            >
-                <span className="min-w-0">
-                    <span className="block text-[13px] font-semibold text-gray-100">{symbol}</span>
-                    <span className="block truncate text-[11px] text-gray-500">{quote?.name ?? company}</span>
-                </span>
-                <span className="text-right tabular-nums">
-                    <span className="block text-[13px] text-gray-100">{quote?.price !== undefined ? formatCurrency(quote.price, quote.currency) : "—"}</span>
-                    <span className={cn("block text-[11px] font-medium", getChangeColorClass(quote?.changePercent))}>
-                        {quote?.changePercent !== undefined ? formatChangePercent(quote.changePercent) : "—"}
-                    </span>
-                </span>
-            </button>
-        </li>
-    );
-};
+const WIDGET_COLUMNS: ColumnKey[] = ["last", "changePercent"];
+const LIST_ORDER = { key: "manual", dir: "asc" } as const;
 
+// The open watchlist in the Watchlist page's own grid, cut down to price and day's change. Its figures come in one
+// request from the shared cache, loaded once. Picking a row loads the stock into every linked widget.
 const WatchlistWidget = ({ symbol, onPickSymbol }: WidgetProps) => {
     const [items, setItems] = useState<{ symbol: string; company: string }[] | null | "failed">(null);
     useEffect(() => {
@@ -245,16 +223,13 @@ const WatchlistWidget = ({ symbol, onPickSymbol }: WidgetProps) => {
             current = false;
         };
     }, []);
+    const symbols = useMemo(() => (Array.isArray(items) ? items.map((item) => item.symbol) : []), [items]);
+    const { rows } = useWatchRows(symbols, []);
+    const gridRows = useMemo(() => (Array.isArray(items) ? items.map((item) => ({ ...item, data: rows[item.symbol] })) : []), [items, rows]);
     if (items === null) return <Loading />;
     if (items === "failed") return <Message>Your watchlist couldn&apos;t load right now.</Message>;
-    if (items.length === 0) return <Message>Your watchlist is empty. Add stocks from their pages with Add to Watchlist.</Message>;
-    return (
-        <ul className="divide-y divide-gray-600">
-            {items.map((item) => (
-                <WatchlistRow key={item.symbol} {...item} active={item.symbol === symbol} onPick={() => onPickSymbol(item.symbol)} />
-            ))}
-        </ul>
-    );
+    if (items.length === 0) return <Message>Your open watchlist is empty. Add stocks on the Watchlist page or with the star in search.</Message>;
+    return <WatchlistGrid rows={gridRows} columns={WIDGET_COLUMNS} sort={LIST_ORDER} density="compact" selected={symbol} onSelect={onPickSymbol} label="Watchlist" linkSymbols={false} maxHeightClass="max-h-full" />;
 };
 
 // The dashboard's Market Snapshot; a click loads a stock into the linked widgets. Its prices come from the same

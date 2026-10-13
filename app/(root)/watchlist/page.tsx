@@ -1,59 +1,38 @@
 import type { Metadata } from "next";
-import WatchlistTable from "@/components/WatchlistTable";
 import PageHeader from "@/components/PageHeader";
-import OpenSearchButton from "@/components/OpenSearchButton";
-import { getWatchlistWithData } from "@/lib/actions/watchlist.actions";
+import RetryButton from "@/components/watchlist/RetryButton";
+import WatchlistApp from "@/components/watchlist/WatchlistApp";
+import { getWatchlists } from "@/lib/actions/watchlist.actions";
+import { getWatchRows } from "@/lib/watchlist-data";
+import { activeList } from "@/lib/watchlists";
 
 export const metadata: Metadata = { title: "Watchlist · Loops Watch" };
 
+// The first rows come with the page so a short list shows prices at once; a longer list fills in from the browser
+const FIRST_ROWS = 10;
+const DESCRIPTION = "Your lists of stocks and funds with Finnhub figures. Each price shows its time; pick a row for its details or open its full page.";
+
 export default async function WatchlistPage() {
-  const watchlist = await getWatchlistWithData();
+  const doc = await getWatchlists();
 
-  if (watchlist === null) {
+  if (doc === null) {
     return (
-      <section className="watchlist-empty-container flex">
-        <div className="watchlist-empty">
-          <h2 className="empty-title">Couldn&apos;t load your watchlist</h2>
-          <p className="empty-description">Something went wrong while loading your saved stocks. Refresh the page to try again.</p>
+      <section className="flex flex-col gap-6">
+        <PageHeader title="Watchlists" description={DESCRIPTION} />
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-gray-600 bg-gray-800 p-6">
+          <h2 className="text-base font-semibold text-gray-100">Couldn&apos;t load your watchlists</h2>
+          <p className="text-sm text-gray-500">The database didn&apos;t answer. Your lists are safe; try again in a moment.</p>
+          <RetryButton />
         </div>
       </section>
     );
   }
 
-  if (watchlist.length === 0) {
-    return (
-      <section className="watchlist-empty-container flex">
-        <div className="watchlist-empty">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="watchlist-star"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.385a.563.563 0 00-.182-.557L3.04 10.385a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345l2.125-5.111z"
-            />
-          </svg>
-          <h2 className="empty-title">Your watchlist is empty</h2>
-          <p className="empty-description">
-            Search for a stock and press &quot;Add to Watchlist&quot; on its page to start tracking it here.
-          </p>
-          <OpenSearchButton label="Search stocks" />
-        </div>
-      </section>
-    );
-  }
+  const initialRows = await getWatchRows(activeList(doc).items.slice(0, FIRST_ROWS).map((item) => item.symbol));
 
   return (
-    <section className="watchlist space-y-6">
-      <PageHeader title="Watchlist" description="Your saved stocks with prices from Finnhub. Each price shows its time; open a row for the full page.">
-        <OpenSearchButton label="Add stock" />
-      </PageHeader>
-      <WatchlistTable watchlist={watchlist} />
+    <section>
+      <WatchlistApp initial={doc} initialRows={initialRows} description={DESCRIPTION} />
     </section>
   );
 }

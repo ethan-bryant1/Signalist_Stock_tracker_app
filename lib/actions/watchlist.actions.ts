@@ -1,12 +1,26 @@
 'use server';
 
 import { connectToDatabase } from '@/database/mongoose';
-import { Watchlist } from '@/database/models/watchlist.model';
 import { getSession } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
-import { getStockOverview } from '@/lib/stock-data';
-import { formatChangePercent, formatMarketCapValue, formatPrice } from '@/lib/utils';
+import { loadWatchlists, newListId, updateWatchlists } from '@/lib/watchlist-store';
+import {
+  activeList,
+  addItem,
+  allSymbols,
+  createList,
+  deleteList,
+  moveItem,
+  normalizeListSymbol,
+  removeItem,
+  renameList,
+  setActiveList,
+  setPrefs,
+  type OpResult,
+  type WatchlistDoc,
+} from '@/lib/watchlists';
 
+// Every symbol in the user's lists, for the daily news email
 export async function getWatchlistSymbolsByEmail(email: string): Promise<string[]> {
   if (!email) return [];
 
@@ -23,8 +37,7 @@ export async function getWatchlistSymbolsByEmail(email: string): Promise<string[
     const userId = (user.id as string) || String(user._id || '');
     if (!userId) return [];
 
-    const items = await Watchlist.find({ userId }, { symbol: 1 }).lean();
-    return items.map((i) => String(i.symbol));
+    return allSymbols(await loadWatchlists(userId));
   } catch (err) {
     console.error('getWatchlistSymbolsByEmail error:', err);
     return [];
@@ -39,29 +52,27 @@ async function getCurrentUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
+// ---------- The open list, for the stock page's button, the search window's stars and the workspace widget ----------
+
+// Whether the symbol is in the list open on the Watchlist page (the list the star buttons add to)
 export async function isStockInWatchlist(symbol: string): Promise<boolean> {
   try {
     const userId = await getCurrentUserId();
     if (!userId || !symbol) return false;
-
-    await connectToDatabase();
-    const item = await Watchlist.exists({ userId, symbol: symbol.toUpperCase() });
-    return !!item;
+    const sym = normalizeListSymbol(symbol);
+    return activeList(await loadWatchlists(userId)).items.some((item) => item.symbol === sym);
   } catch (err) {
     console.error('isStockInWatchlist error:', err);
     return false;
   }
 }
 
-// The signed-in user's saved stocks, newest first, without prices (for the search window's stars)
+// The open list's stocks in its own order, without prices
 export async function getWatchlistSymbols(): Promise<{ symbol: string; company: string }[]> {
   try {
     const userId = await getCurrentUserId();
     if (!userId) return [];
-
-    await connectToDatabase();
-    const items = await Watchlist.find({ userId }, { symbol: 1, company: 1 }).sort({ addedAt: -1 }).lean();
-    return items.map((item) => ({ symbol: String(item.symbol), company: String(item.company || item.symbol) }));
+    return activeList(await loadWatchlists(userId)).items.map(({ symbol, company }) => ({ symbol, company }));
   } catch (err) {
     console.error('getWatchlistSymbols error:', err);
     throw new Error('Could not load the watchlist');
@@ -72,16 +83,13 @@ export async function addToWatchlist(symbol: string, company: string): Promise<{
   try {
     const userId = await getCurrentUserId();
     if (!userId || !symbol) return { success: false };
-
-    await connectToDatabase();
-    const upper = symbol.toUpperCase();
-    // Upsert so adding the same stock twice does not hit the unique index
-    await Watchlist.updateOne(
-      { userId, symbol: upper },
-      { $setOnInsert: { userId, symbol: upper, company: company || upper, addedAt: new Date() } },
-      { upsert: true }
-    );
-    return { success: true };
+    const sym = normalizeListSymbol(symbol);
+    // Already there counts as done, as adding twice did before lists
+    const result = await updateWatchlists(userId, (doc) => {
+      const list = activeList(doc);
+      return list.items.some((item) => item.symbol === sym) ? { ok: true, doc } : addItem(doc, list.id, sym, company, Date.now());
+    });
+    return { success: result.ok };
   } catch (err) {
     console.error('addToWatchlist error:', err);
     return { success: false };
@@ -92,59 +100,83 @@ export async function removeFromWatchlist(symbol: string): Promise<{ success: bo
   try {
     const userId = await getCurrentUserId();
     if (!userId || !symbol) return { success: false };
-
-    await connectToDatabase();
-    await Watchlist.deleteOne({ userId, symbol: symbol.toUpperCase() });
-    return { success: true };
+    const sym = normalizeListSymbol(symbol);
+    const result = await updateWatchlists(userId, (doc) => {
+      const list = activeList(doc);
+      return list.items.some((item) => item.symbol === sym) ? removeItem(doc, list.id, sym) : { ok: true, doc };
+    });
+    return { success: result.ok };
   } catch (err) {
     console.error('removeFromWatchlist error:', err);
     return { success: false };
   }
 }
 
-// The signed-in user's watchlist, newest first, with prices from Finnhub (through the shared gate, which paces the
-// requests within the free plan's budget and reuses what other pages already loaded).
-// Returns null when the watchlist could not be loaded, so the page can tell that apart from an empty list.
-export async function getWatchlistWithData(): Promise<StockWithData[] | null> {
+// ---------- The Watchlist page ----------
+
+// The signed-in user's lists, or null when the database couldn't be read
+export async function getWatchlists(): Promise<WatchlistDoc | null> {
   // Kept outside the try so Next's "render per request" signal from headers() is not swallowed
   const userId = await getCurrentUserId();
-  if (!userId) return [];
-
+  if (!userId) return null;
   try {
-    await connectToDatabase();
-    const items = await Watchlist.find({ userId }).sort({ addedAt: -1 }).lean();
-
-    const result: StockWithData[] = await Promise.all(
-      items.map(async (item) => {
-        const data = await getStockOverview(item.symbol);
-        const changeAmount = data.change;
-
-        return {
-          _id: String(item._id),
-          userId: item.userId,
-          symbol: item.symbol,
-          company: data.name || item.company,
-          addedAt: item.addedAt,
-          currentPrice: data.price,
-          changePercent: data.changePercent,
-          changeAmount,
-          priceFormatted: data.price !== undefined ? formatPrice(data.price) : '—',
-          changeFormatted: formatChangePercent(data.changePercent) || '—',
-          changeAmountFormatted:
-            changeAmount !== undefined ? `${changeAmount > 0 ? '+' : ''}${changeAmount.toFixed(2)}` : '',
-          marketCap: data.marketCap ? formatMarketCapValue(data.marketCap) : '—',
-          peRatio: data.peRatio !== undefined ? data.peRatio.toFixed(1) : '—',
-          quoteTime: data.quoteTime,
-          receivedAt: data.receivedAt,
-          cached: data.cached,
-          checkedAt: data.checkedAt,
-          issue: data.issue,
-        };
-      })
-    );
-    return result;
+    return await loadWatchlists(userId);
   } catch (err) {
-    console.error('getWatchlistWithData error:', err);
+    console.error('getWatchlists error:', err instanceof Error ? err.message : err);
     return null;
   }
+}
+
+const NOT_SIGNED_IN: OpResult = { ok: false, error: 'Sign in again to change your watchlists' };
+const SAVE_FAILED: OpResult = { ok: false, error: "Couldn't save the change. Check your connection and try again." };
+
+// Every change goes through here: it applies to the latest saved copy and returns the new document, or why not
+async function change(apply: (doc: WatchlistDoc) => OpResult): Promise<OpResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
+  try {
+    return await updateWatchlists(userId, apply);
+  } catch (err) {
+    console.error('watchlist change error:', err instanceof Error ? err.message : err);
+    return SAVE_FAILED;
+  }
+}
+
+const text = (value: unknown) => (typeof value === 'string' ? value : '');
+
+export async function createWatchlist(name: unknown): Promise<OpResult> {
+  const id = newListId();
+  return change((doc) => createList(doc, text(name), id));
+}
+
+export async function renameWatchlist(listId: unknown, name: unknown): Promise<OpResult> {
+  return change((doc) => renameList(doc, text(listId), text(name)));
+}
+
+export async function deleteWatchlist(listId: unknown): Promise<OpResult> {
+  return change((doc) => deleteList(doc, text(listId)));
+}
+
+export async function openWatchlist(listId: unknown): Promise<OpResult> {
+  return change((doc) => setActiveList(doc, text(listId)));
+}
+
+// Adds a symbol to a list; index puts it back where it was when undoing a removal
+export async function addWatchlistSymbol(listId: unknown, symbol: unknown, company: unknown, index?: unknown): Promise<OpResult> {
+  const at = typeof index === 'number' && Number.isFinite(index) ? index : undefined;
+  return change((doc) => addItem(doc, text(listId), text(symbol), text(company), Date.now(), at));
+}
+
+export async function removeWatchlistSymbol(listId: unknown, symbol: unknown): Promise<OpResult> {
+  return change((doc) => removeItem(doc, text(listId), text(symbol)));
+}
+
+export async function moveWatchlistSymbol(listId: unknown, symbol: unknown, toIndex: unknown): Promise<OpResult> {
+  if (typeof toIndex !== 'number' || !Number.isFinite(toIndex)) return { ok: false, error: 'Nowhere to move it' };
+  return change((doc) => moveItem(doc, text(listId), text(symbol), toIndex));
+}
+
+// Columns, sorting, row density and the details panel
+export async function saveWatchlistPrefs(prefs: unknown): Promise<OpResult> {
+  return change((doc) => setPrefs(doc, prefs));
 }

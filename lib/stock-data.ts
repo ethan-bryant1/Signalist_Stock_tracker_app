@@ -166,10 +166,13 @@ export type StockOverview = PriceStamp & {
   beta?: number;
   week52High?: number;
   week52Low?: number;
+  avgVolume?: number; // 10-day average, millions of shares
+  // Why the key figures (P/E, EPS, 52-week range, average volume) are missing, when their request failed or waited
+  metricIssue?: FeedIssue;
 };
 
 // A stock's price today with its name, logo and exchange: what the search window previews
-export type StockQuote = Omit<StockOverview, 'peRatio' | 'eps' | 'dividendYield' | 'beta' | 'week52High' | 'week52Low'>;
+export type StockQuote = Omit<StockOverview, 'peRatio' | 'eps' | 'dividendYield' | 'beta' | 'week52High' | 'week52Low' | 'avgVolume' | 'metricIssue'>;
 
 // Finnhub sometimes sends 0 or nothing for figures it doesn't have
 const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
@@ -177,6 +180,12 @@ const nonZero = (value: unknown) => num(value) || undefined;
 
 // Tickers are letters and digits, sometimes with a dot or dash (BRK.B)
 export const isValidSymbol = (symbol: string) => /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(symbol);
+
+// A request still queued under the call budget isn't a failure (it fills the cache for the next load), so it isn't
+// logged as an error; a long watchlist at the open would otherwise print one per stock
+const logFetchError = (what: string, sym: string, issue: FeedIssue) => {
+  if (issue !== 'busy') console.error(`Error fetching ${what} for`, sym, issue);
+};
 
 // The quote (reused for a minute in the session, until the next open once the closing prices are in) and the profile
 // (a day), shared by every page that asks
@@ -186,11 +195,11 @@ export const getStockQuoteData = async (sym: string): Promise<StockQuote> => {
   const [quote, profile] = await Promise.all([
     finnhubGet<FinnhubFullQuote>('/quote', params, { ...FINNHUB_CACHE.quote, ttlMs: marketTtlMs(Date.now(), 60_000), waitMs: PAGE_WAIT_MS }).catch((e) => {
       issue = issueOf(e);
-      console.error('Error fetching quote for', sym, issue);
+      logFetchError('quote', sym, issue);
       return null;
     }),
     finnhubGet<FinnhubFullProfile>('/stock/profile2', params, { ...FINNHUB_CACHE.profile, priority: 'interactive', waitMs: PAGE_WAIT_MS }).catch((e) => {
-      console.error('Error fetching profile2 for', sym, issueOf(e));
+      logFetchError('profile2', sym, issueOf(e));
       return null;
     }),
   ]);
@@ -233,17 +242,21 @@ export const getStockQuoteData = async (sym: string): Promise<StockQuote> => {
   };
 };
 
-// Everything the top of a stock's page shows: name, logo, price and key figures.
-// Pieces that fail to load are left out, so the page still renders.
-export async function getStockOverview(symbol: string): Promise<StockOverview> {
+// A stock's key figures from Finnhub's metric endpoint (cached for hours), and why they're missing if the request
+// failed or waited too long for the call budget
+export type KeyFigures = Pick<StockOverview, 'peRatio' | 'eps' | 'dividendYield' | 'beta' | 'week52High' | 'week52Low' | 'avgVolume' | 'metricIssue'> & {
+  // Market cap from the metric endpoint, for when the profile has none
+  metricMarketCap?: number;
+};
+
+export async function getKeyFigures(symbol: string, priority: 'interactive' | 'background' = 'interactive'): Promise<KeyFigures> {
   const sym = symbol.toUpperCase();
-  const [quote, metrics] = await Promise.all([
-    getStockQuoteData(sym),
-    finnhubData<FinnhubAllMetrics>('/stock/metric', { symbol: sym, metric: 'all' }, { ...FINNHUB_CACHE.metric, priority: 'interactive', waitMs: PAGE_WAIT_MS }).catch((e) => {
-      console.error('Error fetching metrics for', sym, issueOf(e));
-      return null;
-    }),
-  ]);
+  let metricIssue: FeedIssue | undefined;
+  const metrics = await finnhubData<FinnhubAllMetrics>('/stock/metric', { symbol: sym, metric: 'all' }, { ...FINNHUB_CACHE.metric, priority, waitMs: PAGE_WAIT_MS }).catch((e) => {
+    metricIssue = issueOf(e);
+    logFetchError('metrics', sym, metricIssue);
+    return null;
+  });
 
   const m = metrics?.metric ?? {};
   // Finnhub can answer a share-class ticker with another class's figures (BRK.A's for BRK.B, about 1,500 times
@@ -251,15 +264,25 @@ export async function getStockOverview(symbol: string): Promise<StockOverview> {
   const ownListing = !metrics?.symbol || sameListing(metrics.symbol, sym);
 
   return {
-    ...quote,
-    marketCap: quote.marketCap ?? (ownListing ? nonZero(m.marketCapitalization) : undefined),
+    metricMarketCap: ownListing ? nonZero(m.marketCapitalization) : undefined,
     peRatio: num(m.peTTM) ?? num(m.peBasicExclExtraTTM),
     eps: ownListing ? num(m.epsTTM) ?? num(m.epsBasicExclExtraItemsTTM) : undefined,
     dividendYield: num(m.dividendYieldIndicatedAnnual) ?? num(m.currentDividendYieldTTM),
     beta: num(m.beta),
     week52High: ownListing ? nonZero(m['52WeekHigh']) : undefined,
     week52Low: ownListing ? nonZero(m['52WeekLow']) : undefined,
+    avgVolume: ownListing ? nonZero(m['10DayAverageTradingVolume']) : undefined,
+    metricIssue,
   };
+}
+
+// Everything the top of a stock's page shows: name, logo, price and key figures.
+// Pieces that fail to load are left out, so the page still renders.
+// metricPriority 'background' lets a long list's prices go before its key figures, which change slowly
+export async function getStockOverview(symbol: string, { metricPriority = 'interactive' }: { metricPriority?: 'interactive' | 'background' } = {}): Promise<StockOverview> {
+  const sym = symbol.toUpperCase();
+  const [quote, { metricMarketCap, ...figures }] = await Promise.all([getStockQuoteData(sym), getKeyFigures(sym, metricPriority)]);
+  return { ...quote, ...figures, marketCap: quote.marketCap ?? metricMarketCap };
 }
 
 // ---------- The market strip ----------
