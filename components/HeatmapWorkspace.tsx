@@ -8,7 +8,7 @@ import HeatmapTerminal from "@/components/HeatmapTerminal";
 import { HeatmapLegend, HeatmapStatus } from "@/components/HeatmapFooter";
 import { useLiveMarket } from "@/components/LiveMarket";
 import SectorPerformance from "@/components/SectorPerformance";
-import StockHeatmap, { unplacedStocks } from "@/components/StockHeatmap";
+import StockHeatmap, { sizeWhileLoading, sizingNote, unplacedStocks } from "@/components/StockHeatmap";
 import StockInspector from "@/components/StockInspector";
 import { useHeatmapFeed, useNow } from "@/hooks/useHeatmapFeed";
 import { useHeatmapSettings } from "@/hooks/useHeatmapSettings";
@@ -320,7 +320,9 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const assessment = useMemo(() => assessStocks(feed.stocks, { now, session }), [feed.stocks, now, session]);
     const mapStocks = useMemo(() => (state.sector ? feed.stocks.filter((stock) => stock.sector === state.sector) : feed.stocks), [feed.stocks, state.sector]);
     // With Alpaca, volume sizes are the last trading day's volume, like TradingView's; without it, 10-day averages
-    const unplaced = useMemo(() => unplacedStocks(mapStocks, effective.size, alpaca), [mapStocks, effective.size, alpaca]);
+    // Equal tiles while no stock has the chosen figure yet; the toolbar keeps showing the choice
+    const drawSize = useMemo(() => sizeWhileLoading(mapStocks, effective.size, alpaca), [mapStocks, effective.size, alpaca]);
+    const unplaced = useMemo(() => unplacedStocks(mapStocks, drawSize, alpaca), [mapStocks, drawSize, alpaca]);
     // For a longer period, each stock's change is its live price against where the period started; for pre-market
     // or after hours, the session's latest price against the regular close before it
     const colorPeriod = effective.color;
@@ -433,7 +435,10 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     // The 1-day change needs no label; any other period's change is labeled with it ("1W")
     const changeLabel = colorPeriod === "1d" ? undefined : periodLabel;
 
-    const statusNotes = alpacaNotes(feed.alpaca, alpaca && (effective.size === "volume" || effective.size === "dollar-volume") ? mapStocks : undefined);
+    const statusNotes = [
+        ...(drawSize === effective.size ? [] : [sizingNote(effective.size)]),
+        ...alpacaNotes(feed.alpaca, alpaca && (effective.size === "volume" || effective.size === "dollar-volume") ? mapStocks : undefined),
+    ];
     const { noPeriodDataReason, periodDetail } = colorDetails(colorPeriod, periodLabel, extendedShown);
 
     const shownColor = interactive ? effective.color : TRADINGVIEW_COLOR[state.color] ? state.color : "1d";
@@ -586,7 +591,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                             stocks={displayStocks}
                             freshness={assessment.freshness}
                             now={now}
-                            sizeBy={effective.size}
+                            sizeBy={drawSize}
                             volumeToday={alpaca}
                             fullColorAt={PERIOD_FULL_COLOR_AT[colorPeriod]}
                             groupBy={state.group}
@@ -621,7 +626,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                             noPeriodData={noPeriodData}
                             noPeriodDataReason={noPeriodDataReason}
                             periodDetail={periodDetail}
-                            sizeBy={effective.size}
+                            sizeBy={drawSize}
                             notes={statusNotes}
                             source={providers(alpaca, " · ")}
                             className="md:justify-end md:text-right"

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from "react";
-import StockHeatmap, { unplacedStocks } from "@/components/StockHeatmap";
+import StockHeatmap, { sizeWhileLoading, sizingNote, unplacedStocks } from "@/components/StockHeatmap";
 import { HeatmapLegend, HeatmapStatus } from "@/components/HeatmapFooter";
 import { useLiveMarket } from "@/components/LiveMarket";
 import { useHeatmapFeed, useNow } from "@/hooks/useHeatmapFeed";
@@ -22,7 +22,8 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
     const [settings] = useHeatmapSettings();
 
     const assessment = useMemo(() => assessStocks(feed.stocks, { now, session }), [feed.stocks, now, session]);
-    const unplaced = useMemo(() => unplacedStocks(feed.stocks, "cap"), [feed.stocks]);
+    const sizeBy = useMemo(() => sizeWhileLoading(feed.stocks, "cap"), [feed.stocks]);
+    const unplaced = useMemo(() => unplacedStocks(feed.stocks, sizeBy), [feed.stocks, sizeBy]);
 
     return (
         // As tall as the TradingView panel beside it (a 600px widget plus its 32px attribution line)
@@ -32,7 +33,7 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
                     stocks={feed.stocks}
                     freshness={assessment.freshness}
                     now={now}
-                    sizeBy="cap"
+                    sizeBy={sizeBy}
                     groupBy="sector"
                     action="open"
                     showLogos={settings.logos}
@@ -45,7 +46,7 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
             </div>
             <div className="flex shrink-0 flex-col gap-1.5 border-t border-gray-600 px-4 py-2 md:flex-row md:items-center md:justify-between md:gap-4">
                 <HeatmapLegend palette={settings.palette} />
-                <HeatmapStatus feed={feed} assessment={assessment} stocks={feed.stocks} unplaced={unplaced} now={now} className="md:justify-end md:text-right" />
+                <HeatmapStatus feed={feed} assessment={assessment} stocks={feed.stocks} unplaced={unplaced} now={now} notes={sizeBy === "cap" ? [] : [sizingNote("cap")]} className="md:justify-end md:text-right" />
             </div>
         </div>
     );

@@ -60,7 +60,8 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
     const symbol = { symbol: stock.symbol };
     const [quote, profile, stats] = await Promise.all([
       finnhubGet<unknown>('/quote', symbol, { ...FINNHUB_CACHE.quote, ttlMs: QUOTE_MS(index), waitMs: WAIT_MS }).catch(failed),
-      finnhubGet<FinnhubProfile>('/stock/profile2', symbol, { ...FINNHUB_CACHE.profile, waitMs: WAIT_MS }).catch(failed),
+      // The map is sized by the profile's market cap, so it loads with the prices rather than behind them
+      finnhubGet<FinnhubProfile>('/stock/profile2', symbol, { ...FINNHUB_CACHE.profile, priority: 'interactive', waitMs: WAIT_MS }).catch(failed),
       // A missing stat only hides that stock's longer-period change, so it isn't counted as a price failure
       finnhubGet<unknown>('/stock/metric', { ...symbol, metric: 'all' }, { ...FINNHUB_CACHE.metric, waitMs: WAIT_MS }).catch(() => {
         statsFailed++;
