@@ -3,7 +3,8 @@
 # Loops Watch: engineering rules
 
 Loops Watch is a private, owner-only stock research workstation (Next 16, React 19, Better Auth, MongoDB, Finnhub,
-TradingView embeds). Architecture and where things live: [docs/architecture.md](docs/architecture.md).
+TradingView embeds). Start with [docs/handoff.md](docs/handoff.md) (status, decisions, next tasks). Architecture and
+where things live: [docs/architecture.md](docs/architecture.md).
 Data sources and their limits: [docs/heatmap.md](docs/heatmap.md). Specialist skills are in `.claude/skills/`.
 
 ## Financial data
@@ -43,4 +44,6 @@ Data sources and their limits: [docs/heatmap.md](docs/heatmap.md). Specialist sk
 - The owner works on Windows (PowerShell, VS Code) and is learning: give exact commands, and warn that
   `npm install` can leave `package-lock.json` changes that block `git checkout`.
 - Search the repo for what a task needs (`rg`, targeted reads) instead of loading whole directories. Keep
-  `docs/architecture.md` current when the structure changes.
+  `docs/architecture.md` current when the structure changes, and update `docs/handoff.md` (Status, Next) in every PR.
+- Keep token use proportionate: one feature per thread, targeted tests while building and the full checks above
+  before the PR, screenshots only of changed screens, no repeated provider research (record it in `providers.md`).
