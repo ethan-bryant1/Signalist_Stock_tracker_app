@@ -76,7 +76,11 @@ const describeStock = (stock: HeatmapStock, freshness: Freshness, periodText: st
     return [
         `${name} (${symbol})`,
         quote ? formatCurrency(quote.price) : undefined,
-        rounded !== undefined ? `${rounded > 0 ? "up" : rounded < 0 ? "down" : "unchanged"} ${Math.abs(rounded).toFixed(2)}% ${when}` : undefined,
+        rounded !== undefined
+            ? `${rounded > 0 ? "up" : rounded < 0 ? "down" : "unchanged"} ${Math.abs(rounded).toFixed(2)}% ${when}`
+            : quote && fixedPeriod
+                ? `no change available ${when}`
+                : undefined,
         marketCap ? `market cap ${formatMarketCapValue(marketCap)}` : undefined,
         sector,
         FRESHNESS_TEXT[freshness] || undefined,

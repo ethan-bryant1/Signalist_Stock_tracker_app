@@ -58,7 +58,9 @@ it, so these maps move with every trade like the 1-day map.
   (before the open, overnight, weekends). If Finnhub recomputes them in the evening, a longer-period change counts
   that day's move twice until the next morning's quote. The stats are cached for 6 to 8 hours, staggered.
 - **Missing stats.** A stock without a starting price shows "—" and the status line counts it ("2 without 1W data");
-  it is never shown with its 1-day change instead. A failed stats request doesn't count as a price failure.
+  it is never shown with its 1-day change instead. A failed stats request doesn't count as a price failure. While
+  Finnhub fails, the last good stats are used for up to 30 hours, then dropped, so a period's start is never carried
+  past its window.
 - **Colors.** Longer periods move further, so each has a wider scale: full color at ±3% (1D), ±6% (1W), ±9% (MTD),
   ±15% (3M), ±21% (6M), ±24% (YTD), ±30% (1Y). The legend follows the period.
 - **Requests.** The stats add one request per stock, so a cold cache costs about 162 requests.
@@ -66,7 +68,7 @@ it, so these maps move with every trade like the 1-day map.
 ### Requests, caching and refresh
 
 - Each stock needs three requests (quote, profile and stats). On a cache miss at most 4 stocks are fetched at once, so at
-  most 8 requests are in flight. Next refreshes expired cache entries in the background (it serves the old answer
+  most 12 requests are in flight. Next refreshes expired cache entries in the background (it serves the old answer
   straight away), and those background refreshes are not limited by this, so a page view after a long idle spell
   can send most of the ~162 requests at once.
 - Prices are cached on the server for 2 to 3¼ minutes, staggered so they don't all expire together. Profiles are

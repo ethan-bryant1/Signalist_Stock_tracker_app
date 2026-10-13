@@ -54,8 +54,10 @@ export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly Heat
             marketCap: stock.marketCap ?? old.marketCap,
             logo: stock.logo ?? old.logo,
             exchange: stock.exchange ?? old.exchange,
-            periodStart: stock.periodStart ?? old.periodStart,
-            averageVolume: stock.averageVolume ?? old.averageVolume,
+            // Taken as the server sends them: it already keeps the last good stats while Finnhub fails, and drops them
+            // once they're too old, so the page never carries a period's start past its window
+            periodStart: stock.periodStart,
+            averageVolume: stock.averageVolume,
         };
         const unchanged = sameQuote(merged.quote, old.quote) && merged.fetchedAt === old.fetchedAt && merged.marketCap === old.marketCap
             && merged.logo === old.logo && merged.exchange === old.exchange && merged.name === old.name

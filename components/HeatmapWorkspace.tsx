@@ -286,7 +286,10 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
             missing: statuses.filter((status) => status === "missing").length,
         };
     }, [assessment, mapStocks, state.sector]);
-    const selected = state.symbol ? feed.stocks.find((stock) => stock.symbol === state.symbol) : undefined;
+    const selectedStock = state.symbol ? feed.stocks.find((stock) => stock.symbol === state.symbol) : undefined;
+    // The selected stock's panel shows the same change as its tile (it can be outside a focused sector, so it's
+    // worked out on its own)
+    const selected = selectedStock && colorPeriod !== "1d" ? withPeriodChange(selectedStock, colorPeriod) : selectedStock;
 
     const onSelect = useCallback(
         (symbol: string) => {
@@ -533,7 +536,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                             className="h-full"
                         />
                     ) : (
-                        <HeatmapTerminal color={state.color} size={state.size} group={state.group} showMapControls={showMapControls} className="h-full" />
+                        <HeatmapTerminal color={shownColor} size={state.size} group={state.group} showMapControls={showMapControls} className="h-full" />
                     )}
                 </div>
 
@@ -554,7 +557,8 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                     </div>
                 ) : (
                     <p className="border-t border-gray-600 px-4 py-2.5 text-xs leading-relaxed text-gray-500">
-                        Colored by {describe([...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS], state.color)}, sized by {describe(SIZE_OPTIONS, state.size)}, as TradingView
+                        Colored by {describe([...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS], shownColor)}
+                        {shownColor !== state.color ? ` (TradingView has no ${describe(PERIOD_OPTIONS, state.color)})` : ""}, sized by {describe(SIZE_OPTIONS, state.size)}, as TradingView
                         calculates them (delayed). {state.color === "premarket" || state.color === "postmarket" ? `The US market is ${SESSION_TEXT[session]} now. ` : ""}
                         Sectors are FactSet&apos;s, so they don&apos;t match the GICS sectors in the list. Hover for TradingView&apos;s card; a click opens the
                         stock here.
@@ -568,6 +572,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                         {selected ? (
                             <StockInspector
                                 stock={selected}
+                                changeLabel={colorPeriod === "1d" ? undefined : periodLabel}
                                 freshness={assessment.freshness.get(selected.symbol) ?? "missing"}
                                 now={now}
                                 watchlisted={watchlist.has(selected.symbol)}
@@ -612,6 +617,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                     <div aria-hidden className="mx-auto -mt-1 mb-3 h-1 w-10 rounded-full bg-gray-600 sm:hidden" />
                     <StockInspector
                         stock={selected}
+                        changeLabel={colorPeriod === "1d" ? undefined : periodLabel}
                         freshness={assessment.freshness.get(selected.symbol) ?? "missing"}
                         now={now}
                         watchlisted={watchlist.has(selected.symbol)}
