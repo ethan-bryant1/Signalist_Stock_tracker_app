@@ -37,10 +37,11 @@ Every Finnhub and Alpaca REST call goes through that provider's gate (`lib/provi
 
 Pages call `lib/stock-data.ts` and `lib/heatmap-data.ts` after checking the session. The header strip refreshes once a
 minute from `/api/market` (one poller, in the layout; `<IncludeSectorPrices>` adds the sector funds on pages that show
-them). The heatmap refreshes from `/api/heatmap`, stops while its TradingView view is showing, and during trading
-sessions follows `/api/heatmap/stream`; every open tab shares the server's one Finnhub socket, since Finnhub allows one
+them). The dashboard's Market Snapshot refreshes from `/api/heatmap` and during the regular session follows
+`/api/heatmap/stream`; every open tab shares the server's one Finnhub socket, since Finnhub allows one
 connection per key. Every price shows its source and age (`components/PriceStamp.tsx`). TradingView widgets are
-separate, delayed embeds.
+separate, delayed embeds; the S&P 500 Heatmap page (`components/SP500Heatmap.tsx`) is TradingView's map with our
+toolbar and makes no Finnhub requests for the map.
 
 ## Libraries
 

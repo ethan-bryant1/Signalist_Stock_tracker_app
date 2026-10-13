@@ -207,7 +207,7 @@ type HeadingProps = {
     group: TreemapGroup<HeatmapStock>;
     text: string | null;
     height: number;
-    // Clicking a heading zooms into that sector: on the Heatmap page in place, from the dashboard by opening that page
+    // Clicking a heading zooms into that sector in place, or (with sectorHref) opens a page for it
     onFocusSector?: (sector: string) => void;
     sectorHref?: (sector: string) => string;
 };
@@ -231,7 +231,7 @@ const SectorHeading = memo(function SectorHeading({ group, text, height, onFocus
     }
     if (sectorHref) {
         return (
-            <Link href={sectorHref(group.key)} prefetch={false} tabIndex={-1} title={`Open ${group.label} on the Heatmap page`} className={cn(className, interactive)} style={style}>
+            <Link href={sectorHref(group.key)} prefetch={false} tabIndex={-1} title={`Open every ${group.label} stock on the Markets page`} className={cn(className, interactive)} style={style}>
                 {text}
             </Link>
         );

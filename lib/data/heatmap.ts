@@ -1,8 +1,6 @@
-import { SECTOR_ETFS } from "@/lib/data/markets";
-
-// The stocks on the interactive heatmaps (dashboard and Heatmap page): the largest S&P 500 companies in each of
+// The stocks on the dashboard's Market Snapshot map: the largest S&P 500 companies in each of
 // the 11 GICS sectors, 3 to 8 per sector. Finnhub's free plan sends one price per request and allows 60 requests
-// a minute, so the map can't keep all 500 companies fresh; the Heatmap page's TradingView view shows the whole index.
+// a minute, so the map can't keep all 500 companies fresh; the S&P 500 Heatmap page (TradingView) shows the whole index.
 // Ranked by market cap at the close on 2026-10-09 (TradingView's sector lists, cross-checked with the SPDR sector
 // ETFs' top holdings). Re-rank now and then, since companies grow into and out of the top of their sector.
 // Every symbol must also be in lib/data/sp500.ts, which gives its sector and industry (a unit test checks this).
@@ -37,9 +35,3 @@ export const HEATMAP_SYMBOLS = [
     // Materials
     "LIN", "NEM", "FCX",
 ] as const;
-
-// The sectors and stocks a Heatmap page link may name (?sector=…&symbol=…); anything else in a link is ignored
-export const HEATMAP_LINK_VALUES = {
-    sectors: new Set<string>(SECTOR_ETFS.map(({ sector }) => sector)),
-    symbols: new Set<string>(HEATMAP_SYMBOLS),
-};

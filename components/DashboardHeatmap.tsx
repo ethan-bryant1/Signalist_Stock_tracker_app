@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import StockHeatmap, { sizeWhileLoading, sizingNote, unplacedStocks } from "@/components/StockHeatmap";
+import HeatmapDisplaySettings from "@/components/HeatmapDisplaySettings";
 import { HeatmapLegend, HeatmapStatus } from "@/components/HeatmapFooter";
 import { useLiveMarket } from "@/components/LiveMarket";
 import { useHeatmapFeed, useNow } from "@/hooks/useHeatmapFeed";
@@ -9,11 +10,12 @@ import { useHeatmapSettings } from "@/hooks/useHeatmapSettings";
 import { HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/data/heatmap";
 import { assessStocks, periodPhrase, type HeatmapPayload } from "@/lib/market-data";
 
-const sectorHref = (sector: string) => `/heatmap?sector=${encodeURIComponent(sector)}`;
+// A sector heading opens the quotes for every S&P 500 company in that sector
+const sectorHref = (sector: string) => `/market-data?sector=${encodeURIComponent(sector)}`;
 
 // The dashboard's Market Snapshot: a quick read of the market. Hovering shows a stock's quote, clicking opens its page,
-// and a sector heading opens that sector on the Heatmap page. The figures, colors and status line are the same
-// as on the Heatmap page's Market Snapshot view.
+// and a sector heading opens that sector's stocks on the Markets page. The S&P 500 Heatmap page has TradingView's map
+// of the whole index.
 const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
     const { session } = useLiveMarket();
     // Trades stream in only while the regular session trades; otherwise prices refresh once a minute
@@ -46,7 +48,11 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
             </div>
             <div className="flex shrink-0 flex-col gap-1.5 border-t border-gray-600 px-4 py-2 md:flex-row md:items-center md:justify-between md:gap-4">
                 <HeatmapLegend palette={settings.palette} />
-                <HeatmapStatus feed={feed} assessment={assessment} stocks={feed.stocks} unplaced={unplaced} now={now} notes={sizeBy === "cap" ? [] : [sizingNote("cap")]} className="md:justify-end md:text-right" />
+                <div className="flex min-w-0 items-center justify-between gap-3 md:justify-end">
+                    <HeatmapStatus feed={feed} assessment={assessment} stocks={feed.stocks} unplaced={unplaced} now={now} notes={sizeBy === "cap" ? [] : [sizingNote("cap")]} className="md:justify-end md:text-right" />
+                    {/* Colors for red-green color blindness, and logos on or off */}
+                    <HeatmapDisplaySettings />
+                </div>
             </div>
         </div>
     );

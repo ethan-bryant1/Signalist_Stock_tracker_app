@@ -24,7 +24,7 @@ const HeatmapTerminal = ({ color, size, group, showMapControls, className }: Hea
     const config = useMemo(
         () => ({
             ...HEATMAP_PAGE_WIDGET_CONFIG,
-            blockColor: TRADINGVIEW_COLOR[color] ?? TRADINGVIEW_COLOR["1d"],
+            blockColor: TRADINGVIEW_COLOR[color],
             blockSize: TRADINGVIEW_SIZE[size].blockSize,
             isMonoSize: TRADINGVIEW_SIZE[size].isMonoSize,
             grouping: TRADINGVIEW_GROUP[group],
