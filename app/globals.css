@@ -209,12 +209,6 @@
   .auth-blockquote {
     @apply text-sm md:text-xl lg:text-2xl font-medium text-gray-400 mb-1 md:mb-6 lg:mb-8;
   }
-  .auth-testimonial-author {
-    @apply text-xs md:text-lg font-bold text-gray-400 not-italic;
-  }
-  .auth-dashboard-preview {
-    @apply border-6 border-gray-800 left-0 hidden w-[1024px] h-auto max-w-none lg:block rounded-xl shadow-2xl;
-  }
   .form-title {
     @apply text-4xl font-bold text-gray-400 mb-10;
   }
