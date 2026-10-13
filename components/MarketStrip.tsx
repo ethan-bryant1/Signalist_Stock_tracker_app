@@ -12,17 +12,7 @@ import { cn, formatChangePercent, getChangeColorClass } from "@/lib/utils";
 const [SPY, QQQ, DIA, IWM] = INDEX_ETFS;
 const [GLD, USO, TLT] = MACRO_ETFS;
 
-// Beside the market status, wider screens have room for more prices, so none is cut off part way.
-// Phones hide the status and scroll through every price instead.
-const STRIP_FUNDS: { symbol: string; label: string; className?: string }[] = [
-    SPY,
-    QQQ,
-    { ...DIA, className: "sm:hidden lg:block" },
-    { ...IWM, className: "sm:hidden lg:block" },
-    { ...GLD, className: "sm:hidden xl:block" },
-    { ...USO, className: "sm:hidden 2xl:block" },
-    { ...TLT, className: "sm:hidden 2xl:block" },
-];
+const STRIP_FUNDS = [SPY, QQQ, DIA, IWM, GLD, USO, TLT];
 
 const SESSION_LABELS: Record<MarketSession, string> = {
     "pre-market": "Pre-market",
@@ -55,7 +45,36 @@ const MarketClock = () => {
     );
 };
 
-// The header's second row: live prices for the major indexes, gold, oil and bonds,
+type Quotes = ReturnType<typeof useLiveMarket>["quotes"];
+
+// One pass of the ticker. The copy is hidden from screen readers and the keyboard so each price is read once.
+const TickerPrices = ({ quotes, copy = false }: { quotes: Quotes; copy?: boolean }) => (
+    <ul aria-label={copy ? undefined : "Market prices"} aria-hidden={copy || undefined} className={cn("flex shrink-0 items-center", copy && "market-ticker-copy")}>
+        {STRIP_FUNDS.map(({ symbol, label: name }) => {
+            const quote = quotes[symbol];
+            return (
+                <li key={symbol} className="shrink-0 border-l border-gray-600">
+                    <Link
+                        href={`/stocks/${symbol}`}
+                        tabIndex={copy ? -1 : undefined}
+                        title={`${name}, tracked with the ${symbol} fund. Open ${symbol}.`}
+                        className="flex h-9 items-center gap-2 px-3 transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gray-100"
+                    >
+                        <span className="font-medium text-gray-500">{name}</span>
+                        <span className="font-semibold tabular-nums text-gray-100">
+                            {quote?.price !== undefined ? <FlashingPrice value={quote.price} format={(value) => value.toFixed(2)} /> : "—"}
+                        </span>
+                        {quote?.changePercent !== undefined && (
+                            <span className={cn("font-medium tabular-nums", getChangeColorClass(quote.changePercent))}>{formatChangePercent(quote.changePercent)}</span>
+                        )}
+                    </Link>
+                </li>
+            );
+        })}
+    </ul>
+);
+
+// The header's second row: a scrolling ticker of the major indexes, gold, oil and bonds,
 // then whether the US market is trading and the time in New York, like a trading platform's ticker bar
 const MarketStrip = () => {
     const { quotes, session, holiday, asOf, refreshFailing, cachedCount, issue, checkedAt } = useLiveMarket();
@@ -65,44 +84,28 @@ const MarketStrip = () => {
     return (
         <div className="border-b border-gray-600/70">
             <div className="container flex h-9 items-center gap-4 text-xs">
-                <ul
-                    aria-label="Market prices"
-                    className="-ml-3 flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-hide max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)]"
-                >
-                    {STRIP_FUNDS.map(({ symbol, label: name, className }) => {
-                        const quote = quotes[symbol];
-                        return (
-                            <li key={symbol} className={cn("shrink-0 border-l border-gray-600 first:border-l-0", className)}>
-                                <Link
-                                    href={`/stocks/${symbol}`}
-                                    title={`${name}, tracked with the ${symbol} fund. Open ${symbol}.`}
-                                    className="flex h-9 items-center gap-2 px-3 transition-colors hover:bg-gray-800"
-                                >
-                                    <span className="font-medium text-gray-500">{name}</span>
-                                    <span className="font-semibold tabular-nums text-gray-100">
-                                        {quote?.price !== undefined ? <FlashingPrice value={quote.price} format={(value) => value.toFixed(2)} /> : "—"}
-                                    </span>
-                                    {quote?.changePercent !== undefined && (
-                                        <span className={cn("font-medium tabular-nums", getChangeColorClass(quote.changePercent))}>
-                                            {formatChangePercent(quote.changePercent)}
-                                        </span>
-                                    )}
-                                </Link>
-                            </li>
-                        );
-                    })}
-                </ul>
+                {/* The prices scroll past on a loop: the list is drawn three times so the copies fill even a wide screen
+                    without a gap. Hovering pauses it, keyboard focus stops it, and with reduced motion it is a still,
+                    scrollable row. */}
+                <div className="market-ticker -ml-3 min-w-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_1.5rem,black_calc(100%-2rem),transparent)]">
+                    <div className="market-ticker-track flex w-max">
+                        <TickerPrices quotes={quotes} />
+                        <TickerPrices quotes={quotes} copy />
+                        <TickerPrices quotes={quotes} copy />
+                    </div>
+                </div>
 
                 <div className="hidden shrink-0 items-center gap-3 sm:flex">
+                    {/* The clock already gives the time, so the prices' own time shows only when they are cached, delayed or missing */}
                     <PriceStamp
                         hasPrice={asOf !== undefined}
                         quoteTime={asOf}
                         cached={!!refreshFailing || !!cachedCount}
                         issue={issue}
                         renderedAt={checkedAt}
-                        className="hidden lg:inline-flex"
+                        warningOnly
+                        className="hidden border-r border-gray-600 pr-3 lg:inline-flex"
                     />
-                    <span aria-hidden className="hidden h-4 w-px bg-gray-600 lg:block" />
                     <span className="flex items-center gap-2 font-medium text-gray-100">
                         <span className="relative flex h-2 w-2" aria-hidden>
                             {isOpen && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-60 motion-reduce:animate-none" />}
