@@ -12,7 +12,7 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 | Provider clients (server only) | `lib/finnhub.ts`, `lib/alpaca.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
 | Data assembly (server only) | `lib/stock-data.ts` (quotes, overviews, news, market strip), `lib/heatmap-data.ts` (the map) |
 | Browser-callable actions | `lib/actions/finnhub.actions.ts` (search and its quote preview only, signed-in) |
-| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness), `lib/price-stamp.ts` (source and age labels), `lib/period-change.ts`, `lib/alpaca-data.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
+| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/period-change.ts`, `lib/alpaca-data.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
 | Diagnostics | `app/(root)/status` (Data status page: calls per minute, cache share, failures, stream) |
 | Static data | `lib/data/sp500.ts` (GICS list), `lib/data/heatmap.ts` (map universe), `lib/data/markets.ts` (ETFs) |
 | Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `proxy.ts` (Next 16 middleware) |

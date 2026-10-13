@@ -24,10 +24,10 @@ const shortExchange = (exchange?: string) => {
 };
 
 // In the regular session prices are reused for about 5 minutes (4½ to 5½, staggered so they expire a few at a time);
-// the live stream moves the largest stocks between refreshes. Outside it a quote doesn't move, so it's reused for 15
-// minutes (never past the next open). Company profiles (name, logo, market cap) and stats come from FINNHUB_CACHE
+// the live stream moves the largest stocks between refreshes. Once the closing prices are in, quotes are kept until
+// the next open (see marketTtlMs). Company profiles (name, logo, market cap) and stats come from FINNHUB_CACHE
 // (a day and 6 hours, kept in MongoDB).
-const QUOTE_MS = (index: number, now: number) => marketTtlMs(now, (270 + (index % 5) * 15) * 1000, 15 * 60_000);
+const QUOTE_MS = (index: number, now: number) => marketTtlMs(now, (270 + (index % 5) * 15) * 1000);
 // The cache keeps serving the last good stats while Finnhub fails. Past this age (by the answer's Date header) they
 // may be measured to an older close than the anchor assumes, so they're dropped and the longer periods read "—".
 const STATS_MAX_AGE_MS = 30 * 60 * 60_000;

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { priceStamp } from '@/lib/price-stamp';
-import { marketTtlMs } from '@/lib/market-data';
 
 // Tue Oct 13 2026 in New York (EDT, UTC−4)
 const AT_1042 = Date.UTC(2026, 9, 13, 14, 42);
@@ -38,20 +37,5 @@ describe('priceStamp', () => {
 
   it('warns when a price has no time', () => {
     expect(priceStamp({ hasPrice: true, session: 'regular', now: AT_1042 })).toMatchObject({ tone: 'warning', text: 'Finnhub · time unknown' });
-  });
-});
-
-describe('marketTtlMs', () => {
-  const ET = (h: number, m: number, day = 13) => Date.UTC(2026, 9, day, h + 4, m);
-  it('uses the regular time during the session', () => {
-    expect(marketTtlMs(ET(10, 42), 60_000, 15 * 60_000)).toBe(60_000);
-  });
-  it('reuses prices longer outside the session', () => {
-    expect(marketTtlMs(ET(17, 0), 60_000, 15 * 60_000)).toBe(15 * 60_000);
-    expect(marketTtlMs(ET(12, 0, 17), 60_000, 15 * 60_000)).toBe(15 * 60_000);
-  });
-  it('never holds a price past the open, and never under a minute', () => {
-    expect(marketTtlMs(ET(9, 25), 60_000, 15 * 60_000)).toBe(5 * 60_000);
-    expect(marketTtlMs(ET(9, 29), 60_000, 15 * 60_000)).toBe(60_000);
   });
 });
