@@ -112,3 +112,13 @@ export const worstIssue = (issues: Iterable<FeedIssue>): FeedIssue | undefined =
   const seen = new Set(issues);
   return ISSUE_ORDER.find((issue) => seen.has(issue));
 };
+
+// One log line per batch, without URLs (they carry the key). "busy" isn't a failure: those requests are still queued
+// under our own call budget (expected at the open, when every price is due at once) and fill the cache for the next
+// refresh, so they're logged as information and only real failures as errors.
+export const logIssues = (label: string, issues: FeedIssue[]) => {
+  const failed = issues.filter((issue) => issue !== 'busy');
+  const queued = issues.length - failed.length;
+  if (failed.length) console.error(`${label}: ${failed.length} Finnhub requests failed (${[...new Set(failed)].join(', ')})`);
+  if (queued) console.info(`${label}: ${queued} Finnhub requests still queued under the call budget; they fill the cache for the next refresh`);
+};

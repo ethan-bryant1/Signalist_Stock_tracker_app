@@ -2,7 +2,7 @@ import 'server-only';
 
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
-import { FINNHUB_CACHE, finnhubData, finnhubGet, mapWithLimit, worstIssue } from '@/lib/finnhub';
+import { FINNHUB_CACHE, finnhubData, finnhubGet, mapWithLimit, logIssues, worstIssue } from '@/lib/finnhub';
 import { marketTtlMs, normalizeQuote, sameListing, sessionFromClock, type FeedIssue, type MarketSession } from '@/lib/market-data';
 import { issueOf } from '@/lib/providers/gate';
 import { KNOWN_FUNDS, instrumentKind, type InstrumentKind } from '@/lib/instrument';
@@ -341,6 +341,6 @@ export async function getMarketSnapshot(includeSectors = false): Promise<MarketS
 
   snapshot.issue = worstIssue(issues);
   if (cachedCount) snapshot.cachedCount = cachedCount;
-  if (issues.length) console.error(`getMarketSnapshot: ${issues.length} Finnhub requests failed (${[...new Set(issues)].join(', ')})`);
+  logIssues('getMarketSnapshot', issues);
   return snapshot;
 }
