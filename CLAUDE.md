@@ -3,7 +3,7 @@
 # Loops Watch: engineering rules
 
 Loops Watch is a private, owner-only stock research workstation (Next 16, React 19, Better Auth, MongoDB, Finnhub,
-optional Alpaca, TradingView embeds). Architecture and where things live: [docs/architecture.md](docs/architecture.md).
+TradingView embeds). Architecture and where things live: [docs/architecture.md](docs/architecture.md).
 Data sources and their limits: [docs/heatmap.md](docs/heatmap.md). Specialist skills are in `.claude/skills/`.
 
 ## Financial data

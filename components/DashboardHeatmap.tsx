@@ -49,7 +49,7 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
             <div className="flex shrink-0 flex-col gap-1.5 border-t border-gray-600 px-4 py-2 md:flex-row md:items-center md:justify-between md:gap-4">
                 <HeatmapLegend palette={settings.palette} />
                 <div className="flex min-w-0 items-center justify-between gap-3 md:justify-end">
-                    <HeatmapStatus feed={feed} assessment={assessment} stocks={feed.stocks} unplaced={unplaced} now={now} notes={sizeBy === "cap" ? [] : [sizingNote("cap")]} className="md:justify-end md:text-right" />
+                    <HeatmapStatus feed={feed} assessment={assessment} stocks={feed.stocks} unplaced={unplaced} now={now} notes={sizeBy === "cap" ? [] : [sizingNote()]} className="md:justify-end md:text-right" />
                     {/* Colors for red-green color blindness, and logos on or off */}
                     <HeatmapDisplaySettings />
                 </div>

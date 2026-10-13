@@ -7,25 +7,6 @@ import { addDays, closeMinutes, isTradingDay, nextTradingDay, OPEN_MINUTES } fro
 
 export type MarketSession = "pre-market" | "regular" | "post-market" | "closed";
 
-// The periods the interactive heatmap can color by besides the 1-day change: from Finnhub's daily stats
-// (lib/period-change.ts), and 1H, 4H and 1M from Alpaca (lib/alpaca.ts)
-export type HistoryPeriod = "1h" | "4h" | "1w" | "1m" | "mtd" | "3m" | "6m" | "ytd" | "1y";
-
-// Whether Alpaca's figures (1H, 4H, 1M, extended hours, today's volume) are available
-export type AlpacaStatus = "ok" | "not-configured" | "auth" | "failed";
-
-// One extended session's latest price for a stock, and the regular close its move is measured from
-export type ExtendedPrice = {
-    // The latest price in that session, and its time; none yet when the stock hasn't traded in it
-    price?: number;
-    time?: number;
-    reference: number;
-    // True while the session is on (prices are live); false for the last finished session
-    live: boolean;
-    // The New York day the session belongs to
-    day: string;
-};
-
 // One stock's latest price and the day's figures around it
 export type Quote = {
     price: number;
@@ -42,7 +23,7 @@ export type Quote = {
     time?: number;
 };
 
-// A company on the interactive heatmaps, with whatever the provider had for it. Missing figures stay undefined, never 0.
+// A company on the Market Snapshot map, with whatever the provider had for it. Missing figures stay undefined, never 0.
 export type HeatmapStock = {
     symbol: string;
     name: string;
@@ -56,15 +37,6 @@ export type HeatmapStock = {
     quote?: Quote;
     // When we received the quote from Finnhub (its response's Date header), in milliseconds
     fetchedAt?: number;
-    // The price each longer period started at (1 week ago, the start of the year, ...), from Finnhub's daily stats
-    // (lib/period-change.ts). The live price against these gives the longer periods' changes.
-    periodStart?: Partial<Record<HistoryPeriod, number>>;
-    // Average daily volume over the last 10 trading days, in shares, from the same stats
-    averageVolume?: number;
-    // The last trading day's volume so far (up to 15 minutes ago), from Alpaca
-    todayVolume?: { shares: number; dollars?: number; day: string; through: number };
-    // Pre-market and after-hours prices, from Alpaca and Finnhub's trade stream
-    extended?: Partial<Record<"pre-market" | "post-market", ExtendedPrice>>;
 };
 
 // What went wrong when some figures couldn't be fetched, worst first. "busy" means our own request budget for the
@@ -72,7 +44,7 @@ export type HeatmapStock = {
 // "rate-limit" means the provider itself refused with 429.
 export type FeedIssue = "not-configured" | "auth" | "rate-limit" | "busy" | "provider" | "network";
 
-// Everything the server sends for the interactive heatmaps
+// Everything the server sends for the Market Snapshot map
 export type HeatmapPayload = {
     provider: "Finnhub";
     // Every stock in the universe, in its listed order, priced or not
@@ -82,7 +54,6 @@ export type HeatmapPayload = {
     // Requests that failed while putting it together, and the main reason
     failedRequests: number;
     issue?: FeedIssue;
-    alpaca?: AlpacaStatus;
 };
 
 const finite = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
