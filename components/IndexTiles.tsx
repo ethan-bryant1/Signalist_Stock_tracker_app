@@ -3,12 +3,14 @@
 import Link from "next/link";
 import DayRange from "@/components/DayRange";
 import FlashingPrice from "@/components/FlashingPrice";
+import PriceStamp from "@/components/PriceStamp";
 import { useLiveMarket } from "@/components/LiveMarket";
 import { INDEX_ETFS } from "@/lib/data/markets";
-import type { MarketQuote } from "@/lib/actions/finnhub.actions";
+import type { FeedIssue } from "@/lib/market-data";
+import type { MarketQuote } from "@/lib/stock-data";
 import { cn, formatChangePercent, formatSignedNumber, getChangeColorClass } from "@/lib/utils";
 
-const IndexTile = ({ symbol, label, quote }: { symbol: string; label: string; quote?: MarketQuote }) => {
+const IndexTile = ({ symbol, label, quote, stamp }: { symbol: string; label: string; quote?: MarketQuote; stamp: { cached: boolean; issue?: FeedIssue; checkedAt: number } }) => {
     const { price, change, changePercent, dayLow, dayHigh } = quote ?? {};
 
     return (
@@ -33,18 +35,21 @@ const IndexTile = ({ symbol, label, quote }: { symbol: string; label: string; qu
             {price !== undefined && dayLow !== undefined && dayHigh !== undefined && (
                 <DayRange low={dayLow} high={dayHigh} price={price} />
             )}
+            <PriceStamp hasPrice={price !== undefined} quoteTime={quote?.time} cached={stamp.cached && price !== undefined} issue={stamp.issue} renderedAt={stamp.checkedAt} className="mt-2" />
         </Link>
     );
 };
 
 // One tile per major index, with live prices from the funds that track them
 const IndexTiles = () => {
-    const { quotes } = useLiveMarket();
+    const { quotes, refreshFailing, cachedCount, issue, checkedAt } = useLiveMarket();
+    // Prices from our cache (the server's, or the page's last answer while refreshing fails) are marked as such
+    const stamp = { cached: !!refreshFailing || !!cachedCount, issue, checkedAt };
 
     return (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {INDEX_ETFS.map(({ symbol, label }) => (
-                <IndexTile key={symbol} symbol={symbol} label={label} quote={quotes[symbol]} />
+                <IndexTile key={symbol} symbol={symbol} label={label} quote={quotes[symbol]} stamp={stamp} />
             ))}
         </div>
     );

@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Loops Watch",
-  description: "Track real-time stock prices, get personalized alerts and explore detailed company insights.",
+  description: "A private market workstation: heatmaps, research and watchlists, with every price labeled by its source and age.",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

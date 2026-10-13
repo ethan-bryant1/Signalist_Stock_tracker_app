@@ -3,6 +3,7 @@
 // APIs here, so the server, the browser and the unit tests all apply exactly the same rules.
 
 import type { MarketSector } from "@/lib/data/sp500";
+import { addDays, closeMinutes, isTradingDay, nextTradingDay, OPEN_MINUTES } from "@/lib/market-calendar";
 
 export type MarketSession = "pre-market" | "regular" | "post-market" | "closed";
 
@@ -66,8 +67,10 @@ export type HeatmapStock = {
     extended?: Partial<Record<"pre-market" | "post-market", ExtendedPrice>>;
 };
 
-// What went wrong when some figures couldn't be fetched, worst first
-export type FeedIssue = "not-configured" | "auth" | "rate-limit" | "provider" | "network";
+// What went wrong when some figures couldn't be fetched, worst first. "busy" means our own request budget for the
+// provider was used up, so the request is still waiting its turn (it fills the cache for the next refresh);
+// "rate-limit" means the provider itself refused with 429.
+export type FeedIssue = "not-configured" | "auth" | "rate-limit" | "busy" | "provider" | "network";
 
 // Everything the server sends for the interactive heatmaps
 export type HeatmapPayload = {
@@ -158,15 +161,49 @@ export const newYorkClock = (ms: number) => {
     };
 };
 
-// The US trading session from the New York clock: pre-market from 4:00, open 9:30, close 16:00, after hours until 20:00.
-// Only a fallback for when Finnhub's market status can't load, since it doesn't know about holidays or early closes.
+// The instant a New York wall-clock time happens on a calendar day ("2026-10-13", 570 = 9:30 AM), across daylight
+// saving: New York is 4 hours behind UTC in summer and 5 in winter, so the summer guess is checked and moved if needed.
+export const newYorkMs = (day: string, minutes: number) => {
+    const [year, month, date] = day.split("-").map(Number);
+    const summer = Date.UTC(year, month - 1, date, 4) + minutes * 60_000;
+    return newYorkClock(summer).minutes === minutes ? summer : summer + 60 * 60_000;
+};
+
+// The US trading session from the New York clock and the exchange calendar (lib/market-calendar.ts): pre-market from
+// 4:00, open 9:30, close 16:00 (13:00 on early-close days), after hours until 20:00 (17:00 on early-close days);
+// weekends and exchange holidays are closed. Finnhub's market status is preferred where a page shows the session,
+// since it also knows unscheduled closures.
 export const sessionFromClock = (ms: number): MarketSession => {
-    const { weekday, minutes } = newYorkClock(ms);
-    if (weekday === "Sat" || weekday === "Sun") return "closed";
-    if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return "pre-market";
-    if (minutes >= 9 * 60 + 30 && minutes < 16 * 60) return "regular";
-    if (minutes >= 16 * 60 && minutes < 20 * 60) return "post-market";
+    const { day, minutes } = newYorkClock(ms);
+    if (!isTradingDay(day)) return "closed";
+    const close = closeMinutes(day);
+    if (minutes >= 4 * 60 && minutes < OPEN_MINUTES) return "pre-market";
+    if (minutes >= OPEN_MINUTES && minutes < close) return "regular";
+    if (minutes >= close && minutes < close + 4 * 60) return "post-market";
     return "closed";
+};
+
+// The next regular-session open at or after `ms`
+export const nextOpenMs = (ms: number) => {
+    const { day, minutes } = newYorkClock(ms);
+    const first = isTradingDay(day) && minutes < OPEN_MINUTES ? day : nextTradingDay(addDays(day, 1));
+    return newYorkMs(first, OPEN_MINUTES);
+};
+
+// After the close, prices keep refreshing this long so the closing auction's prints are captured
+export const SETTLE_AFTER_CLOSE_MS = 20 * 60_000;
+
+// How long a Finnhub quote may be reused. During the regular session, `regularMs`. A quote doesn't move outside the
+// session, so once the closing prices are in (refreshing every `regularMs` for 20 minutes after the close) it's
+// kept until the next open: overnight, weekends and holidays cost no quote requests. Never under a minute.
+export const marketTtlMs = (now: number, regularMs: number): number => {
+    if (sessionFromClock(now) === "regular") return regularMs;
+    const { day } = newYorkClock(now);
+    if (isTradingDay(day)) {
+        const close = newYorkMs(day, closeMinutes(day));
+        if (now >= close && now < close + SETTLE_AFTER_CLOSE_MS) return regularMs;
+    }
+    return Math.max(60_000, nextOpenMs(now) - now);
 };
 
 const NY_TIME = new Intl.DateTimeFormat("en-US", { timeZone: NEW_YORK, hour: "numeric", minute: "2-digit" });
@@ -217,7 +254,7 @@ export const quotePeriodPhrase = (time: number | undefined, now: number, mapPhra
 export type Freshness = "fresh" | "stale" | "missing";
 
 // During the regular session a price older than this is stale. Prices are cached on the server for up to
-// 3¼ minutes and the page asks every minute, so a working feed stays well inside it.
+// 5½ minutes and the page asks every minute, so a working feed stays well inside it.
 export const STALE_IN_SESSION_MS = 15 * 60_000;
 // In any session, a price this far behind the newest price on the map didn't refresh with the others
 export const BEHIND_OTHERS_MS = 30 * 60_000;

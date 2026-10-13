@@ -41,6 +41,20 @@ type Size = { width: number; height: number };
 export const unplacedStocks = (stocks: readonly HeatmapStock[], sizeBy: SizeMetric, volumeToday = false) =>
     sizeBy === "equal" ? [] : stocks.filter((stock) => !sizeValue(stock, sizeBy, volumeToday));
 
+// The sizing to draw with: equal tiles while prices are in but no stock has the chosen figure yet (on a first start
+// Finnhub's free-plan limit can hold the market caps back for a minute or two), so the map shows instead of going
+// blank. The status line says so; the chosen sizing comes back as soon as any figure arrives.
+export const sizeWhileLoading = (stocks: readonly HeatmapStock[], sizeBy: SizeMetric, volumeToday = false): SizeMetric =>
+    sizeBy !== "equal" && stocks.some((stock) => stock.quote) && !stocks.some((stock) => sizeValue(stock, sizeBy, volumeToday))
+        ? "equal"
+        : sizeBy;
+
+// The status line's note while sizeWhileLoading() draws equal tiles
+export const sizingNote = (sizeBy: SizeMetric) => ({
+    text: `Sized equally until ${sizeBy === "cap" ? "market caps" : "volumes"} load`,
+    title: `Finnhub hasn't sent ${sizeBy === "cap" ? "market caps" : "volumes"} yet; they load within its free-plan limit and the map resizes when they arrive`,
+});
+
 // What a stock's tile is sized by, or undefined when that figure is missing
 const sizeValue = (stock: HeatmapStock, sizeBy: SizeMetric, volumeToday = false) =>
     sizeBy === "equal" ? 1 : sizeBy === "cap" ? stock.marketCap : volumeSize(stock, sizeBy === "dollar-volume", volumeToday);

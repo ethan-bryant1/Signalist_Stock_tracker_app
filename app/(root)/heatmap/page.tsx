@@ -3,8 +3,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import BackToDashboard from "@/components/BackToDashboard";
 import HeatmapWorkspace from "@/components/HeatmapWorkspace";
-import { LiveMarketProvider } from "@/components/LiveMarket";
-import { getMarketSnapshot } from "@/lib/actions/finnhub.actions";
+import { IncludeSectorPrices } from "@/components/LiveMarket";
+import { getMarketSnapshot } from "@/lib/stock-data";
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
 import { getSession } from "@/lib/better-auth/auth";
 import { HEATMAP_LINK_VALUES, HEATMAP_SYMBOLS } from "@/lib/data/heatmap";
@@ -31,7 +31,7 @@ export default async function HeatmapPage({ searchParams }: { searchParams: Prom
     ]);
 
     return (
-        <LiveMarketProvider initial={snapshot} includeSectors>
+        <IncludeSectorPrices initial={snapshot}>
             <div className="flex flex-col gap-6">
                 <BackToDashboard />
 
@@ -46,6 +46,6 @@ export default async function HeatmapPage({ searchParams }: { searchParams: Prom
 
                 <HeatmapWorkspace initial={heatmap} initialState={initialState} watchlist={watchlist.map(({ symbol }) => symbol)} />
             </div>
-        </LiveMarketProvider>
+        </IncludeSectorPrices>
     );
 }

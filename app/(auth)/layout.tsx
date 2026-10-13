@@ -3,7 +3,6 @@ import Image from "next/image";
 import {getSession} from "@/lib/better-auth/auth";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
-import {Star} from "lucide-react";
 import Logo from "@/components/Logo";
 
 const Layout = async ({ children }: { children : React.ReactNode }) => {
@@ -25,21 +24,11 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
 
             <section className="auth-right-section">
                 <div className="z-10 relative lg:mt-4 lg:mb-16">
-                    <blockquote className="auth-blockquote">
-                        Loops Watch turned my watchlist into a winning list. The alerts are spot-on, and I feel more confident making moves in the market
-                    </blockquote>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <cite className="auth-testimonial-author">- Ethan R.</cite>
-                            <p className="max-md:text-xs text-gray-500">Retail Investor</p>
-                        </div>
-                        {/* Drawn as icons so the stars follow the theme's text color */}
-                        <div className="flex items-center gap-0.5" role="img" aria-label="Rated 5 out of 5 stars">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <Star key={star} aria-hidden className="w-5 h-5 fill-current text-gray-400" />
-                            ))}
-                        </div>
-                    </div>
+                    {/* What the app does, stated plainly: no testimonials or features it doesn't have */}
+                    <p className="auth-blockquote">
+                        A private market workstation: heatmaps, research and watchlists on free data, with every price labeled by its source and age.
+                    </p>
+                    <p className="max-md:text-xs text-gray-500">For the owner&apos;s personal use</p>
                 </div>
 
                 <div className="flex-1 relative">

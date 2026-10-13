@@ -3,8 +3,9 @@
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import FlashingPrice from "@/components/FlashingPrice";
+import PriceStamp from "@/components/PriceStamp";
 import { useLiveMarket } from "@/components/LiveMarket";
-import type { MarketSession } from "@/lib/actions/finnhub.actions";
+import type { MarketSession } from "@/lib/market-data";
 import { INDEX_ETFS, MACRO_ETFS } from "@/lib/data/markets";
 import { cn, formatChangePercent, getChangeColorClass } from "@/lib/utils";
 
@@ -37,14 +38,6 @@ const NEW_YORK_TIME = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
 });
 
-// "Fri 4:00 PM", for when prices last changed
-const NEW_YORK_DAY_TIME = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "America/New_York",
-});
-
 const subscribeToSeconds = (onTick: () => void) => {
     const timer = window.setInterval(onTick, 1000);
     return () => window.clearInterval(timer);
@@ -65,7 +58,7 @@ const MarketClock = () => {
 // The header's second row: live prices for the major indexes, gold, oil and bonds,
 // then whether the US market is trading and the time in New York, like a trading platform's ticker bar
 const MarketStrip = () => {
-    const { quotes, session, holiday, asOf } = useLiveMarket();
+    const { quotes, session, holiday, asOf, refreshFailing, cachedCount, issue, checkedAt } = useLiveMarket();
     const isOpen = session === "regular";
     const label = session === "closed" && holiday ? `Closed for ${holiday}` : SESSION_LABELS[session];
 
@@ -100,10 +93,16 @@ const MarketStrip = () => {
                     })}
                 </ul>
 
-                <div
-                    className="hidden shrink-0 items-center gap-3 sm:flex"
-                    title={asOf ? `Prices as of ${NEW_YORK_DAY_TIME.format(asOf)} ET` : undefined}
-                >
+                <div className="hidden shrink-0 items-center gap-3 sm:flex">
+                    <PriceStamp
+                        hasPrice={asOf !== undefined}
+                        quoteTime={asOf}
+                        cached={!!refreshFailing || !!cachedCount}
+                        issue={issue}
+                        renderedAt={checkedAt}
+                        className="hidden lg:inline-flex"
+                    />
+                    <span aria-hidden className="hidden h-4 w-px bg-gray-600 lg:block" />
                     <span className="flex items-center gap-2 font-medium text-gray-100">
                         <span className="relative flex h-2 w-2" aria-hidden>
                             {isOpen && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-60 motion-reduce:animate-none" />}

@@ -16,6 +16,8 @@ import {
   type IntradayPeriod,
 } from '@/lib/alpaca-data';
 import { newYorkClock, newestQuoteTime, type AlpacaStatus, type HeatmapStock } from '@/lib/market-data';
+import { PROVIDER_TIMEOUT_MS, ProviderError, providerError } from '@/lib/providers/gate';
+import { gate } from '@/lib/providers/registry';
 
 // Alpaca's market data, for what Finnhub's free plan lacks (see lib/alpaca-data.ts for what the free plan allows).
 // Server only: the keys must never reach the browser. They come from a free Alpaca account (paper trading is enough).
@@ -30,34 +32,39 @@ const getAlpacaKeys = () => {
 
 export const alpacaConfigured = () => !!getAlpacaKeys();
 
-class AlpacaError extends Error {
-  constructor(readonly status?: number) {
-    super(`Alpaca request failed${status ? ` (HTTP ${status})` : ''}`);
+class AlpacaError extends ProviderError {
+  constructor(status?: number) {
+    super('Alpaca', status === 401 || status === 403 ? 'auth' : status === 429 ? 'rate-limit' : status ? 'provider' : 'network', status);
     this.name = 'AlpacaError';
   }
 }
 
-// A cached GET. The keys go in headers, never the URL, and errors never include either.
+// A GET through the shared Alpaca gate (cached, merged, paced within the free plan's 200 calls a minute).
+// The keys go in headers, never the URL or the cache key, and errors never include either.
 async function alpacaGet(path: string, params: Record<string, string>, revalidateSeconds: number): Promise<unknown> {
   const keys = getAlpacaKeys();
   if (!keys) throw new AlpacaError();
-  const url = `${ALPACA_DATA_URL}${path}?${new URLSearchParams(params)}`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: { 'APCA-API-KEY-ID': keys.id, 'APCA-API-SECRET-KEY': keys.secret },
-      cache: 'force-cache',
-      next: { revalidate: revalidateSeconds },
-    });
-  } catch {
-    throw new AlpacaError();
-  }
-  if (!res.ok) throw new AlpacaError(res.status);
-  try {
-    return await res.json();
-  } catch {
-    throw new AlpacaError(res.status);
-  }
+  const query = new URLSearchParams(params);
+  const key = `alpaca:${path}?${new URLSearchParams([...query].sort(([a], [b]) => a.localeCompare(b)))}`;
+  const served = await gate('alpaca').request<unknown>(key, async () => {
+    let res: Response;
+    try {
+      res = await fetch(`${ALPACA_DATA_URL}${path}?${query}`, {
+        headers: { 'APCA-API-KEY-ID': keys.id, 'APCA-API-SECRET-KEY': keys.secret },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+      });
+    } catch {
+      throw new AlpacaError();
+    }
+    if (!res.ok) throw new AlpacaError(res.status);
+    try {
+      return { data: await res.json() };
+    } catch {
+      throw new AlpacaError(res.status);
+    }
+  }, { ttlMs: revalidateSeconds * 1000, staleMs: revalidateSeconds * 1000, waitMs: 5000 });
+  return served.data;
 }
 
 // Bars for many symbols, following Alpaca's pages (up to 10,000 bars a page, across the symbols). The heatmap's requests
@@ -94,11 +101,13 @@ export async function getAlpacaExtras(stocks: readonly HeatmapStock[], now: numb
   const newest = newestQuoteTime(stocks);
   if (newest === undefined) return { status: 'ok', stocks: result };
   const lastSessionDay = newYorkClock(newest).day;
-  // The last moment SIP can be asked about
-  const sipEnd = now - SIP_DELAY_MS;
+  // The last moment SIP can be asked about, on a whole minute so the same requests repeat (and hit the cache)
+  // for a minute instead of changing every millisecond
+  const sipEnd = Math.floor((now - SIP_DELAY_MS) / 60_000) * 60_000;
   const failures: number[] = [];
   const failed = (error: unknown) => {
-    failures.push(error instanceof AlpacaError ? (error.status ?? 0) : 0);
+    const known = providerError(error);
+    failures.push(known ? (known.issue === 'busy' ? -1 : known.status ?? 0) : 0);
     return undefined;
   };
   const set = (symbol: string, update: (entry: Pick<HeatmapStock, 'periodStart' | 'todayVolume' | 'extended'>) => void) => {
@@ -177,7 +186,7 @@ export async function getAlpacaExtras(stocks: readonly HeatmapStock[], now: numb
   };
 
   await Promise.all([intraday('1h'), intraday('4h'), month(), volume(), extended('pre-market'), extended('post-market')]);
-  if (failures.length) console.error(`getAlpacaExtras: ${failures.length} Alpaca requests failed (${[...new Set(failures)].map((s) => s || 'network').join(', ')})`);
+  if (failures.length) console.error(`getAlpacaExtras: ${failures.length} Alpaca requests failed (${[...new Set(failures)].map((s) => (s === -1 ? 'busy' : s || 'network')).join(', ')})`);
   const status: AlpacaStatus = !failures.length ? 'ok' : failures.some((s) => s === 401 || s === 403) ? 'auth' : 'failed';
   return { status, stocks: result };
 }

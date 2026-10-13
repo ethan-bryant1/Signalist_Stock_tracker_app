@@ -287,7 +287,7 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
     const [filter, setFilter] = useState<Filter>("all");
     // The highlighted row, which the preview shows
     const [selected, setSelected] = useState("");
-    const [remote, setRemote] = useState<{ term: string; rows: Row[] } | null>(null);
+    const [remote, setRemote] = useState<{ term: string; rows: Row[]; failed?: boolean } | null>(null);
     const [companies, setCompanies] = useState<SectorCompany[] | null>(null);
     // Saved stocks by symbol, newest first, or null until they load
     const [watchlist, setWatchlist] = useState<Map<string, string> | null>(null);
@@ -299,6 +299,7 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
 
     const term = query.trim();
     const loading = !!term && remote?.term !== term;
+    const searchFailed = !!term && remote?.term === term && !!remote.failed;
 
     const openSearch = (initialQuery = "") => {
         setQuery(initialQuery);
@@ -348,9 +349,9 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
         latestTermRef.current = value;
         if (!value) return;
 
-        const rows = await searchStocks(value).catch(() => []);
+        const rows = await searchStocks(value).catch(() => null);
         if (latestTermRef.current === value) {
-            setRemote({ term: value, rows: rows.map(({ symbol, name, type }) => ({ symbol, name, type })) });
+            setRemote({ term: value, rows: (rows ?? []).map(({ symbol, name, type }) => ({ symbol, name, type })), failed: rows === null });
         }
     }, 250);
 
@@ -643,9 +644,21 @@ export default function SearchCommand({ initialStocks }: { initialStocks: StockW
 
                                 {term && !loading && results.length === 0 && (
                                     <div className="flex flex-col items-center gap-1 px-6 py-16 text-center">
-                                        <p className="font-medium text-gray-100">No matches for “{term}”</p>
-                                        <p className="text-sm text-gray-500">Check the spelling, or try a symbol like AAPL.</p>
+                                        {searchFailed ? (
+                                            <>
+                                                <p className="font-medium text-gray-100">Search is unavailable right now</p>
+                                                <p className="text-sm text-gray-500">Finnhub didn&apos;t answer (often its free-plan rate limit). S&amp;P 500 names still match instantly; try again in a minute.</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="font-medium text-gray-100">No matches for “{term}”</p>
+                                                <p className="text-sm text-gray-500">Check the spelling, or try a symbol like AAPL.</p>
+                                            </>
+                                        )}
                                     </div>
+                                )}
+                                {term && searchFailed && results.length > 0 && (
+                                    <p className="px-4 py-2 text-xs text-gray-500">Showing S&amp;P 500 matches only: Finnhub&apos;s search didn&apos;t answer.</p>
                                 )}
                                 {term && results.length > 0 && filteredResults.length === 0 && (
                                     <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">

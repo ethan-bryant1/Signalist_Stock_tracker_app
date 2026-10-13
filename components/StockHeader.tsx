@@ -1,7 +1,8 @@
 import { Globe } from "lucide-react";
 import StockLogo from "@/components/StockLogo";
+import PriceStamp from "@/components/PriceStamp";
 import WatchlistButton from "@/components/WatchlistButton";
-import type { StockOverview } from "@/lib/actions/finnhub.actions";
+import type { StockOverview } from "@/lib/stock-data";
 import { cn, formatChangePercent, formatCurrency, formatSignedNumber, getChangeColorClass } from "@/lib/utils";
 
 // "https://www.apple.com/" becomes "apple.com"
@@ -16,7 +17,7 @@ const websiteLabel = (url?: string) => {
 
 // Top of a stock's page: logo, name, where it trades, the latest price and the watchlist button
 const StockHeader = ({ overview, isInWatchlist }: { overview: StockOverview; isInWatchlist: boolean }) => {
-    const { symbol, name, logo, exchange, industry, website, currency, price, change, changePercent } = overview;
+    const { symbol, name, logo, exchange, industry, website, currency, price, change, changePercent, quoteTime, cached, issue, checkedAt } = overview;
     const details = [symbol, exchange, industry].filter(Boolean).join(" · ");
     const siteLabel = websiteLabel(website);
 
@@ -47,6 +48,9 @@ const StockHeader = ({ overview, isInWatchlist }: { overview: StockOverview; isI
                         <p className={cn("mt-1 text-sm font-medium tabular-nums", getChangeColorClass(changePercent))}>
                             {formatSignedNumber(change)} ({formatChangePercent(changePercent)})
                         </p>
+                    )}
+                    {checkedAt !== undefined && (
+                        <PriceStamp hasPrice={price !== undefined} quoteTime={quoteTime} cached={cached} issue={issue} renderedAt={checkedAt} className="mt-1" />
                     )}
                 </div>
                 <div className="w-full sm:w-56">
