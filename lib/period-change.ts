@@ -11,7 +11,7 @@ export type { HistoryPeriod };
 
 // Finnhub's name for each return (percent, through the last daily close). "1w" is five trading days, "3m" 13 weeks,
 // "6m" 26 weeks and "1y" 52 weeks. Finnhub has no 1-month return, only month to date.
-export const FINNHUB_RETURN_FIELDS: Record<HistoryPeriod, string> = {
+export const FINNHUB_RETURN_FIELDS: Partial<Record<HistoryPeriod, string>> = {
     "1w": "5DayPriceReturnDaily",
     mtd: "monthToDatePriceReturnDaily",
     "3m": "13WeekPriceReturnDaily",
@@ -69,29 +69,72 @@ export function periodStarts(stats: StockStats, anchor: number | undefined): Hea
     return Object.keys(starts).length ? starts : undefined;
 }
 
-// A stock as the map shows it for a longer period: its change is the live price against the period's starting
-// price. Without a starting price there's no change to show (the tile reads "—"), never the 1-day change instead.
-// The same stock object always gives back the same result for a period, so tiles that didn't change don't redraw.
-const cache = new WeakMap<HeatmapStock, Partial<Record<HistoryPeriod, HeatmapStock>>>();
+// What the interactive map can color by besides the 1-day change: a longer period, or an extended-hours session
+export type ShiftedColor = HistoryPeriod | "premarket" | "postmarket";
+const EXTENDED_SESSION = { premarket: "pre-market", postmarket: "post-market" } as const;
 
-export function withPeriodChange(stock: HeatmapStock, period: HistoryPeriod): HeatmapStock {
-    const saved = cache.get(stock)?.[period];
+// A stock as the map shows it for a longer period: its change is the live price against the period's starting
+// price. For pre-market or after hours, its price is the session's latest and its change is from the regular close
+// before it. Without a starting price (or a trade in the session) there's no change to show (the tile reads "—"),
+// never the 1-day change instead.
+// The same stock object always gives back the same result for a period, so tiles that didn't change don't redraw.
+const cache = new WeakMap<HeatmapStock, Partial<Record<ShiftedColor, HeatmapStock>>>();
+
+const withoutChange = (stock: HeatmapStock, quote: Quote): HeatmapStock => ({ ...stock, quote: { ...quote, change: undefined, changePercent: undefined } });
+
+export function withPeriodChange(stock: HeatmapStock, color: ShiftedColor): HeatmapStock {
+    const saved = cache.get(stock)?.[color];
     if (saved) return saved;
-    const start = stock.periodStart?.[period];
     const quote = stock.quote;
     let shown: HeatmapStock;
     if (!quote) shown = stock;
-    else if (start === undefined) shown = { ...stock, quote: { ...quote, change: undefined, changePercent: undefined } };
-    else shown = { ...stock, quote: { ...quote, change: quote.price - start, changePercent: ((quote.price - start) / start) * 100 } };
-    cache.set(stock, { ...cache.get(stock), [period]: shown });
+    else if (color === "premarket" || color === "postmarket") {
+        const session = stock.extended?.[EXTENDED_SESSION[color]];
+        shown =
+            session?.price === undefined
+                ? withoutChange(stock, quote)
+                : {
+                      ...stock,
+                      quote: {
+                          ...quote,
+                          price: session.price,
+                          previousClose: session.reference,
+                          change: session.price - session.reference,
+                          changePercent: ((session.price - session.reference) / session.reference) * 100,
+                          time: session.time ?? quote.time,
+                      },
+                  };
+    } else {
+        const start = stock.periodStart?.[color];
+        shown = start === undefined ? withoutChange(stock, quote) : { ...stock, quote: { ...quote, change: quote.price - start, changePercent: ((quote.price - start) / start) * 100 } };
+    }
+    cache.set(stock, { ...cache.get(stock), [color]: shown });
     return shown;
 }
+
+// Whether a priced stock has a figure for the color: a period's starting price, or a trade in the extended session
+export const hasColorData = (stock: HeatmapStock, color: ShiftedColor) =>
+    color === "premarket" || color === "postmarket" ? stock.extended?.[EXTENDED_SESSION[color]]?.price !== undefined : stock.periodStart?.[color] !== undefined;
+
+// The extended session the stocks' prices are for: live now, or the last one that finished (and its day)
+export const extendedSessionShown = (stocks: readonly HeatmapStock[], color: "premarket" | "postmarket") => {
+    for (const stock of stocks) {
+        const session = stock.extended?.[EXTENDED_SESSION[color]];
+        if (session) return { live: session.live, day: session.day };
+    }
+    return undefined;
+};
 
 // How many percent gives a tile its full color for each period. Longer periods move further, so a 1-year map
 // colored on the 1-day scale would be all full green and red. Each is a multiple of 3, so the legend's marks at
 // every third are whole numbers.
-export const PERIOD_FULL_COLOR_AT: Record<"1d" | HistoryPeriod, number> = {
+export const PERIOD_FULL_COLOR_AT: Record<"1d" | HistoryPeriod | "premarket" | "postmarket", number> = {
+    "1h": 1.5,
+    "4h": 3,
     "1d": 3,
+    "1m": 9,
+    premarket: 3,
+    postmarket: 3,
     "1w": 6,
     mtd: 9,
     "3m": 15,
@@ -100,8 +143,16 @@ export const PERIOD_FULL_COLOR_AT: Record<"1d" | HistoryPeriod, number> = {
     "1y": 30,
 };
 
-// The value a stock is sized by on a volume map: average daily shares, or those shares times the live price
-export const volumeSize = (stock: HeatmapStock, dollars: boolean) => {
+// The value a stock is sized by on a volume map. With `today`, the last trading day's volume so far (from Alpaca);
+// otherwise the 10-day average. Never a mix, so a missing figure leaves the stock off the map rather than sizing it
+// on a different basis from the others.
+export const volumeSize = (stock: HeatmapStock, dollars: boolean, today = false) => {
+    if (today) {
+        const volume = stock.todayVolume;
+        if (!volume) return undefined;
+        if (!dollars) return volume.shares;
+        return volume.dollars ?? (stock.quote ? volume.shares * stock.quote.price : undefined);
+    }
     if (!stock.averageVolume) return undefined;
     if (!dollars) return stock.averageVolume;
     return stock.quote ? stock.averageVolume * stock.quote.price : undefined;

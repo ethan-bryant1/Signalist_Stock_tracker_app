@@ -38,12 +38,12 @@ type Size = { width: number; height: number };
 
 // The stocks a market-cap map can't place because Finnhub sent no market cap for them. They're listed under
 // the map rather than drawn at a made-up size.
-export const unplacedStocks = (stocks: readonly HeatmapStock[], sizeBy: SizeMetric) =>
-    sizeBy === "equal" ? [] : stocks.filter((stock) => !sizeValue(stock, sizeBy));
+export const unplacedStocks = (stocks: readonly HeatmapStock[], sizeBy: SizeMetric, volumeToday = false) =>
+    sizeBy === "equal" ? [] : stocks.filter((stock) => !sizeValue(stock, sizeBy, volumeToday));
 
 // What a stock's tile is sized by, or undefined when that figure is missing
-const sizeValue = (stock: HeatmapStock, sizeBy: SizeMetric) =>
-    sizeBy === "equal" ? 1 : sizeBy === "cap" ? stock.marketCap : volumeSize(stock, sizeBy === "dollar-volume");
+const sizeValue = (stock: HeatmapStock, sizeBy: SizeMetric, volumeToday = false) =>
+    sizeBy === "equal" ? 1 : sizeBy === "cap" ? stock.marketCap : volumeSize(stock, sizeBy === "dollar-volume", volumeToday);
 
 // The map's size in whole pixels, measured before the browser paints
 const useElementSize = (ref: React.RefObject<HTMLElement | null>) => {
@@ -275,6 +275,8 @@ type StockHeatmapProps = {
     freshness: ReadonlyMap<string, Freshness>;
     now: number;
     sizeBy: SizeMetric;
+    // Volume sizes use the last trading day's volume (from Alpaca) instead of the 10-day average
+    volumeToday?: boolean;
     groupBy: "sector" | "none";
     // What clicking a stock does: open its page (the dashboard) or select it (the Heatmap page)
     action: "open" | "select";
@@ -310,6 +312,7 @@ const StockHeatmap = ({
     freshness,
     now,
     sizeBy,
+    volumeToday = false,
     groupBy,
     action,
     showLogos,
@@ -349,7 +352,7 @@ const StockHeatmap = ({
     const labelHeight = onFocusSector || sectorHref ? INTERACTIVE_LABEL_HEIGHT : LABEL_HEIGHT;
     const groups = useMemo(() => {
         if (!size) return [];
-        const valueOf = (stock: HeatmapStock) => sizeValue(stock, sizeBy) ?? 0;
+        const valueOf = (stock: HeatmapStock) => sizeValue(stock, sizeBy, volumeToday) ?? 0;
         // Biggest first, so equal-size tiles still read in market-cap order like the market-cap map
         const order = sizeBy === "equal" ? (stock: HeatmapStock) => stock.marketCap ?? 0 : valueOf;
         const ordered = [...stocks].sort((a, b) => order(b) - order(a));
@@ -369,7 +372,7 @@ const StockHeatmap = ({
             box,
             { gap: SECTOR_GAP, labelHeight }
         );
-    }, [stocks, size, sizeBy, groupBy, labelHeight]);
+    }, [stocks, size, sizeBy, volumeToday, groupBy, labelHeight]);
 
     // In the order the stocks were given, which stays the same from one refresh to the next
     const tiles = useMemo(() => {

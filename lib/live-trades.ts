@@ -1,13 +1,15 @@
 // Live prices from Finnhub's trade stream, and how they update the interactive heatmaps. No server or browser APIs
 // here, so the stream route, the page and the unit tests apply the same rules.
 
-import { sessionFromClock, type HeatmapStock, type Quote } from "@/lib/market-data";
+import { newYorkClock, sessionFromClock, type HeatmapStock, type Quote } from "@/lib/market-data";
 
 // Finnhub's free plan streams trades for up to 50 symbols at a time
 export const STREAM_SYMBOL_LIMIT = 50;
 
-// The newest trade the page has heard of for one stock
-export type LiveTrade = { symbol: string; price: number; time: number };
+// The newest trade the page has heard of for one stock in one session. Trades outside the regular session only move
+// the pre-market and after-hours maps.
+export type TradeSession = "regular" | "pre-market" | "post-market";
+export type LiveTrade = { symbol: string; price: number; time: number; session?: TradeSession };
 
 // The stocks to stream: the largest by market cap, up to the limit, so the tiles that fill most of the map move
 // live. The rest keep updating once a minute. Stocks without a market cap come last, in their listed order.
@@ -19,9 +21,8 @@ export const pickStreamSymbols = (stocks: readonly Pick<HeatmapStock, "symbol" |
         .map(({ stock }) => stock.symbol);
 
 // Finnhub's trade message: {"type":"trade","data":[{"s":"AAPL","p":227.5,"t":1760025600000,"v":100,"c":["1"]}]}.
-// Returns the newest usable trade per symbol, for the symbols asked for. Only trades in the regular session count:
-// the map shows the 1-day change from the previous close, which Finnhub's quote also gives for regular hours only,
-// so a pre-market or after-hours trade would mix two different moves on one tile.
+// Returns the newest usable trade per symbol and session, for the symbols asked for, each tagged with its session
+// (by the New York clock). Trades overnight (8 PM to 4 AM) are left out.
 export function latestTrades(message: unknown, symbols: ReadonlySet<string>): LiveTrade[] {
     if (!message || typeof message !== "object") return [];
     const { type, data } = message as { type?: unknown; data?: unknown };
@@ -33,9 +34,12 @@ export function latestTrades(message: unknown, symbols: ReadonlySet<string>): Li
         const { s, p, t } = raw as { s?: unknown; p?: unknown; t?: unknown };
         if (typeof s !== "string" || !symbols.has(s)) continue;
         if (typeof p !== "number" || !Number.isFinite(p) || p <= 0) continue;
-        if (typeof t !== "number" || !Number.isFinite(t) || sessionFromClock(t) !== "regular") continue;
-        const seen = newest.get(s);
-        if (!seen || t >= seen.time) newest.set(s, { symbol: s, price: p, time: t });
+        if (typeof t !== "number" || !Number.isFinite(t)) continue;
+        const session = sessionFromClock(t);
+        if (session === "closed") continue;
+        const key = `${s} ${session}`;
+        const seen = newest.get(key);
+        if (!seen || t >= seen.time) newest.set(key, { symbol: s, price: p, time: t, session });
     }
     return [...newest.values()];
 }
@@ -59,9 +63,12 @@ const quoteWithTrade = (quote: Quote, trade: LiveTrade): Quote => {
 // same New York day (a trade can't carry today's move onto yesterday's previous close). Stocks without a quote yet
 // wait for the next refresh, which brings the previous close the change needs. Unchanged stocks keep the same
 // object, and when nothing changed the same list comes back, so tiles don't redraw.
+// Only regular-session trades count here: the map shows the 1-day change from the previous close, which Finnhub's
+// quote also gives for regular hours only, so a pre-market or after-hours trade would mix two different moves on one tile.
 export function applyLiveTrades(stocks: HeatmapStock[], trades: readonly LiveTrade[], receivedAt: number): HeatmapStock[] {
-    if (!trades.length) return stocks;
-    const bySymbol = new Map(trades.map((trade) => [trade.symbol, trade]));
+    const regular = trades.filter((trade) => (trade.session ?? "regular") === "regular");
+    if (!regular.length) return stocks;
+    const bySymbol = new Map(regular.map((trade) => [trade.symbol, trade]));
     let changed = false;
     const next = stocks.map((stock) => {
         const trade = bySymbol.get(stock.symbol);
@@ -89,3 +96,25 @@ export const newerQuote = (a: Quote | undefined, b: Quote | undefined): Quote | 
     if (!b) return a;
     return (b.time ?? 0) >= (a.time ?? 0) ? b : a;
 };
+
+// Applies pre-market and after-hours trades to the stocks' extended-hours prices. A trade only counts for a session
+// the server said is on (so its reference close is known), from that session's day, and newer than the price shown.
+export function applyExtendedTrades(stocks: HeatmapStock[], trades: readonly LiveTrade[]): HeatmapStock[] {
+    const extended = trades.filter((trade) => trade.session === "pre-market" || trade.session === "post-market");
+    if (!extended.length) return stocks;
+    const byKey = new Map(extended.map((trade) => [`${trade.symbol} ${trade.session}`, trade]));
+    let changed = false;
+    const next = stocks.map((stock) => {
+        let updated = stock;
+        for (const session of ["pre-market", "post-market"] as const) {
+            const trade = byKey.get(`${stock.symbol} ${session}`);
+            const current = updated.extended?.[session];
+            if (!trade || !current?.live || newYorkClock(trade.time).day !== current.day) continue;
+            if (current.time !== undefined && trade.time <= current.time) continue;
+            updated = { ...updated, extended: { ...updated.extended, [session]: { ...current, price: trade.price, time: trade.time } } };
+            changed = true;
+        }
+        return updated;
+    });
+    return changed ? next : stocks;
+}

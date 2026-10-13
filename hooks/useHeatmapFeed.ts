@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { applyLiveTrades, newerQuote, type LiveTrade } from "@/lib/live-trades";
+import { applyExtendedTrades, applyLiveTrades, newerQuote, type LiveTrade } from "@/lib/live-trades";
 import type { HeatmapPayload, HeatmapStock } from "@/lib/market-data";
 
 // The page asks for fresh prices every minute; the server caches each price for two to three minutes
@@ -40,6 +40,30 @@ const samePeriodStart = (a: HeatmapStock["periodStart"], b: HeatmapStock["period
     return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
 };
 
+const sameTodayVolume = (a: HeatmapStock["todayVolume"], b: HeatmapStock["todayVolume"]) =>
+    a === b || (!!a && !!b && a.shares === b.shares && a.dollars === b.dollars && a.through === b.through && a.day === b.day);
+
+type Extended = NonNullable<HeatmapStock["extended"]>;
+const SESSIONS = ["pre-market", "post-market"] as const;
+const sameExtendedPrice = (a: Extended["pre-market"], b: Extended["pre-market"]) =>
+    a === b || (!!a && !!b && a.price === b.price && a.time === b.time && a.reference === b.reference && a.live === b.live && a.day === b.day);
+const sameExtended = (a: HeatmapStock["extended"], b: HeatmapStock["extended"]) =>
+    a === b || (!!a && !!b && SESSIONS.every((session) => sameExtendedPrice(a[session], b[session])));
+
+// A refresh's extended-hours prices, except where the page already has a newer streamed trade for the same session
+const mergeExtended = (old: HeatmapStock["extended"], next: HeatmapStock["extended"]): HeatmapStock["extended"] => {
+    if (!old || !next) return next ?? old;
+    const merged: Extended = { ...next };
+    for (const session of SESSIONS) {
+        const before = old[session];
+        const after = next[session];
+        if (before && after && before.day === after.day && before.reference === after.reference && (before.time ?? 0) > (after.time ?? 0)) {
+            merged[session] = { ...after, price: before.price, time: before.time };
+        }
+    }
+    return merged;
+};
+
 export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly HeatmapStock[]): HeatmapStock[] => {
     const before = new Map(previous.map((stock) => [stock.symbol, stock]));
     const merged = next.map((stock) => {
@@ -56,10 +80,13 @@ export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly Heat
             exchange: stock.exchange ?? old.exchange,
             periodStart: stock.periodStart ?? old.periodStart,
             averageVolume: stock.averageVolume ?? old.averageVolume,
+            todayVolume: stock.todayVolume ?? old.todayVolume,
+            extended: mergeExtended(old.extended, stock.extended),
         };
         const unchanged = sameQuote(merged.quote, old.quote) && merged.fetchedAt === old.fetchedAt && merged.marketCap === old.marketCap
             && merged.logo === old.logo && merged.exchange === old.exchange && merged.name === old.name
-            && samePeriodStart(merged.periodStart, old.periodStart) && merged.averageVolume === old.averageVolume;
+            && samePeriodStart(merged.periodStart, old.periodStart) && merged.averageVolume === old.averageVolume
+            && sameTodayVolume(merged.todayVolume, old.todayVolume) && sameExtended(merged.extended, old.extended);
         return unchanged ? old : merged;
     });
     return merged.length === previous.length && merged.every((stock, index) => stock === previous[index]) ? previous : merged;
@@ -109,7 +136,7 @@ export const useHeatmapFeed = (initial: HeatmapPayload, { stream = false }: { st
                 const trades = JSON.parse((event as MessageEvent).data) as LiveTrade[];
                 const receivedAt = Date.now();
                 setFeed((previous) => {
-                    const stocks = applyLiveTrades(previous.stocks, trades, receivedAt);
+                    const stocks = applyExtendedTrades(applyLiveTrades(previous.stocks, trades, receivedAt), trades);
                     return stocks === previous.stocks ? previous : { ...previous, stocks };
                 });
             });

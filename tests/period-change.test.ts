@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyLiveTrades } from '@/lib/live-trades';
 import type { HeatmapStock, Quote } from '@/lib/market-data';
-import { parseFinnhubStats, periodStarts, statsAnchor, volumeSize, withPeriodChange } from '@/lib/period-change';
+import { hasColorData, parseFinnhubStats, periodStarts, statsAnchor, volumeSize, withPeriodChange } from '@/lib/period-change';
 
 // Tue 2026-10-13 2:00 PM and Mon 2026-10-12 4:00 PM New York (EDT, UTC−4)
 const TUESDAY_2PM = Date.UTC(2026, 9, 13, 18);
@@ -74,5 +74,31 @@ describe('volumeSize', () => {
     expect(volumeSize(s, true)).toBe(200_000);
     expect(volumeSize(stock(undefined, { averageVolume: 1_000 }), true)).toBeUndefined();
     expect(volumeSize(stock({ price: 1 }), false)).toBeUndefined();
+  });
+});
+
+describe('extended hours and Alpaca figures', () => {
+  const quote: Quote = { price: 103, previousClose: 100, change: 3, changePercent: 3, time: MONDAY_CLOSE };
+
+  it("shows the session's latest price against the close before it", () => {
+    const withTrade = stock(quote, { extended: { 'post-market': { price: 105.06, time: MONDAY_CLOSE + 60_000, reference: 103, live: true, day: '2026-10-12' } } });
+    const shown = withPeriodChange(withTrade, 'postmarket');
+    expect(shown.quote).toMatchObject({ price: 105.06, previousClose: 103, time: MONDAY_CLOSE + 60_000 });
+    expect(shown.quote?.changePercent).toBeCloseTo(2);
+    expect(hasColorData(withTrade, 'postmarket')).toBe(true);
+    expect(hasColorData(withTrade, 'premarket')).toBe(false);
+  });
+
+  it('shows no change for a stock with no trade in the session yet', () => {
+    const waiting = stock(quote, { extended: { 'pre-market': { reference: 103, live: true, day: '2026-10-13' } } });
+    expect(withPeriodChange(waiting, 'premarket').quote).toMatchObject({ price: 103, change: undefined, changePercent: undefined });
+  });
+
+  it("sizes by today's volume without falling back to the average", () => {
+    const today = stock(quote, { averageVolume: 5000, todayVolume: { shares: 1000, dollars: 102_000, day: '2026-10-12', through: MONDAY_CLOSE } });
+    expect(volumeSize(today, false, true)).toBe(1000);
+    expect(volumeSize(today, true, true)).toBe(102_000);
+    expect(volumeSize({ ...today, todayVolume: { shares: 1000, day: '2026-10-12', through: MONDAY_CLOSE } }, true, true)).toBe(103_000);
+    expect(volumeSize(stock(quote, { averageVolume: 5000 }), false, true)).toBeUndefined();
   });
 });

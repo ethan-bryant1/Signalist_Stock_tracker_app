@@ -7,7 +7,7 @@ Built with Next.js 16, Better Auth, MongoDB, Inngest, Finnhub and TradingView wi
 ## Features
 
 - **Dashboard:** live S&P 500, Nasdaq 100, Dow 30 and Russell 2000 prices that refresh every minute, a market open/closed badge, a market overview, a heatmap of 54 large S&P 500 companies (hover, tap or use the arrow keys for each stock's quote, with the price time and a stale-price warning), top stories and quotes.
-- **Stock heatmap:** two views. The interactive map of the same 54 companies updates live with every trade during market hours (Finnhub's free trade stream, relayed through the server so the key stays private), can be colored by the 1-day, 1-week, month-to-date, 3-month, 6-month, year-to-date or 1-year change and sized by market cap or average volume, lets you select a stock and keep its details beside the map, focus a sector from its heading or the Sector ETFs list, and come back to the same view with the browser's Back button. The Full S&P 500 view is TradingView's map of every company, colored by any period from 1 hour to 1 year (or pre-market and after hours) and sized by market cap, volume or dollar volume. See [docs/heatmap.md](docs/heatmap.md) for where every figure comes from.
+- **Stock heatmap:** two views. The interactive map of the same 54 companies updates live with every trade during market hours (Finnhub's free trade stream, relayed through the server so the key stays private), can be colored by the 1-day, 1-week, month-to-date, 3-month, 6-month, year-to-date or 1-year change and sized by market cap or average volume (with a free Alpaca account also 1-hour, 4-hour, 1-month, pre-market and after-hours changes and today's volume), lets you select a stock and keep its details beside the map, focus a sector from its heading or the Sector ETFs list, and come back to the same view with the browser's Back button. The Full S&P 500 view is TradingView's map of every company, colored by any period from 1 hour to 1 year (or pre-market and after hours) and sized by market cap, volume or dollar volume. See [docs/heatmap.md](docs/heatmap.md) for where every figure comes from.
 - **Market data:** every US stock in a screener, plus search and sector filters for the S&P 500.
 - **Stock pages:** price, key figures (P/E, EPS, market cap, 52-week range and more), a full chart, the company's latest news, profile, technical analysis and financials.
 - **Search:** press Ctrl+K (Cmd+K on a Mac) to find any US stock.
@@ -43,6 +43,7 @@ Loops Watch shows Finnhub prices and news, and Finnhub's free plan is licensed f
    npm test                     # unit tests for the market-data rules, heatmap layout, colors and sign-in rules
    npm run check:market-data    # checks the real Finnhub data behind the heatmaps with your key (about 4 minutes)
    npm run check:stream         # checks Finnhub's live trade stream with your key (20 seconds)
+   npm run check:alpaca         # checks your Alpaca keys and the data the heatmap takes from Alpaca
    ```
 
 ## Deploy to Vercel

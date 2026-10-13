@@ -5,6 +5,7 @@ import { SP500_COMPANIES } from '@/lib/data/sp500';
 import { FINNHUB_BASE_URL, FinnhubError, fetchFinnhub, getFinnhubToken, mapWithLimit, worstIssue } from '@/lib/finnhub';
 import { normalizeQuote, sameCompany, sameListing, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
 import { parseFinnhubStats, periodStarts, statsAnchor } from '@/lib/period-change';
+import { getAlpacaExtras } from '@/lib/alpaca';
 
 const SP500_BY_SYMBOL = new Map(SP500_COMPANIES.map((company) => [company.symbol, company]));
 
@@ -95,8 +96,16 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
     };
   });
 
+  // What Finnhub's free plan lacks (1H, 4H, 1M, extended hours, today's volume), from Alpaca when its keys are set
+  const alpaca = await getAlpacaExtras(stocks, generatedAt);
+  const withAlpaca = stocks.map((stock) => {
+    const extra = alpaca.stocks.get(stock.symbol);
+    if (!extra || (!extra.periodStart && !extra.todayVolume && !extra.extended)) return stock;
+    return { ...stock, ...extra, periodStart: extra.periodStart ? { ...stock.periodStart, ...extra.periodStart } : stock.periodStart };
+  });
+
   // One line instead of one per stock, without URLs (they carry the key)
   if (statsFailed) console.error(`getHeatmapData: ${statsFailed} Finnhub stats requests failed`);
   if (issues.length) console.error(`getHeatmapData: ${issues.length} Finnhub requests failed (${[...new Set(issues)].join(', ')})`);
-  return { provider: 'Finnhub', stocks, generatedAt, failedRequests: issues.length, issue: worstIssue(issues) };
+  return { provider: 'Finnhub', stocks: withAlpaca, generatedAt, failedRequests: issues.length, issue: worstIssue(issues), alpaca: alpaca.status };
 }

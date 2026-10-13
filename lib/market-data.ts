@@ -6,8 +6,24 @@ import type { MarketSector } from "@/lib/data/sp500";
 
 export type MarketSession = "pre-market" | "regular" | "post-market" | "closed";
 
-// The longer periods the interactive heatmap can color by, besides the 1-day change (lib/period-change.ts)
-export type HistoryPeriod = "1w" | "mtd" | "3m" | "6m" | "ytd" | "1y";
+// The periods the interactive heatmap can color by besides the 1-day change: from Finnhub's daily stats
+// (lib/period-change.ts), and 1H, 4H and 1M from Alpaca (lib/alpaca.ts)
+export type HistoryPeriod = "1h" | "4h" | "1w" | "1m" | "mtd" | "3m" | "6m" | "ytd" | "1y";
+
+// Whether Alpaca's figures (1H, 4H, 1M, extended hours, today's volume) are available
+export type AlpacaStatus = "ok" | "not-configured" | "auth" | "failed";
+
+// One extended session's latest price for a stock, and the regular close its move is measured from
+export type ExtendedPrice = {
+    // The latest price in that session, and its time; none yet when the stock hasn't traded in it
+    price?: number;
+    time?: number;
+    reference: number;
+    // True while the session is on (prices are live); false for the last finished session
+    live: boolean;
+    // The New York day the session belongs to
+    day: string;
+};
 
 // One stock's latest price and the day's figures around it
 export type Quote = {
@@ -44,6 +60,10 @@ export type HeatmapStock = {
     periodStart?: Partial<Record<HistoryPeriod, number>>;
     // Average daily volume over the last 10 trading days, in shares, from the same stats
     averageVolume?: number;
+    // The last trading day's volume so far (up to 15 minutes ago), from Alpaca
+    todayVolume?: { shares: number; dollars?: number; day: string; through: number };
+    // Pre-market and after-hours prices, from Alpaca and Finnhub's trade stream
+    extended?: Partial<Record<"pre-market" | "post-market", ExtendedPrice>>;
 };
 
 // What went wrong when some figures couldn't be fetched, worst first
@@ -59,6 +79,7 @@ export type HeatmapPayload = {
     // Requests that failed while putting it together, and the main reason
     failedRequests: number;
     issue?: FeedIssue;
+    alpaca?: AlpacaStatus;
 };
 
 const finite = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);

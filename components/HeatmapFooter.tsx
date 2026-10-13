@@ -82,16 +82,39 @@ type HeatmapStatusProps = {
     // The period the colors show ("1D", "1W") and how many priced stocks have no figure for it
     periodLabel?: string;
     noPeriodData?: number;
+    // Why those stocks have no figure (shown on hover)
+    noPeriodDataReason?: string;
+    // Replaces the regular session's label, for an extended-hours map ("Live", or the finished session's day)
+    periodDetail?: { label: string; day?: string };
     // What the map is sized by, which says why a stock couldn't be drawn
     sizeBy?: "cap" | "equal" | "volume" | "dollar-volume";
+    // Anything else worth a line, like Alpaca's data failing
+    notes?: { text: string; title?: string; problem?: boolean }[];
+    // Where the figures come from
+    source?: string;
     className?: string;
 };
 
 // What the map shows and how current it is: the period, how many stocks have prices, how many are stale,
 // any left off the map, the time of the newest price and the source. Problems come first.
-export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, periodLabel = "1D", noPeriodData = 0, sizeBy = "cap", className }: HeatmapStatusProps) => {
+export const HeatmapStatus = ({
+    feed,
+    assessment,
+    stocks,
+    unplaced,
+    now,
+    periodLabel = "1D",
+    noPeriodData = 0,
+    noPeriodDataReason,
+    periodDetail,
+    sizeBy = "cap",
+    notes = [],
+    source = "Finnhub",
+    className,
+}: HeatmapStatusProps) => {
     const unplacedReason = sizeBy === "cap" ? "no market cap" : "no volume data";
-    const { period, priced, stale, newestQuoteTime } = assessment;
+    const { priced, stale, newestQuoteTime } = assessment;
+    const period = periodDetail ?? assessment.period;
     const total = stocks.length;
     const streaming = new Set(feed.live.symbols);
     const streamed = stocks.filter((stock) => streaming.has(stock.symbol)).length;
@@ -153,11 +176,19 @@ export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, periodL
             {noPeriodData > 0 && (
                 <>
                     <span aria-hidden>·</span>
-                    <span className="text-gray-400" title={`Finnhub's daily stats didn't load for these stocks, so their tiles have no ${periodLabel} change`}>
+                    <span className="text-gray-400" title={noPeriodDataReason ?? `Finnhub's daily stats didn't load for these stocks, so their tiles have no ${periodLabel} change`}>
                         {noPeriodData} without {periodLabel} data
                     </span>
                 </>
             )}
+            {notes.map((note) => (
+                <span key={note.text} className="contents">
+                    <span aria-hidden>·</span>
+                    <span className={note.problem ? "font-medium text-gray-100" : "text-gray-400"} title={note.title}>
+                        {note.text}
+                    </span>
+                </span>
+            ))}
             {unplaced.length > 0 && (
                 <>
                     <span aria-hidden>·</span>
@@ -183,7 +214,7 @@ export const HeatmapStatus = ({ feed, assessment, stocks, unplaced, now, periodL
                 </>
             )}
             <span aria-hidden>·</span>
-            <span>Finnhub</span>
+            <span>{source}</span>
         </div>
     );
 };

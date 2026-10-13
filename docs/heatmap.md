@@ -36,15 +36,19 @@ browser, and error messages and logs never include request URLs.
 | Market session | Finnhub `/stock/market-status` (the header's live prices), falling back to the New York clock | The fallback doesn't know holidays or early closes. |
 | Longer-period changes | Calculated from Finnhub `/stock/metric?metric=all` returns and the live price | See "Longer periods" below. |
 | Average volume | `/stock/metric` `10DayAverageTradingVolume` (millions of shares) | Average daily shares over the last 10 trading days. Dollar volume is that × the live price. |
+| 1H, 4H and 1M starting prices | Alpaca SIP minute and daily bars (optional) | See "Alpaca" below. |
+| Pre-market and after-hours prices | Alpaca SIP minute bars and IEX latest trades, plus Finnhub's trade stream (optional) | See "Alpaca" below. |
+| Today's volume | Alpaca SIP daily bar for the last trading day, up to 15 minutes ago (optional) | Volume and dollar volume (shares × Alpaca's volume-weighted price). Without Alpaca, volume sizes use the 10-day average. |
 | Sector ETF moves | Finnhub `/quote` for XLK, XLF, XLV, XLY, XLC, XLI, XLP, XLE, XLU, XLRE, XLB | |
 
 ### What Finnhub's free plan doesn't have
 
 No price history (`/stock/candle` is a paid endpoint), so no intraday periods (1H, 4H); no 1-month return (only
 month to date); no pre-market or after-hours prices; no trading volume on `/quote` (only a 10-day average in
-`/stock/metric`); no batch quotes. Those options aren't shown in the interactive view (the Full S&P 500 view has them).
-Free real-time data for the whole market doesn't exist elsewhere either: the exchanges charge for it, so free plans
-are 15 minutes delayed (Alpaca, checked 2026-10-12) or cover one exchange.
+`/stock/metric`); no batch quotes. A free Alpaca account fills most of these in (see "Alpaca" below); without its keys
+those options aren't shown in the interactive view (the Full S&P 500 view has them).
+Free real-time data for the whole market doesn't exist: the exchanges charge for it, so free plans are 15 minutes
+delayed or cover one exchange. Alpaca's free plan is both (checked 2026-10-12).
 
 ### Longer periods
 
@@ -62,6 +66,35 @@ it, so these maps move with every trade like the 1-day map.
 - **Colors.** Longer periods move further, so each has a wider scale: full color at ±3% (1D), ±6% (1W), ±9% (MTD),
   ±15% (3M), ±21% (6M), ±24% (YTD), ±30% (1Y). The legend follows the period.
 - **Requests.** The stats add one request per stock, so a cold cache costs about 162 requests.
+
+### Alpaca
+
+With `ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY` set (a free Alpaca account; paper trading is enough), the
+interactive view also offers 1H, 4H, 1M, pre-market, after hours, and today's volume (`lib/alpaca.ts`, rules in
+`lib/alpaca-data.ts`). The keys stay on the server and go in request headers, never URLs or logs.
+
+Alpaca's free (Basic) plan has two feeds: SIP (every US exchange) for any time range that ends at least 15 minutes
+ago, and IEX (one exchange, a few percent of volume) in real time. The app uses SIP for every price in the past and
+the live prices from Finnhub, so nothing on the map is delayed:
+
+- **1H and 4H.** The starting price is the close of the last SIP minute bar an hour (or 4) before the map's newest
+  price; the live price is compared with it. That moment is always more than 15 minutes ago, so SIP has it. After the
+  close they cover the session's last hour (or 4).
+- **1M.** The last daily close on or before the same date a month before the last trading day (Mar 31 → Feb 28).
+- **Pre-market and after hours.** While a session is on: IEX's latest trade (real time, but IEX only, so quiet stocks
+  may not have traded there yet) or the last SIP minute bar up to 15 minutes ago, whichever is newer, then every trade
+  from Finnhub's stream, if it carries extended-hours trades (not yet checked with real data). Otherwise the last finished session's final price
+  from SIP. The change is from the regular close before the session. A stock with no trade in it reads "—" and is
+  counted. Outside a session the status line names the session's day ("Last session (Mon, Oct 12)").
+- **Today's volume.** The last trading day's SIP daily bar, which covers up to 15 minutes ago; the status line says
+  how recent ("Volume to 3:44 PM ET"). Dollar volume is shares × the bar's volume-weighted price.
+- **Requests.** Six or seven requests per refresh for all 54 stocks (minute bars for 1H, 4H and each extended session, daily
+  bars for 1M and volume, and IEX's latest trades while a session is on), cached for 15 seconds to 6 hours. The free
+  plan allows 200 a minute.
+- **Failures.** If Alpaca refuses the keys, its options are hidden and the status line says "Alpaca keys refused". If
+  some requests fail, the options stay, stocks without a figure read "—", and the status line says "Some Alpaca data
+  didn't load"; the next refresh tries again.
+- `npm run check:alpaca` checks the keys and each kind of data with your account.
 
 ### Requests, caching and refresh
 
@@ -90,10 +123,12 @@ stocks move within a second or two of each trade instead of once a minute.
   keep the once-a-minute refresh. `npm run check:stream` checks the limit and the connection with your key.
 - **Batches.** The server sends at most two batches a second, with only each stock's newest trade, since the busiest
   stocks trade hundreds of times a second.
-- **Regular session only.** Only trades between 9:30 AM and 4:00 PM ET move a tile, since the 1-day change is a
-  regular-session figure (Finnhub's quote is too). A trade only replaces a price it is newer than and from the same
+- **Sessions.** Each trade is tagged with its session by the New York clock. Only regular-session trades (9:30 AM to
+  4:00 PM ET) move the regular price, since the 1-day change is a regular-session figure (Finnhub's quote is too).
+  Pre-market and after-hours trades only move the pre-market and after-hours maps (with Alpaca), and the page opens
+  the stream in those sessions only while one of those maps is shown. A trade only replaces a price it is newer than and from the same
   New York day; a stock waits for its first refresh of the day, which brings the previous close the change needs.
-  The page doesn't open the stream outside the regular session or while the tab is hidden.
+  The page doesn't open the stream while the tab is hidden.
 - **Refreshes don't undo it.** A refresh can bring a price cached on the server a minute or two ago; the page keeps
   whichever price is newer.
 - **Connections.** Each connection lasts about 4½ minutes (inside Vercel's 5-minute limit for one request on the
@@ -202,5 +237,7 @@ card moves by `transform` at most once per frame. Measured on 2026-10-11 (Chromi
   layout, label fitting, card placement, arrow keys, URL state and the sector mapping.
 - `npm run check:stream`: connects to Finnhub's trade stream with your key, subscribes to 50 symbols and reports
   whether Finnhub accepted it and how many trades arrived in 20 seconds (none outside market hours is normal).
+- `npm run check:alpaca`: checks your Alpaca keys, SIP daily and minute bars (including the last pre-market and
+  after-hours sessions), bars for every map stock in one request, and IEX's latest trades. Never prints the keys.
 - `npm run check:market-data`: checks the real Finnhub answers for every map stock and sector ETF with your key
   (pacing itself under the rate limit, never printing the key) and prints PASS, PASS WITH WARNINGS or FAIL.

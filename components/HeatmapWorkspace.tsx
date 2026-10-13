@@ -16,13 +16,13 @@ import { HEATMAP_LINK_VALUES, HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/da
 import {
     EXTENDED_HOURS_OPTIONS,
     GROUP_OPTIONS,
-    INTERACTIVE_SIZE_OPTIONS,
-    INTERACTIVE_SUPPORTS,
     PERIOD_OPTIONS,
     SIZE_OPTIONS,
     TRADINGVIEW_COLOR,
     focusSector,
     interactiveSettings,
+    interactiveSizeOptions,
+    interactiveSupports,
     parseHeatmapState,
     selectStock,
     serializeHeatmapState,
@@ -30,8 +30,9 @@ import {
     type HeatmapView,
     type Option,
 } from "@/lib/heatmap-state";
-import { assessStocks, capWeightedChange, periodPhrase, type HeatmapPayload, type HistoryPeriod, type MarketSession } from "@/lib/market-data";
-import { PERIOD_FULL_COLOR_AT, withPeriodChange } from "@/lib/period-change";
+import { newYorkInstant } from "@/lib/alpaca-data";
+import { assessStocks, capWeightedChange, formatNewYorkDay, formatNewYorkTime, periodPhrase, type AlpacaStatus, type HeatmapPayload, type HeatmapStock, type MarketSession } from "@/lib/market-data";
+import { PERIOD_FULL_COLOR_AT, extendedSessionShown, hasColorData, withPeriodChange, type ShiftedColor } from "@/lib/period-change";
 import { cn, formatChangePercent, getChangeColorClass } from "@/lib/utils";
 
 // A row of buttons where one is selected, like a trading platform's toolbar
@@ -108,26 +109,66 @@ const VIEW_OPTIONS: { value: HeatmapView; label: string; title: string }[] = [
 ];
 
 const describe = (options: Option<string>[], value: string) => options.find((option) => option.value === value)?.description ?? value;
+const COLOR_OPTIONS = [...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS];
+
+// Whether the server's Alpaca keys back 1H, 4H, 1M, extended hours and today's volume. When some of Alpaca's requests
+// failed the options stay, and the stocks without figures read "—" with a note, rather than the toolbar changing.
+const alpacaAvailable = (status?: AlpacaStatus) => status === "ok" || status === "failed";
+const providers = (alpaca: boolean, joiner: string) => (alpaca ? ["Finnhub", "Alpaca"] : ["Finnhub"]).join(joiner);
 
 // What the interactive map shows instead when the chosen period or size needs TradingView's map, naming only the
 // settings that fell back
-const fallbackText = (state: HeatmapState) => {
-    const effective = interactiveSettings(state);
+const fallbackText = (state: HeatmapState, alpaca: boolean) => {
+    const effective = interactiveSettings(state, alpaca);
     const unsupported = [
-        effective.colorFellBack ? describe([...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS], state.color) : undefined,
+        effective.colorFellBack ? describe(COLOR_OPTIONS, state.color) : undefined,
         effective.sizeFellBack ? describe(SIZE_OPTIONS, state.size) : undefined,
     ].filter(Boolean);
-    return `Showing ${describe(PERIOD_OPTIONS, effective.color)} sized by ${describe(INTERACTIVE_SIZE_OPTIONS, effective.size)}: ${unsupported.join(" and ")} ${unsupported.length > 1 ? "need" : "needs"} the Full S&P 500 view.`;
+    return `Showing ${describe(COLOR_OPTIONS, effective.color)} sized by ${describe(interactiveSizeOptions(alpaca), effective.size)}: ${unsupported.join(" and ")} ${unsupported.length > 1 ? "need" : "needs"} the Full S&P 500 view${alpaca ? "" : ", or Alpaca keys on the server"}.`;
+};
+
+// What the status line says about Alpaca's figures: a failure, and how recent today's volume is on a volume map
+const alpacaNotes = (status: AlpacaStatus | undefined, volumeStocks: readonly HeatmapStock[] | undefined) => {
+    const notes: { text: string; title?: string; problem?: boolean }[] = [];
+    if (status === "auth") {
+        notes.push({ text: "Alpaca keys refused", title: "Alpaca turned down the server's keys, so 1H, 4H, 1M, extended hours and today's volume are off. Check ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY.", problem: true });
+    } else if (status === "failed") {
+        notes.push({ text: "Some Alpaca data didn't load", title: "Stocks without a figure read \u201c—\u201d; the next refresh tries again" });
+    }
+    const through = Math.max(0, ...(volumeStocks ?? []).map((stock) => stock.todayVolume?.through ?? 0));
+    if (through) notes.push({ text: `Volume to ${formatNewYorkTime(through)} ET`, title: "Alpaca's free plan has every exchange's volume up to 15 minutes ago" });
+    return notes;
 };
 
 // How a screen reader says what period a longer change covers
-const HISTORY_PHRASE: Record<HistoryPeriod, string> = {
+const HISTORY_PHRASE: Record<ShiftedColor, string> = {
+    premarket: "in pre-market trading",
+    postmarket: "in after-hours trading",
+    "1h": "over the last hour",
+    "4h": "over the last 4 hours",
+    "1m": "over the last month",
     "1w": "over the last 5 trading days",
     mtd: "this month",
     "3m": "over the last 13 weeks",
     "6m": "over the last 26 weeks",
     ytd: "this year",
     "1y": "over the last 52 weeks",
+};
+
+// For the status line: why stocks have no figure for the colors, and which extended session they show
+const colorDetails = (color: "1d" | ShiftedColor, label: string, extended?: { live: boolean; day: string }) => {
+    if (color === "premarket" || color === "postmarket") {
+        return {
+            noPeriodDataReason: `These stocks haven't traded ${HISTORY_PHRASE[color]} ${extended?.live ? "yet today" : "in that session"}`,
+            periodDetail: !extended
+                ? { label: "No session data" }
+                : extended.live
+                    ? { label: "Live" }
+                    : { label: "Last session", day: formatNewYorkDay(newYorkInstant(extended.day, 12 * 60)) },
+        };
+    }
+    const fromAlpaca = color === "1h" || color === "4h" || color === "1m";
+    return { noPeriodDataReason: fromAlpaca ? `Alpaca had no price for these stocks where the ${label} period starts` : undefined, periodDetail: undefined };
 };
 
 const SESSION_TEXT: Record<MarketSession, string> = {
@@ -214,8 +255,11 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const [watchlist, setWatchlist] = useState(() => new Set(initialWatchlist));
 
     const { session } = useLiveMarket();
-    // Trades stream in only while the regular session trades; otherwise prices refresh once a minute
-    const feed = useHeatmapFeed(initial, { stream: session === "regular" });
+    // Trades stream in while the session the map shows is trading (the regular one, or the pre-market or after-hours
+    // session on those maps); otherwise prices refresh once a minute
+    const streamExtended = alpacaAvailable(initial.alpaca) && ((state.color === "premarket" && session === "pre-market") || (state.color === "postmarket" && session === "post-market"));
+    const feed = useHeatmapFeed(initial, { stream: session === "regular" || (state.view === "interactive" && streamExtended) });
+    const alpaca = alpacaAvailable(feed.alpaca);
     const now = useNow(initial.generatedAt);
     const [settings] = useHeatmapSettings();
 
@@ -231,7 +275,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const isFullscreen = useSyncExternalStore(subscribeToFullscreen, frameIsFullscreen, () => false);
 
     const interactive = state.view === "interactive";
-    const effective = interactiveSettings(state);
+    const effective = interactiveSettings(state, alpaca);
 
     // The address bar follows the view, without adding history entries for every click. A plain replaceState (no
     // state of our own) lets Next keep its router in step, so Back from a stock's page comes back to this address.
@@ -264,15 +308,19 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
 
     const assessment = useMemo(() => assessStocks(feed.stocks, { now, session }), [feed.stocks, now, session]);
     const mapStocks = useMemo(() => (state.sector ? feed.stocks.filter((stock) => stock.sector === state.sector) : feed.stocks), [feed.stocks, state.sector]);
-    const unplaced = useMemo(() => unplacedStocks(mapStocks, effective.size), [mapStocks, effective.size]);
-    // For a longer period, each stock's change is its live price against where the period started
+    // With Alpaca, volume sizes are the last trading day's volume, like TradingView's; without it, 10-day averages
+    const unplaced = useMemo(() => unplacedStocks(mapStocks, effective.size, alpaca), [mapStocks, effective.size, alpaca]);
+    // For a longer period, each stock's change is its live price against where the period started; for pre-market
+    // or after hours, the session's latest price against the regular close before it
     const colorPeriod = effective.color;
     const displayStocks = useMemo(
         () => (colorPeriod === "1d" ? mapStocks : mapStocks.map((stock) => withPeriodChange(stock, colorPeriod))),
         [mapStocks, colorPeriod]
     );
-    // Priced stocks with no starting price for the period (Finnhub's stats didn't load for them)
-    const noPeriodData = colorPeriod === "1d" ? 0 : mapStocks.filter((stock) => stock.quote && stock.periodStart?.[colorPeriod] === undefined).length;
+    // Priced stocks with no figure for the period (no starting price, or no trade in the extended session)
+    const noPeriodData = colorPeriod === "1d" ? 0 : mapStocks.filter((stock) => stock.quote && !hasColorData(stock, colorPeriod)).length;
+    const extendedColor = colorPeriod === "premarket" || colorPeriod === "postmarket" ? colorPeriod : undefined;
+    const extendedShown = useMemo(() => (extendedColor ? extendedSessionShown(mapStocks, extendedColor) : undefined), [mapStocks, extendedColor]);
     // Current prices only, so the figure never mixes today's moves with a stale stock's earlier one
     const summary = useMemo(() => capWeightedChange(displayStocks, assessment.freshness), [displayStocks, assessment.freshness]);
     // The status line counts the stocks on the map, which is one sector's while a sector is focused
@@ -332,8 +380,8 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const switchView = (view: HeatmapView) => {
         change((previous) => ({ ...previous, view }));
         const next = { ...state, view };
-        const fell = interactiveSettings(next);
-        if (view === "interactive" && (fell.colorFellBack || fell.sizeFellBack)) announce(fallbackText(next));
+        const fell = interactiveSettings(next, alpaca);
+        if (view === "interactive" && (fell.colorFellBack || fell.sizeFellBack)) announce(fallbackText(next, alpaca));
         keepFocus(() => viewToggleRef.current?.querySelector<HTMLElement>(`[data-view="${view}"]`));
     };
 
@@ -360,11 +408,15 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
         }
     };
 
-    // The interactive view offers only what Finnhub's free plan can back (INTERACTIVE_SUPPORTS). 1H, 4H, 1M and
-    // extended hours are in the Full S&P 500 view, which has no month to date.
-    const periodOptions = PERIOD_OPTIONS.filter((option) => (interactive ? INTERACTIVE_SUPPORTS.color.has(option.value) : !!TRADINGVIEW_COLOR[option.value]));
-    const sizeOptions = interactive ? INTERACTIVE_SIZE_OPTIONS : SIZE_OPTIONS;
-    const periodLabel = PERIOD_OPTIONS.find((option) => option.value === effective.color)?.label ?? "1D";
+    // The interactive view offers only what its data can back (interactiveSupports): Finnhub's free plan, plus 1H, 4H,
+    // 1M and extended hours with Alpaca. The Full S&P 500 view has everything but month to date.
+    const supports = interactiveSupports(alpaca);
+    const periodOptions = PERIOD_OPTIONS.filter((option) => (interactive ? supports.color.has(option.value) : !!TRADINGVIEW_COLOR[option.value]));
+    const sizeOptions = interactive ? interactiveSizeOptions(alpaca) : SIZE_OPTIONS;
+    const periodLabel = COLOR_OPTIONS.find((option) => option.value === effective.color)?.label ?? "1D";
+
+    const statusNotes = alpacaNotes(feed.alpaca, alpaca && (effective.size === "volume" || effective.size === "dollar-volume") ? mapStocks : undefined);
+    const { noPeriodDataReason, periodDetail } = colorDetails(colorPeriod, periodLabel, extendedShown);
 
     const shownColor = interactive ? effective.color : TRADINGVIEW_COLOR[state.color] ? state.color : "1d";
     const shownSize = interactive ? effective.size : state.size;
@@ -372,7 +424,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
 
     const title = interactive ? "S&P 500 sector leaders" : showMapControls ? "TradingView heatmap" : "S&P 500";
     const subtitle = interactive
-        ? `${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description} · GICS sectors · prices from Finnhub`
+        ? `${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description} · GICS sectors · prices from ${providers(alpaca, " and ")}`
         : showMapControls
             ? "Pick the index in TradingView's bar above the map · data and calculations by TradingView, delayed"
             : "Every S&P 500 company · data and calculations by TradingView, delayed · FactSet sectors";
@@ -445,7 +497,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                         value={PERIOD_OPTIONS.some((option) => option.value === shownColor) ? shownColor : undefined}
                         onChange={(color) => change((previous) => ({ ...previous, color }))}
                     />
-                    {!interactive && (
+                    {(!interactive || alpaca) && (
                         <Segmented
                             className="order-2"
                             label="Extended hours"
@@ -461,7 +513,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                 {/* Screen readers hear this through the page's announcement, not as a live region added already filled */}
                 {fellBack && (
                     <div data-heatmap-notice className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-gray-600 bg-gray-900/40 px-4 py-2 text-xs text-gray-400">
-                        <span>{fallbackText(state)}</span>
+                        <span>{fallbackText(state, alpaca)}</span>
                         <button
                             type="button"
                             onClick={() => switchView("tradingview")}
@@ -498,7 +550,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                         </ol>
                         <span
                             className="flex shrink-0 items-center gap-1.5 tabular-nums text-gray-500"
-                            title={`Market-cap-weighted ${describe(PERIOD_OPTIONS, effective.color)} of the ${summary.counted} stocks on the map with current prices${summary.stale ? `; ${summary.stale} with stale prices left out` : ""}`}
+                            title={`Market-cap-weighted ${describe(COLOR_OPTIONS, effective.color)} of the ${summary.counted} stocks on the map with current prices${summary.stale ? `; ${summary.stale} with stale prices left out` : ""}`}
                         >
                             <span className="hidden sm:inline">Map stocks combined</span>
                             <span className="sm:hidden">Combined</span>
@@ -517,6 +569,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                             freshness={assessment.freshness}
                             now={now}
                             sizeBy={effective.size}
+                            volumeToday={alpaca}
                             fullColorAt={PERIOD_FULL_COLOR_AT[colorPeriod]}
                             groupBy={state.group}
                             action="select"
@@ -548,7 +601,11 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                             now={now}
                             periodLabel={periodLabel}
                             noPeriodData={noPeriodData}
+                            noPeriodDataReason={noPeriodDataReason}
+                            periodDetail={periodDetail}
                             sizeBy={effective.size}
+                            notes={statusNotes}
+                            source={providers(alpaca, " · ")}
                             className="md:justify-end md:text-right"
                         />
                     </div>

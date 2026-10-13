@@ -5,7 +5,7 @@ import {
   DEFAULT_STATE,
   EXTENDED_HOURS_OPTIONS,
   GROUP_OPTIONS,
-  INTERACTIVE_SUPPORTS,
+  interactiveSupports,
   PERIOD_OPTIONS,
   SIZE_OPTIONS,
   TRADINGVIEW_COLOR,
@@ -58,8 +58,14 @@ describe('heatmap view in the address bar', () => {
 
 describe('what the interactive map can show', () => {
   it("supports the periods Finnhub's daily stats back, and every size", () => {
-    expect([...INTERACTIVE_SUPPORTS.color]).toEqual(['1d', '1w', 'mtd', '3m', '6m', 'ytd', '1y']);
-    expect([...INTERACTIVE_SUPPORTS.size].sort()).toEqual(['cap', 'dollar-volume', 'equal', 'volume']);
+    expect([...interactiveSupports(false).color]).toEqual(['1d', '1w', 'mtd', '3m', '6m', 'ytd', '1y']);
+    expect([...interactiveSupports(false).size].sort()).toEqual(['cap', 'dollar-volume', 'equal', 'volume']);
+  });
+
+  it('adds 1H, 4H, 1M and extended hours with Alpaca', () => {
+    expect([...interactiveSupports(true).color].sort()).toEqual(['1d', '1h', '1m', '1w', '1y', '3m', '4h', '6m', 'mtd', 'postmarket', 'premarket', 'ytd']);
+    expect(interactiveSettings({ ...DEFAULT_STATE, color: '1h' }, true)).toEqual({ color: '1h', size: 'cap', colorFellBack: false, sizeFellBack: false });
+    expect(interactiveSettings({ ...DEFAULT_STATE, color: 'premarket' }, false).colorFellBack).toBe(true);
   });
 
   it('falls back openly, never quietly showing another measure under the chosen label', () => {
