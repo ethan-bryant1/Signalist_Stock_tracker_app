@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, CandlestickChart, LayoutGrid, LayoutDashboard, Search } from "lucide-react";
+import { Activity, CandlestickChart, LayoutDashboard, LayoutTemplate, Search } from "lucide-react";
 import {getSession} from "@/lib/better-auth/auth";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
@@ -7,7 +7,7 @@ import Logo from "@/components/Logo";
 
 const FEATURES = [
     { icon: LayoutDashboard, title: "Market overview", text: "Index funds, a Market Snapshot of the largest S&P 500 companies, sector funds and headlines." },
-    { icon: LayoutGrid, title: "Workspaces", text: "Your own layouts of charts, quotes, news and market panels, with one linked symbol." },
+    { icon: LayoutTemplate, title: "Workspaces", text: "Your own layouts of charts, quotes, news and market panels, with one linked symbol." },
     { icon: CandlestickChart, title: "Stock research", text: "TradingView charts, key figures, news, profiles and financials for any US stock or fund." },
     { icon: Search, title: "Search and watchlist", text: "Find any US listing with Ctrl+K and keep the ones you follow in one place." },
     { icon: Activity, title: "Honest data", text: "Every price shows its source and time; delayed and stale figures are labeled." },
