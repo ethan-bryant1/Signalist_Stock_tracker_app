@@ -1,7 +1,7 @@
 // Live prices from Finnhub's trade stream, and how they update the interactive heatmaps. No server or browser APIs
 // here, so the stream route, the page and the unit tests apply the same rules.
 
-import { newYorkClock, sessionFromClock, type HeatmapStock, type Quote } from "@/lib/market-data";
+import { sessionFromClock, type HeatmapStock, type Quote } from "@/lib/market-data";
 
 // Finnhub's free plan streams trades for up to 50 symbols at a time
 export const STREAM_SYMBOL_LIMIT = 50;
@@ -96,25 +96,3 @@ export const newerQuote = (a: Quote | undefined, b: Quote | undefined): Quote | 
     if (!b) return a;
     return (b.time ?? 0) >= (a.time ?? 0) ? b : a;
 };
-
-// Applies pre-market and after-hours trades to the stocks' extended-hours prices. A trade only counts for a session
-// the server said is on (so its reference close is known), from that session's day, and newer than the price shown.
-export function applyExtendedTrades(stocks: HeatmapStock[], trades: readonly LiveTrade[]): HeatmapStock[] {
-    const extended = trades.filter((trade) => trade.session === "pre-market" || trade.session === "post-market");
-    if (!extended.length) return stocks;
-    const byKey = new Map(extended.map((trade) => [`${trade.symbol} ${trade.session}`, trade]));
-    let changed = false;
-    const next = stocks.map((stock) => {
-        let updated = stock;
-        for (const session of ["pre-market", "post-market"] as const) {
-            const trade = byKey.get(`${stock.symbol} ${session}`);
-            const current = updated.extended?.[session];
-            if (!trade || !current?.live || newYorkClock(trade.time).day !== current.day) continue;
-            if (current.time !== undefined && trade.time <= current.time) continue;
-            updated = { ...updated, extended: { ...updated.extended, [session]: { ...current, price: trade.price, time: trade.time } } };
-            changed = true;
-        }
-        return updated;
-    });
-    return changed ? next : stocks;
-}

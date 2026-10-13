@@ -78,23 +78,12 @@ const STREAM_OFF_TEXT: Record<string, string> = {
 type HeatmapStatusProps = {
     feed: Pick<HeatmapFeed, "refreshError" | "failingSince" | "issue" | "failedRequests" | "lastSuccessAt" | "live">;
     assessment: FeedAssessment;
-    // The stocks on this map, which can be one focused sector
+    // The stocks on this map
     stocks: readonly Pick<HeatmapStock, "symbol">[];
     unplaced: readonly HeatmapStock[];
     now: number;
-    // The period the colors show ("1D", "1W") and how many priced stocks have no figure for it
-    periodLabel?: string;
-    noPeriodData?: number;
-    // Why those stocks have no figure (shown on hover)
-    noPeriodDataReason?: string;
-    // Replaces the regular session's label, for an extended-hours map ("Live", or the finished session's day)
-    periodDetail?: { label: string; day?: string };
-    // What the map is sized by, which says why a stock couldn't be drawn
-    sizeBy?: "cap" | "equal" | "volume" | "dollar-volume";
-    // Anything else worth a line, like Alpaca's data failing
+    // Anything else worth a line, like tiles drawn at equal size while market caps load
     notes?: { text: string; title?: string; problem?: boolean }[];
-    // Where the figures come from
-    source?: string;
     className?: string;
 };
 
@@ -106,18 +95,11 @@ export const HeatmapStatus = ({
     stocks,
     unplaced,
     now,
-    periodLabel = "1D",
-    noPeriodData = 0,
-    noPeriodDataReason,
-    periodDetail,
-    sizeBy = "cap",
     notes = [],
-    source = "Finnhub",
     className,
 }: HeatmapStatusProps) => {
-    const unplacedReason = sizeBy === "cap" ? "no market cap" : "no volume data";
-    const { priced, stale, newestQuoteTime } = assessment;
-    const period = periodDetail ?? assessment.period;
+    const unplacedReason = "no market cap";
+    const { priced, stale, newestQuoteTime, period } = assessment;
     const total = stocks.length;
     const streaming = new Set(feed.live.symbols);
     const streamed = stocks.filter((stock) => streaming.has(stock.symbol)).length;
@@ -163,7 +145,7 @@ export const HeatmapStatus = ({
                 </>
             )}
             <span className="font-medium text-gray-400">
-                {periodLabel} · {period.label}
+                1D · {period.label}
                 {period.day ? ` (${period.day})` : ""}
             </span>
             <span aria-hidden>·</span>
@@ -174,14 +156,6 @@ export const HeatmapStatus = ({
                 <>
                     <span aria-hidden>·</span>
                     <span className="text-gray-400">{stale} stale</span>
-                </>
-            )}
-            {noPeriodData > 0 && (
-                <>
-                    <span aria-hidden>·</span>
-                    <span className="text-gray-400" title={noPeriodDataReason ?? `Finnhub's daily stats didn't load for these stocks, so their tiles have no ${periodLabel} change`}>
-                        {noPeriodData} without {periodLabel} data
-                    </span>
                 </>
             )}
             {notes.map((note) => (
@@ -217,7 +191,7 @@ export const HeatmapStatus = ({
                 </>
             )}
             <span aria-hidden>·</span>
-            <span>{source}</span>
+            <span>Finnhub</span>
         </div>
     );
 };

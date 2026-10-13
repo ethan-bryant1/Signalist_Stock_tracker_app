@@ -9,10 +9,10 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 | Pages | `app/(root)/` (dashboard `page.tsx`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `watchlist`, `stocks/[symbol]`), `app/(auth)/` (sign in/up) |
 | API routes | `app/api/market` (index and sector fund prices), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
 | Request gate (every provider call) | `lib/providers/gate.ts` (budget, cache, merging, usage; pure), `lib/providers/registry.ts` (one gate per provider), `lib/providers/mongo-store.ts` (slow answers kept in MongoDB) |
-| Provider clients (server only) | `lib/finnhub.ts`, `lib/alpaca.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
+| Provider clients (server only) | `lib/finnhub.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
 | Data assembly (server only) | `lib/stock-data.ts` (quotes, overviews, news, market strip), `lib/heatmap-data.ts` (the map) |
 | Browser-callable actions | `lib/actions/finnhub.actions.ts` (search and its quote preview only, signed-in) |
-| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/period-change.ts`, `lib/alpaca-data.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
+| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
 | Diagnostics | `app/(root)/status` (Data status page: calls per minute, cache share, failures, stream) |
 | Static data | `lib/data/sp500.ts` (GICS list), `lib/data/heatmap.ts` (map universe), `lib/data/markets.ts` (ETFs) |
 | Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `proxy.ts` (Next 16 middleware) |
@@ -21,9 +21,9 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 
 ## Data flow
 
-Every Finnhub and Alpaca REST call goes through that provider's gate (`lib/providers/registry.ts`):
+Every Finnhub REST call goes through the provider's gate (`lib/providers/registry.ts`):
 
-- **Budget.** A sliding one-minute window set under the free plan (Finnhub 50/min and 20/s, Alpaca 180/min). Callers
+- **Budget.** A sliding one-minute window set under the free plan (Finnhub 50/min and 20/s; a new provider gets its own budget there). Callers
   queue; what someone is looking at goes before background refreshes. A call holds its slot until its answer lands and
   is counted from then, so a slow call can't let the next minute's calls overlap it at the provider. Each call gives up
   after 10 s. A 429 pauses the provider for 30 s.
@@ -37,10 +37,11 @@ Every Finnhub and Alpaca REST call goes through that provider's gate (`lib/provi
 
 Pages call `lib/stock-data.ts` and `lib/heatmap-data.ts` after checking the session. The header strip refreshes once a
 minute from `/api/market` (one poller, in the layout; `<IncludeSectorPrices>` adds the sector funds on pages that show
-them). The heatmap refreshes from `/api/heatmap`, stops while its TradingView view is showing, and during trading
-sessions follows `/api/heatmap/stream`; every open tab shares the server's one Finnhub socket, since Finnhub allows one
+them). The dashboard's Market Snapshot refreshes from `/api/heatmap` and during the regular session follows
+`/api/heatmap/stream`; every open tab shares the server's one Finnhub socket, since Finnhub allows one
 connection per key. Every price shows its source and age (`components/PriceStamp.tsx`). TradingView widgets are
-separate, delayed embeds.
+separate, delayed embeds; the S&P 500 Heatmap page (`components/SP500Heatmap.tsx`) is TradingView's map with our
+toolbar and makes no Finnhub requests for the map.
 
 ## Libraries
 
@@ -57,6 +58,6 @@ Evaluated 2026-10-13. Add one only when a feature needs it.
 
 ## Development and cost
 
-- Claude's development usage (this repo's work) is separate from the app's API usage (the owner's Finnhub and
-  Alpaca keys at runtime). The app makes no AI calls for market data; Gemini only writes email text.
+- Claude's development usage (this repo's work) is separate from the app's API usage (the owner's Finnhub key
+  at runtime). The app makes no AI calls for market data; Gemini only writes email text.
 - Deterministic checks (`npm test`, `npm run check:*`) verify figures; don't ask a model to recompute them.

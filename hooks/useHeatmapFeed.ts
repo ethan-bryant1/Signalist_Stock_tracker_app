@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { applyExtendedTrades, applyLiveTrades, newerQuote, type LiveTrade } from "@/lib/live-trades";
+import { applyLiveTrades, newerQuote, type LiveTrade } from "@/lib/live-trades";
 import type { HeatmapPayload, HeatmapStock } from "@/lib/market-data";
 
 // The page asks for fresh prices every minute; the server caches each price for two to three minutes
@@ -33,37 +33,6 @@ const sameQuote = (a?: HeatmapStock["quote"], b?: HeatmapStock["quote"]) =>
 // as one unit, with that quote's own times, so it shows as stale instead of disappearing or mixing figures from
 // two different moments. Unchanged stocks keep the same object, so their tiles don't redraw, and when nothing
 // changed at all the previous list itself comes back, so nothing computed from it is redone.
-const samePeriodStart = (a: HeatmapStock["periodStart"], b: HeatmapStock["periodStart"]) => {
-    if (a === b) return true;
-    if (!a || !b) return false;
-    const keys = Object.keys(a) as (keyof typeof a)[];
-    return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
-};
-
-const sameTodayVolume = (a: HeatmapStock["todayVolume"], b: HeatmapStock["todayVolume"]) =>
-    a === b || (!!a && !!b && a.shares === b.shares && a.dollars === b.dollars && a.through === b.through && a.day === b.day);
-
-type Extended = NonNullable<HeatmapStock["extended"]>;
-const SESSIONS = ["pre-market", "post-market"] as const;
-const sameExtendedPrice = (a: Extended["pre-market"], b: Extended["pre-market"]) =>
-    a === b || (!!a && !!b && a.price === b.price && a.time === b.time && a.reference === b.reference && a.live === b.live && a.day === b.day);
-const sameExtended = (a: HeatmapStock["extended"], b: HeatmapStock["extended"]) =>
-    a === b || (!!a && !!b && SESSIONS.every((session) => sameExtendedPrice(a[session], b[session])));
-
-// A refresh's extended-hours prices, except where the page already has a newer streamed trade for the same session
-const mergeExtended = (old: HeatmapStock["extended"], next: HeatmapStock["extended"]): HeatmapStock["extended"] => {
-    if (!old || !next) return next ?? old;
-    const merged: Extended = { ...next };
-    for (const session of SESSIONS) {
-        const before = old[session];
-        const after = next[session];
-        if (before && after && before.day === after.day && before.reference === after.reference && (before.time ?? 0) > (after.time ?? 0)) {
-            merged[session] = { ...after, price: before.price, time: before.time };
-        }
-    }
-    return merged;
-};
-
 export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly HeatmapStock[]): HeatmapStock[] => {
     const before = new Map(previous.map((stock) => [stock.symbol, stock]));
     const merged = next.map((stock) => {
@@ -78,17 +47,9 @@ export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly Heat
             marketCap: stock.marketCap ?? old.marketCap,
             logo: stock.logo ?? old.logo,
             exchange: stock.exchange ?? old.exchange,
-            // Taken as the server sends them: it already keeps the last good stats while Finnhub fails, and drops them
-            // once they're too old, so the page never carries a period's start (or an old day's volume) past its window
-            periodStart: stock.periodStart,
-            averageVolume: stock.averageVolume,
-            todayVolume: stock.todayVolume,
-            extended: mergeExtended(old.extended, stock.extended),
         };
         const unchanged = sameQuote(merged.quote, old.quote) && merged.fetchedAt === old.fetchedAt && merged.marketCap === old.marketCap
-            && merged.logo === old.logo && merged.exchange === old.exchange && merged.name === old.name
-            && samePeriodStart(merged.periodStart, old.periodStart) && merged.averageVolume === old.averageVolume
-            && sameTodayVolume(merged.todayVolume, old.todayVolume) && sameExtended(merged.extended, old.extended);
+            && merged.logo === old.logo && merged.exchange === old.exchange && merged.name === old.name;
         return unchanged ? old : merged;
     });
     return merged.length === previous.length && merged.every((stock, index) => stock === previous[index]) ? previous : merged;
@@ -141,7 +102,7 @@ export const useHeatmapFeed = (initial: HeatmapPayload, { stream = false, enable
                 const trades = JSON.parse((event as MessageEvent).data) as LiveTrade[];
                 const receivedAt = Date.now();
                 setFeed((previous) => {
-                    const stocks = applyExtendedTrades(applyLiveTrades(previous.stocks, trades, receivedAt), trades);
+                    const stocks = applyLiveTrades(previous.stocks, trades, receivedAt);
                     return stocks === previous.stocks ? previous : { ...previous, stocks };
                 });
             });

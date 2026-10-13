@@ -18,13 +18,13 @@ type HeatmapTerminalProps = {
 
 // TradingView's S&P 500 heatmap, set from the Heatmap page's toolbar. It's a sealed frame from TradingView's site:
 // its data, calculations, hover card and sectors (FactSet's, not GICS) are TradingView's, and the page can't
-// react to anything inside it, so selecting stocks and focusing sectors happen in the interactive view instead.
+// react to anything inside it, so selecting stocks and focusing sectors happen in the Market Snapshot view instead.
 const HeatmapTerminal = ({ color, size, group, showMapControls, className }: HeatmapTerminalProps) => {
     // Rebuilt only when a setting changes, since every new config reloads the map
     const config = useMemo(
         () => ({
             ...HEATMAP_PAGE_WIDGET_CONFIG,
-            blockColor: TRADINGVIEW_COLOR[color] ?? TRADINGVIEW_COLOR["1d"],
+            blockColor: TRADINGVIEW_COLOR[color],
             blockSize: TRADINGVIEW_SIZE[size].blockSize,
             isMonoSize: TRADINGVIEW_SIZE[size].isMonoSize,
             grouping: TRADINGVIEW_GROUP[group],

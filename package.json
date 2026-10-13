@@ -10,8 +10,7 @@
     "test:db": "node scripts/test-db.mjs",
     "test": "vitest run",
     "check:market-data": "node scripts/check-market-data.mjs",
-    "check:stream": "node scripts/check-stream.mjs",
-    "check:alpaca": "node scripts/check-alpaca.mjs"
+    "check:stream": "node scripts/check-stream.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

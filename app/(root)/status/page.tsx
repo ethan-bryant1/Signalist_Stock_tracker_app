@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import BackToDashboard from "@/components/BackToDashboard";
-import { alpacaConfigured } from "@/lib/alpaca";
 import { getFinnhubToken } from "@/lib/finnhub";
 import { finnhubStreamHub } from "@/lib/finnhub-stream";
 import { formatNewYorkMoment } from "@/lib/market-data";
@@ -13,7 +12,6 @@ export const dynamic = "force-dynamic";
 
 const PROVIDER_LABELS: Record<string, { name: string; limit: string }> = {
     finnhub: { name: "Finnhub", limit: "free plan: about 60 calls a minute" },
-    alpaca: { name: "Alpaca", limit: "free Basic plan: 200 calls a minute" },
 };
 
 const Stat = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) => (
@@ -64,7 +62,7 @@ const ProviderCard = ({ usage, configured, now }: { usage: GateUsage; configured
 export default function StatusPage() {
     const { now, usage } = providerUsage();
     const hub = finnhubStreamHub();
-    const configured: Record<string, boolean> = { finnhub: !!getFinnhubToken(), alpaca: alpacaConfigured() };
+    const configured: Record<string, boolean> = { finnhub: !!getFinnhubToken() };
 
     return (
         <div className="flex flex-col gap-6">
