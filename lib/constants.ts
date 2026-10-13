@@ -1,5 +1,6 @@
 export const NAV_ITEMS: { href: string; label: string }[] = [
     { href: "/", label: "Dashboard" },
+    { href: "/workspace", label: "Workspace" },
     { href: "/watchlist", label: "Watchlist" },
     { href: "/heatmap", label: "Heatmap" },
     { href: "/market-data", label: "Markets" },
@@ -181,6 +182,18 @@ export const HEATMAP_PAGE_WIDGET_CONFIG = {
 
 export const TOP_STORIES_PAGE_WIDGET_CONFIG = { ...TOP_STORIES_WIDGET_CONFIG, height: '800' };
 
+// TradingView's economic calendar: US releases (jobs, inflation, rates) with their forecast, previous and actual
+// figures as TradingView publishes them. Medium and high importance only, so the list isn't mostly noise.
+export const ECONOMIC_CALENDAR_WIDGET_CONFIG = {
+    colorTheme: 'dark',
+    isTransparent: true,
+    locale: 'en',
+    countryFilter: 'us',
+    importanceFilter: '0,1',
+    width: '100%',
+    height: 800,
+};
+
 // The Market Data page shows TradingView's stock screener: every US-listed stock, biggest first,
 // with tabs for performance, valuation and more, and a toolbar to sort and filter
 export const MARKET_DATA_PAGE_WIDGET_CONFIG = {
@@ -256,8 +269,8 @@ export const CANDLE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     withdateranges: true, // 1D, 5D, 1M, ... buttons under the chart
     compareSymbols: [],
     studies: [],
-    width: '100%',
-    height: 560,
+    // Fills its panel (TradingView's documented autosize), so the chart can grow to full screen without reloading
+    autosize: true,
 });
 
 export const TECHNICAL_ANALYSIS_WIDGET_CONFIG = (symbol: string) => ({

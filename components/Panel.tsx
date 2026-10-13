@@ -9,19 +9,22 @@ interface PanelProps {
     href?: string;
     // The link's text instead of "Open", for a link that leads on to a fuller page in the same tab
     linkLabel?: string;
+    // Buttons for the title bar, before the link
+    actions?: React.ReactNode;
     className?: string;
     bodyClassName?: string;
     children: React.ReactNode;
 }
 
-// A bordered box with a title bar, used to frame each block of the dashboard and heatmap pages
-const Panel = ({ title, description, href, linkLabel, className, bodyClassName, children }: PanelProps) => (
+// A bordered box with a title bar, used to frame each block of the app's pages
+const Panel = ({ title, description, href, linkLabel, actions, className, bodyClassName, children }: PanelProps) => (
     <section className={cn("flex min-w-0 flex-col overflow-hidden rounded-xl border border-gray-600 bg-gray-800", className)}>
         <header className="flex min-h-14 items-center justify-between gap-4 border-b border-gray-600 px-4 py-3">
             <div className="min-w-0">
                 <h2 className="truncate text-base font-semibold text-gray-100">{title}</h2>
                 {description && <p className="mt-0.5 truncate text-xs text-gray-500">{description}</p>}
             </div>
+            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
             {href && (
                 <Link
                     href={href}

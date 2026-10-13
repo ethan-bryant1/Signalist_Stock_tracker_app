@@ -156,28 +156,31 @@ const MarketDataExplorer = ({ initialSector }: { initialSector?: MarketSector })
                 )}
             </div>
 
-            {showScreener ? (
-                <TradingViewWidget
-                    key="screener"
-                    scriptUrl={`${TRADINGVIEW_SCRIPT_URL}screener.js`}
-                    config={MARKET_DATA_PAGE_WIDGET_CONFIG}
-                    height={800}
-                />
-            ) : results.length > 0 ? (
-                <TradingViewWidget
-                    key="list"
-                    scriptUrl={`${TRADINGVIEW_SCRIPT_URL}market-quotes.js`}
-                    config={listConfig}
-                    height={listHeight}
-                />
-            ) : (
-                <div className="flex flex-col items-center gap-4 rounded-lg border border-gray-600 px-6 py-16 text-center">
-                    <p className="text-gray-400">It may be listed outside the S&amp;P 500. Search every US stock instead.</p>
-                    <button type="button" onClick={searchAllStocks} className="watchlist-btn w-fit! px-6">
-                        Search all stocks
-                    </button>
-                </div>
-            )}
+            {/* One frame for whichever TradingView list shows, like the panels elsewhere */}
+            <div className="min-w-0 overflow-hidden rounded-xl border border-gray-600 bg-gray-800">
+                {showScreener ? (
+                    <TradingViewWidget
+                        key="screener"
+                        scriptUrl={`${TRADINGVIEW_SCRIPT_URL}screener.js`}
+                        config={MARKET_DATA_PAGE_WIDGET_CONFIG}
+                        height={800}
+                    />
+                ) : results.length > 0 ? (
+                    <TradingViewWidget
+                        key="list"
+                        scriptUrl={`${TRADINGVIEW_SCRIPT_URL}market-quotes.js`}
+                        config={listConfig}
+                        height={listHeight}
+                    />
+                ) : (
+                    <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
+                        <p className="text-gray-400">It may be listed outside the S&amp;P 500. Search every US stock instead.</p>
+                        <button type="button" onClick={searchAllStocks} className="watchlist-btn w-fit! px-6">
+                            Search all stocks
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

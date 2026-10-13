@@ -3,12 +3,13 @@
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { FINNHUB_CACHE, finnhubData, getFinnhubToken } from '@/lib/finnhub';
 import { issueOf } from '@/lib/providers/gate';
-import { getStockQuoteData, isValidSymbol, toTradingViewExchange, type StockQuote } from '@/lib/stock-data';
+import { getCompanyNews, getStockQuoteData, isValidSymbol, toTradingViewExchange, type StockQuote } from '@/lib/stock-data';
 import { cache } from 'react';
 import { headers } from 'next/headers';
 import { getSession } from '@/lib/better-auth/auth';
 
-// The only Finnhub figures the browser asks for directly: the search window's results and its quote preview.
+// The only Finnhub figures the browser asks for directly: the search window's results and its quote preview, and
+// the workspace's quote and company-news widgets. All go through the shared cache, so they add no polling.
 // Pages get everything else on the server (lib/stock-data.ts).
 
 export type { StockQuote };
@@ -105,10 +106,18 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
 export async function getStockQuote(symbol: string): Promise<StockQuote> {
   const sym = String(symbol ?? '').trim().toUpperCase();
   if (!getFinnhubToken()) {
-    return { symbol: sym, tradingViewSymbol: sym, currency: 'USD', issue: 'not-configured' };
+    return { symbol: sym, kind: 'other', tradingViewSymbol: sym, currency: 'USD', issue: 'not-configured' };
   }
-  if (!isValidSymbol(sym) || !(await isSignedIn())) return { symbol: sym, tradingViewSymbol: sym, currency: 'USD' };
+  if (!isValidSymbol(sym) || !(await isSignedIn())) return { symbol: sym, kind: 'other', tradingViewSymbol: sym, currency: 'USD' };
 
   return getStockQuoteData(sym);
 }
 
+
+// A symbol's past week of company news for the workspace's news widget (the stock page loads its own on the server).
+// null when Finnhub couldn't answer.
+export async function getCompanyNewsForWidget(symbol: string): Promise<MarketNewsArticle[] | null> {
+  const sym = String(symbol ?? '').trim().toUpperCase();
+  if (!getFinnhubToken() || !isValidSymbol(sym) || !(await isSignedIn())) return null;
+  return getCompanyNews(sym, 15);
+}

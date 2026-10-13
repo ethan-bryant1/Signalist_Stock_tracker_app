@@ -5,6 +5,7 @@ import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { FINNHUB_CACHE, finnhubData, finnhubGet, mapWithLimit, worstIssue } from '@/lib/finnhub';
 import { marketTtlMs, normalizeQuote, sameListing, sessionFromClock, type FeedIssue, type MarketSession } from '@/lib/market-data';
 import { issueOf } from '@/lib/providers/gate';
+import { KNOWN_FUNDS, instrumentKind, type InstrumentKind } from '@/lib/instrument';
 
 // Stock and market figures for server components, routes and jobs. Server only, and not server actions: pages
 // call these after checking the session, so nobody outside can spend the Finnhub budget through them.
@@ -141,6 +142,8 @@ export type PriceStamp = {
 
 export type StockOverview = PriceStamp & {
   symbol: string;
+  // A company, a fund we know, or another listing (lib/instrument.ts), which decides the figures its page lists
+  kind: InstrumentKind;
   // Ticker with its exchange (NASDAQ:AAPL), which TradingView's profile and financials widgets need
   tradingViewSymbol: string;
   name?: string;
@@ -195,12 +198,17 @@ export const getStockQuoteData = async (sym: string): Promise<StockQuote> => {
   // Finnhub returns a price of 0 for symbols it has no quote for, which normalizeQuote drops
   const latest = normalizeQuote(quote?.data);
   const p = profile?.data;
-  const prefix = toTradingViewExchange(p?.exchange);
+  const fund = KNOWN_FUNDS[sym];
+  const prefix = toTradingViewExchange(p?.exchange) ?? (p?.name ? undefined : fund?.tradingViewExchange);
+  // A failed profile request says nothing about the kind, so the page keeps a company's layout (with dashes)
+  // unless the symbol is a fund we know
+  const kind: InstrumentKind = profile ? instrumentKind(sym, !!p?.name) : fund ? 'fund' : 'stock';
 
   return {
     symbol: sym,
+    kind,
     tradingViewSymbol: prefix ? `${prefix}:${sym}` : sym,
-    name: p?.name || undefined,
+    name: p?.name || (kind === 'fund' ? fund?.name : undefined),
     logo: p?.logo || undefined,
     exchange: prefix ?? (p?.exchange || undefined),
     industry: p?.finnhubIndustry || undefined,

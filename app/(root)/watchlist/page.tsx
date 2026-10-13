@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
 import WatchlistTable from "@/components/WatchlistTable";
+import PageHeader from "@/components/PageHeader";
 import OpenSearchButton from "@/components/OpenSearchButton";
 import { getWatchlistWithData } from "@/lib/actions/watchlist.actions";
+
+export const metadata: Metadata = { title: "Watchlist · Loops Watch" };
 
 export default async function WatchlistPage() {
   const watchlist = await getWatchlistWithData();
@@ -46,10 +50,9 @@ export default async function WatchlistPage() {
 
   return (
     <section className="watchlist space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="watchlist-title">Watchlist</h2>
+      <PageHeader title="Watchlist" description="Your saved stocks with prices from Finnhub. Each price shows its time; open a row for the full page.">
         <OpenSearchButton label="Add stock" />
-      </div>
+      </PageHeader>
       <WatchlistTable watchlist={watchlist} />
     </section>
   );
