@@ -5,7 +5,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { AlertTriangle, RefreshCw, Search } from "lucide-react";
 import EarningsTable from "@/components/news/EarningsTable";
-import EconomicCalendar from "@/components/news/EconomicCalendar";
+import UpcomingEvents from "@/components/news/UpcomingEvents";
+import type { EventsResult } from "@/lib/events";
 import NewsList from "@/components/news/NewsList";
 import { useNow } from "@/hooks/useHeatmapFeed";
 import { saveNewsSettings, toggleBookmark } from "@/lib/actions/news.actions";
@@ -53,6 +54,7 @@ const chunk = <T,>(items: readonly T[], size: number) => Array.from({ length: Ma
 
 type Props = {
     initialMarket: NewsResult;
+    events: EventsResult;
     watchlistSymbols: string[];
     initialPrefs: NewsPrefs;
     initialSaved: SavedArticle[];
@@ -62,8 +64,8 @@ type Props = {
 };
 
 // The News page: market, M&A and watchlist headlines from Finnhub with search and bookmarks, the earnings calendar,
-// and TradingView's economic calendar beside them. Settings and bookmarks are saved with the account.
-const NewsCenter = ({ initialMarket, watchlistSymbols, initialPrefs, initialSaved, prefsUnavailable, renderedAt }: Props) => {
+// and upcoming Fed and economic-data events beside them. Settings and bookmarks are saved with the account.
+const NewsCenter = ({ initialMarket, events, watchlistSymbols, initialPrefs, initialSaved, prefsUnavailable, renderedAt }: Props) => {
     const ids = useId();
     const now = useNow(renderedAt);
     const [prefs, setPrefs] = useState(initialPrefs);
@@ -497,10 +499,11 @@ const NewsCenter = ({ initialMarket, watchlistSymbols, initialPrefs, initialSave
                 </div>
             </section>
 
-            <EconomicCalendar
-                importance={prefs.importance}
-                region={prefs.region}
-                onChange={(change) => changePrefs(change)}
+            <UpcomingEvents
+                result={events}
+                filter={prefs.events}
+                onFilterChange={(filter) => changePrefs({ events: filter })}
+                now={now}
                 className="h-[44rem] xl:sticky xl:top-28 xl:h-[calc(100dvh-8.5rem)] xl:min-h-[36rem]"
             />
         </div>

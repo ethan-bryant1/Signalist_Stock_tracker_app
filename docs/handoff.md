@@ -40,7 +40,10 @@ Last updated: 2026-10-13, after PR #24.
   and settings saved per user (MongoDB `news_prefs`); 15-minute refresh only while visible.
 - Calls: 2 per 10 minutes for headlines, 1 per watchlist symbol per 30 minutes (only when that tab opens), 1 per
   6 hours for earnings; a revisit makes 0 (measured on mock data).
-- Economic calendar stays TradingView (`events.js`, importance and region settings); Finnhub's is paid.
+- Side panel: upcoming events (FOMC, Fed speeches and testimony, Beige Book, CPI, jobs, PPI, GDP, PCE) from the
+  free Federal Reserve, BLS and BEA schedules, filter All/Fed/Data, New York times, no forecasts. Replaced the
+  TradingView economic calendar at the owner's request. The workspace's "Economic calendar" widget is still TradingView.
+  Real sources unverified until the owner runs `npm run check:events`.
 - `NewsRow` is shared by the News page, stock pages and the workspace's Company news and new Market news widgets.
 - Not built (no free source): Economy and Sectors news categories.
 
@@ -61,11 +64,13 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Tests
 
-- Unit: `npm test` (Vitest, `tests/`), 226 passing.
+- Unit: `npm test` (Vitest, `tests/`), 237 passing.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
-  On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases.
-- Real provider: owner runs `npm run check:market-data` and `npm run check:stream` in market hours. Still unverified.
+  On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases, events 19/19 plus
+  2 failure cases.
+- Real provider: owner runs `npm run check:market-data` and `npm run check:stream` in market hours, and
+  `npm run check:events` (any time). Still unverified.
 
 ## Next (priority order)
 

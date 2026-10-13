@@ -186,20 +186,18 @@ export function groupByDay(items: readonly NewsItem[], now: number): { day: stri
 export const NEWS_TABS = ["all", "markets", "deals", "watchlist", "earnings", "saved"] as const;
 export type NewsTab = (typeof NEWS_TABS)[number];
 export type NewsDensity = "compact" | "comfortable";
-// TradingView's calendar importance filter: high only, medium and high, or everything
-export type CalendarImportance = "high" | "medium" | "all";
-// US only, or the US with the other large economies
-export type CalendarRegion = "us" | "major";
+// Which upcoming events the side panel lists (lib/events.ts): everything, the Federal Reserve's, or data releases
+export const EVENT_FILTERS = ["all", "fed", "data"] as const;
+export type EventFilter = (typeof EVENT_FILTERS)[number];
 
 export type NewsPrefs = {
     tab: NewsTab;
     sort: NewsSort;
     density: NewsDensity;
-    importance: CalendarImportance;
-    region: CalendarRegion;
+    events: EventFilter;
 };
 
-export const DEFAULT_NEWS_PREFS: NewsPrefs = { tab: "all", sort: "newest", density: "comfortable", importance: "medium", region: "us" };
+export const DEFAULT_NEWS_PREFS: NewsPrefs = { tab: "all", sort: "newest", density: "comfortable", events: "all" };
 
 const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
 
@@ -210,14 +208,9 @@ export const parseNewsPrefs = (value: unknown): NewsPrefs => {
         tab: pick(raw.tab, NEWS_TABS, DEFAULT_NEWS_PREFS.tab),
         sort: pick(raw.sort, ["newest", "oldest"] as const, DEFAULT_NEWS_PREFS.sort),
         density: pick(raw.density, ["compact", "comfortable"] as const, DEFAULT_NEWS_PREFS.density),
-        importance: pick(raw.importance, ["high", "medium", "all"] as const, DEFAULT_NEWS_PREFS.importance),
-        region: pick(raw.region, ["us", "major"] as const, DEFAULT_NEWS_PREFS.region),
+        events: pick(raw.events, EVENT_FILTERS, DEFAULT_NEWS_PREFS.events),
     };
 };
-
-// TradingView's documented events.js options for the calendar settings
-export const CALENDAR_IMPORTANCE_FILTER: Record<CalendarImportance, string> = { high: "1", medium: "0,1", all: "-1,0,1" };
-export const CALENDAR_COUNTRIES: Record<CalendarRegion, string> = { us: "us", major: "us,eu,gb,de,fr,jp,cn,ca" };
 
 export const MAX_SAVED = 100;
 export type SavedArticle = Pick<NewsItem, "id" | "headline" | "source" | "url" | "datetime" | "tickers"> & { savedAt: number };

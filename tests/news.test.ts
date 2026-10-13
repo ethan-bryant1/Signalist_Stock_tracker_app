@@ -160,12 +160,13 @@ describe("times", () => {
 describe("settings and bookmarks", () => {
     it("falls back to defaults for anything unknown", () => {
         expect(parseNewsPrefs(null)).toEqual(DEFAULT_NEWS_PREFS);
-        expect(parseNewsPrefs({ tab: "earnings", sort: "sideways", density: "compact", importance: "high", region: "mars" })).toEqual({
+        expect(parseNewsPrefs({ tab: "earnings", sort: "sideways", density: "compact", events: "fed", importance: "high" })).toEqual({
             ...DEFAULT_NEWS_PREFS,
             tab: "earnings",
             density: "compact",
-            importance: "high",
+            events: "fed",
         });
+        expect(parseNewsPrefs({ events: "parties" }).events).toBe("all");
     });
 
     it("saves and removes by link, newest saved first, at most MAX_SAVED", () => {

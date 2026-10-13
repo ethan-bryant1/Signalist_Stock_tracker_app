@@ -9,14 +9,19 @@ import { mongoSlowStore } from '@/lib/providers/mongo-store';
 // Budgets sit a little under each free plan's limit (see .claude/skills/market-data-engineer/providers.md):
 //   Finnhub: about 60 calls a minute (widely cited; its pricing page couldn't be read), 30 a second documented.
 //            50 leaves room for the check scripts and anything else using the same key.
+//   Federal Reserve, BLS, BEA: public schedule files, fetched a few times a day (lib/events-data.ts); a small
+//            budget keeps any loop from hammering a government site.
 // On Vercel each running server instance has its own gate, so two busy instances could together pass a budget;
 // the slow store keeps that rare by sharing the expensive answers.
 
 // Add a provider here (with its budget) when the app starts using one.
-export type ProviderName = 'finnhub';
+export type ProviderName = 'finnhub' | 'fed' | 'bls' | 'bea';
 
 const BUDGETS: Record<ProviderName, { perMinute: number; perSecond: number }> = {
   finnhub: { perMinute: 50, perSecond: 20 },
+  fed: { perMinute: 4, perSecond: 1 },
+  bls: { perMinute: 4, perSecond: 1 },
+  bea: { perMinute: 4, perSecond: 1 },
 };
 
 const gates = ((globalThis as { __loopsGates?: Map<ProviderName, RequestGate> }).__loopsGates ??= new Map());
