@@ -464,3 +464,79 @@
     animation: none;
   }
 }
+
+/* Workspace grid (react-grid-layout), in the app's grays instead of the library's stylesheet */
+.ws-grid .react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}
+.ws-grid .react-grid-item {
+  transition: transform 200ms ease, width 200ms ease, height 200ms ease;
+}
+.ws-grid .react-grid-item.resizing,
+.ws-grid .react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform, width, height;
+}
+.ws-grid .react-grid-item.react-grid-placeholder {
+  border: 1px dashed var(--color-gray-500);
+  border-radius: 12px;
+  background: var(--color-gray-700);
+  opacity: 0.6;
+  transition-duration: 100ms;
+  z-index: 2;
+  user-select: none;
+}
+.ws-grid .react-grid-item > .react-resizable-handle {
+  position: absolute;
+  z-index: 4;
+  width: 18px;
+  height: 18px;
+}
+.ws-grid .react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--color-gray-500);
+  border-bottom: 2px solid var(--color-gray-500);
+}
+.ws-grid .react-grid-item > .react-resizable-handle:hover::after {
+  border-color: var(--color-gray-100);
+}
+.ws-grid .react-grid-item > .react-resizable-handle-se {
+  right: 0;
+  bottom: 0;
+  cursor: se-resize;
+}
+.ws-grid .react-grid-item > .react-resizable-handle-e {
+  top: 50%;
+  right: 0;
+  margin-top: -9px;
+  cursor: ew-resize;
+  transform: rotate(-45deg);
+}
+.ws-grid .react-grid-item > .react-resizable-handle-s {
+  bottom: 0;
+  left: 50%;
+  margin-left: -9px;
+  cursor: ns-resize;
+  transform: rotate(45deg);
+}
+/* Resize handles only while editing the layout */
+.ws-grid:not(.ws-editing) .react-resizable-handle {
+  display: none;
+}
+/* While a widget moves or resizes, frames (TradingView's) can't swallow the pointer */
+.ws-grid.ws-busy iframe {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-grid .react-grid-item,
+  .ws-grid .react-grid-layout {
+    transition: none;
+  }
+}
