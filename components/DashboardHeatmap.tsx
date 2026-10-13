@@ -9,6 +9,7 @@ import { useHeatmapFeed, useNow } from "@/hooks/useHeatmapFeed";
 import { useHeatmapSettings } from "@/hooks/useHeatmapSettings";
 import { HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/data/heatmap";
 import { assessStocks, periodPhrase, type HeatmapPayload } from "@/lib/market-data";
+import { cn } from "@/lib/utils";
 
 // A sector heading opens the quotes for every S&P 500 company in that sector
 const sectorHref = (sector: string) => `/market-data?sector=${encodeURIComponent(sector)}`;
@@ -16,7 +17,18 @@ const sectorHref = (sector: string) => `/market-data?sector=${encodeURIComponent
 // The dashboard's Market Snapshot: a quick read of the market. Hovering shows a stock's quote, clicking opens its page,
 // and a sector heading opens that sector's stocks on the Markets page. The S&P 500 Heatmap page has TradingView's map
 // of the whole index.
-const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
+// In a workspace, onSelect makes a click load the stock into the linked widgets instead of opening its page.
+const DashboardHeatmap = ({
+    initial,
+    className = "h-[632px]",
+    selectedSymbol,
+    onSelect,
+}: {
+    initial: HeatmapPayload;
+    className?: string;
+    selectedSymbol?: string;
+    onSelect?: (symbol: string) => void;
+}) => {
     const { session } = useLiveMarket();
     // Trades stream in only while the regular session trades; otherwise prices refresh once a minute
     const feed = useHeatmapFeed(initial, { stream: session === "regular" });
@@ -28,8 +40,8 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
     const unplaced = useMemo(() => unplacedStocks(feed.stocks, sizeBy), [feed.stocks, sizeBy]);
 
     return (
-        // As tall as the TradingView panel beside it (a 600px widget plus its 32px attribution line)
-        <div data-heat-palette={settings.palette} className="flex h-[632px] flex-col">
+        // On the dashboard, as tall as the TradingView panel beside it (a 600px widget plus its 32px attribution line)
+        <div data-heat-palette={settings.palette} className={cn("flex flex-col", className)}>
             <div className="relative min-h-0 flex-1">
                 <StockHeatmap
                     stocks={feed.stocks}
@@ -37,7 +49,9 @@ const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
                     now={now}
                     sizeBy={sizeBy}
                     groupBy="sector"
-                    action="open"
+                    action={onSelect ? "select" : "open"}
+                    selectedSymbol={onSelect ? selectedSymbol : undefined}
+                    onSelect={onSelect}
                     showLogos={settings.logos}
                     periodText={periodPhrase(assessment.period)}
                     label={`Heatmap of ${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}`}

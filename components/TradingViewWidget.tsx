@@ -8,7 +8,8 @@ interface TradingViewWidgetProps {
     title?: string;
     scriptUrl: string;
     config: Record<string, unknown>;
-    height?: number;
+    // The widget's height in pixels, or 'fill' to fill a parent with a set height
+    height?: number | 'fill';
     className?: string;
 }
 
@@ -29,13 +30,15 @@ export const WidgetFailed = ({ name, onRetry, className }: { name: string; onRet
 const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className }: TradingViewWidgetProps) => {
     const { containerRef, status, retry } = useTradingViewWidget(scriptUrl, config, height);
 
+    const fill = height === 'fill';
+
     return (
-        <div className="w-full">
+        <div className={cn("w-full", fill && "h-full")}>
             {title && <h3 className="font-semibold text-2xl text-gray-100 mb-5">{title}</h3>}
             {/* At least the widget's height plus its attribution, so a failure message has room before the widget loads */}
-            <div className="relative" style={{ minHeight: height + TRADINGVIEW_ATTRIBUTION_HEIGHT }}>
+            <div className={cn("relative", fill && "h-full")} style={fill ? undefined : { minHeight: height + TRADINGVIEW_ATTRIBUTION_HEIGHT }}>
                 {/* Left empty: the hook writes the widget and its attribution into it */}
-                <div className={cn('tradingview-widget-container', className)} ref={containerRef} />
+                <div className={cn('tradingview-widget-container', fill && 'tradingview-widget-container--fill h-full', className)} ref={containerRef} />
                 {status === 'failed' && <WidgetFailed name="widget" onRetry={retry} />}
             </div>
         </div>

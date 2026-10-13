@@ -31,15 +31,26 @@ const ChangeBar = ({ value, scale }: { value?: number; scale: number }) => {
     );
 };
 
+const Frame = ({ framed, className, children }: { framed: boolean; className?: string; children: React.ReactNode }) =>
+    framed ? (
+        <Panel title="Sector ETFs" description="1D move of each sector fund" className={className} bodyClassName="flex flex-col">
+            {children}
+        </Panel>
+    ) : (
+        <div className={cn("flex flex-col", className)}>{children}</div>
+    );
+
 type SectorPerformanceProps = {
     now: number;
     className?: string;
+    // false inside a workspace widget, which brings its own frame and title
+    framed?: boolean;
 };
 
 // Each GICS sector's SPDR Select Sector ETF move since the previous close, biggest gain first. A row opens that
 // sector's quotes on the Markets page. An ETF whose price is stale shows its figure in gray and is left out of the
 // breadth, so no figure mixes two sessions' moves.
-const SectorPerformance = ({ now, className }: SectorPerformanceProps) => {
+const SectorPerformance = ({ now, className, framed = true }: SectorPerformanceProps) => {
     const { quotes, session } = useLiveMarket();
     const listRef = useRef<HTMLUListElement>(null);
     // While the pointer or keyboard is in the list, the rows keep their order, so a refresh never moves the row
@@ -75,7 +86,7 @@ const SectorPerformance = ({ now, className }: SectorPerformanceProps) => {
     const newestEtf = rows.reduce<number | undefined>((newest, { etf }) => (etf?.time && etf.time > (newest ?? 0) ? etf.time : newest), undefined);
 
     return (
-        <Panel title="Sector ETFs" description="1D move of each sector fund" className={className} bodyClassName="flex flex-col">
+        <Frame framed={framed} className={className}>
             <div className="grid grid-cols-[minmax(0,1fr)_4.25rem] gap-x-2 whitespace-nowrap px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                 <span>Sector · ETF</span>
                 <span className="text-right" title="The ETF's change since the previous close">1D</span>
@@ -146,7 +157,7 @@ const SectorPerformance = ({ now, className }: SectorPerformanceProps) => {
                     {staleEtfs > 0 ? `; ${staleEtfs} stale, left out of the breadth` : ""}.
                 </p>
             </div>
-        </Panel>
+        </Frame>
     );
 };
 

@@ -3,6 +3,7 @@ import StockLogo from "@/components/StockLogo";
 import PriceStamp from "@/components/PriceStamp";
 import WatchlistButton from "@/components/WatchlistButton";
 import type { StockOverview } from "@/lib/stock-data";
+import { KIND_LABEL } from "@/lib/instrument";
 import { cn, formatChangePercent, formatCurrency, formatSignedNumber, getChangeColorClass } from "@/lib/utils";
 
 // "https://www.apple.com/" becomes "apple.com"
@@ -17,8 +18,10 @@ const websiteLabel = (url?: string) => {
 
 // Top of a stock's page: logo, name, where it trades, the latest price and the watchlist button
 const StockHeader = ({ overview, isInWatchlist }: { overview: StockOverview; isInWatchlist: boolean }) => {
-    const { symbol, name, logo, exchange, industry, website, currency, price, change, changePercent, quoteTime, cached, issue, checkedAt } = overview;
-    const details = [symbol, exchange, industry].filter(Boolean).join(" · ");
+    const { symbol, kind, name, logo, exchange, industry, website, currency, price, change, changePercent, quoteTime, cached, issue, checkedAt } = overview;
+    // TradingView calls NYSE Arca, where most ETFs list, "AMEX"
+    const market = kind === "fund" && exchange === "AMEX" ? "NYSE Arca" : exchange;
+    const details = [symbol, market, kind === "stock" ? industry : KIND_LABEL[kind]].filter(Boolean).join(" · ");
     const siteLabel = websiteLabel(website);
 
     return (

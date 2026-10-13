@@ -2,7 +2,7 @@ import 'server-only';
 
 import { HEATMAP_SYMBOLS } from '@/lib/data/heatmap';
 import { SP500_COMPANIES } from '@/lib/data/sp500';
-import { FINNHUB_CACHE, finnhubGet, getFinnhubToken, worstIssue } from '@/lib/finnhub';
+import { FINNHUB_CACHE, finnhubGet, getFinnhubToken, logIssues, worstIssue } from '@/lib/finnhub';
 import { issueOf } from '@/lib/providers/gate';
 import { marketTtlMs, normalizeQuote, sameCompany, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
 
@@ -83,7 +83,6 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
     };
   }));
 
-  // One line instead of one per stock, without URLs (they carry the key)
-  if (issues.length) console.error(`getHeatmapData: ${issues.length} Finnhub requests failed (${[...new Set(issues)].join(', ')})`);
+  logIssues('getHeatmapData', issues);
   return { provider: 'Finnhub', stocks, generatedAt, failedRequests: issues.length, issue: worstIssue(issues) };
 }

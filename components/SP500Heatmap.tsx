@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Maximize2, Minimize2, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
+import { FullscreenButton, ToolButton } from "@/components/ToolButton";
+import { useFullscreen } from "@/hooks/useFullscreen";
 import HeatmapTerminal from "@/components/HeatmapTerminal";
 import { useLiveMarket } from "@/components/LiveMarket";
 import SectorPerformance from "@/components/SectorPerformance";
@@ -59,32 +61,6 @@ const Segmented = <T extends string>({
     </div>
 );
 
-const ToolButton = ({ onClick, pressed, title, children }: { onClick?: () => void; pressed?: boolean; title: string; children: React.ReactNode }) => (
-    <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={pressed}
-        title={title}
-        className={cn(
-            "inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors",
-            pressed ? "border-gray-100 bg-gray-100 text-gray-900" : "border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-100"
-        )}
-    >
-        {children}
-    </button>
-);
-
-const subscribeToFullscreen = (onChange: () => void) => {
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-};
-// Only this page's own frame in full screen counts (not a video elsewhere). iPhones have no Fullscreen API, so
-// document.fullscreenElement is undefined there, which must read as "not in full screen".
-const frameIsFullscreen = () => !!document.fullscreenElement?.hasAttribute("data-heatmap-frame");
-// Unknown (null) until the browser answers, so the server's HTML keeps room for the button and nothing jumps
-const fullscreenSupported = () => !!document.fullscreenEnabled;
-const fullscreenUnknown = () => null;
-
 const describe = (options: Option<string>[], value: string) => options.find((option) => option.value === value)?.description ?? value;
 
 const SESSION_TEXT: Record<MarketSession, string> = {
@@ -114,9 +90,7 @@ const SP500Heatmap = ({ initialState, initialNow }: { initialState: HeatmapState
     const { session } = useLiveMarket();
     const now = useNow(initialNow);
 
-    const frameRef = useRef<HTMLDivElement>(null);
-    const canFullscreen = useSyncExternalStore(subscribeToFullscreen, fullscreenSupported, fullscreenUnknown);
-    const isFullscreen = useSyncExternalStore(subscribeToFullscreen, frameIsFullscreen, () => false);
+    const { ref: frameRef, canFullscreen, isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
     // The address bar follows the settings, without adding history entries for every click. A plain replaceState (no
     // state of our own) lets Next keep its router in step, so Back from a stock's page comes back to this address.
@@ -126,11 +100,6 @@ const SP500Heatmap = ({ initialState, initialNow }: { initialState: HeatmapState
             window.history.replaceState(null, "", url);
         }
     }, [state]);
-
-    const toggleFullscreen = () => {
-        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-        else frameRef.current?.requestFullscreen().catch(() => {});
-    };
 
     const extended = state.color === "premarket" || state.color === "postmarket";
     const mapHeight = isFullscreen ? "min-h-0 flex-1" : "h-[560px] sm:h-[620px] lg:h-[700px] xl:h-[760px]";
@@ -159,15 +128,7 @@ const SP500Heatmap = ({ initialState, initialNow }: { initialState: HeatmapState
                             <SlidersHorizontal className="h-3.5 w-3.5" />
                             More options
                         </ToolButton>
-                        {canFullscreen !== false && (
-                            // Hidden, but holding its place, until the browser says whether it supports full screen
-                            <span className={cn("contents", canFullscreen === null && "[&>button]:invisible")} aria-hidden={canFullscreen === null || undefined}>
-                                <ToolButton onClick={toggleFullscreen} title={isFullscreen ? "Exit full screen (Esc)" : "Full screen"}>
-                                    {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-                                    <span className="hidden sm:inline">{isFullscreen ? "Exit full screen" : "Full screen"}</span>
-                                </ToolButton>
-                            </span>
-                        )}
+                        <FullscreenButton canFullscreen={canFullscreen} isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
                     </div>
                 </header>
 
