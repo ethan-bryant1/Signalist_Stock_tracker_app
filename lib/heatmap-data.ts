@@ -29,6 +29,9 @@ const PROFILE_SECONDS = 24 * 60 * 60;
 // Company stats (period returns, average volume) are worked out from daily closes. They're cached for 6 to 8
 // hours, staggered, so a recompute after the close reaches the map overnight and they don't all reload at once.
 const STATS_SECONDS = (index: number) => 6 * 60 * 60 + (index % 8) * 15 * 60;
+// The cache keeps serving the last good stats while Finnhub fails. Past this age (by the answer's Date header) they
+// may be measured to an older close than the anchor assumes, so they're dropped and the longer periods read "—".
+const STATS_MAX_AGE_MS = 30 * 60 * 60_000;
 // Finnhub's free plan allows 60 requests a minute, so only a few go out at once
 const CONCURRENCY = 4;
 
@@ -80,7 +83,8 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
       : undefined;
 
     // Per-share stats from another share class's answer would be wrong for this one, so they need this exact listing
-    const ownStats = stats?.data && typeof stats.data === 'object' && (!(stats.data as { symbol?: unknown }).symbol || sameListing(String((stats.data as { symbol?: unknown }).symbol), stock.symbol));
+    const statsCurrent = !!stats && (stats.fetchedAt === undefined || generatedAt - stats.fetchedAt < STATS_MAX_AGE_MS);
+    const ownStats = statsCurrent && stats?.data && typeof stats.data === 'object' && (!(stats.data as { symbol?: unknown }).symbol || sameListing(String((stats.data as { symbol?: unknown }).symbol), stock.symbol));
     const parsed = ownStats ? parseFinnhubStats(stats.data) : undefined;
 
     return {

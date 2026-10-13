@@ -28,10 +28,12 @@ const PALETTE_WORDS: Record<HeatPalette, { down: string; up: string }> = {
 export const HeatmapLegend = ({ className, palette = "classic", fullColorAt = FULL_COLOR_AT }: { className?: string; palette?: HeatPalette; fullColorAt?: number }) => {
     const words = PALETTE_WORDS[palette];
     const scale = fullColorAt / FULL_COLOR_AT;
+    // Tiles scale a longer period's change onto the 1-day scale, so its gray band widens by the same factor
+    const neutral = Number((0.05 * scale).toFixed(2));
     return (
         <div
             role="img"
-            aria-label={`Color scale: gray for moves within ±0.05%, deepening to full ${words.down} at −${fullColorAt}% or lower and full ${words.up} at +${fullColorAt}% or higher. Striped tiles have an old or missing price.`}
+            aria-label={`Color scale: gray for moves within ±${neutral}%, deepening to full ${words.down} at −${fullColorAt}% or lower and full ${words.up} at +${fullColorAt}% or higher. Striped tiles have an old or missing price.`}
             className={cn("flex shrink-0 items-center gap-3 text-[10px] tabular-nums text-gray-500", className)}
         >
             <div className="flex items-center gap-1.5">

@@ -111,6 +111,9 @@ const VIEW_OPTIONS: { value: HeatmapView; label: string; title: string }[] = [
 const describe = (options: Option<string>[], value: string) => options.find((option) => option.value === value)?.description ?? value;
 const COLOR_OPTIONS = [...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS];
 
+// A stock as the map shows it for the chosen colors
+const shownInPeriod = (stock: HeatmapStock, color: "1d" | ShiftedColor) => (color === "1d" ? stock : withPeriodChange(stock, color));
+
 // Whether the server's Alpaca keys back 1H, 4H, 1M, extended hours and today's volume. When some of Alpaca's requests
 // failed the options stay, and the stocks without figures read "—" with a note, rather than the toolbar changing.
 const alpacaAvailable = (status?: AlpacaStatus) => status === "ok" || status === "failed";
@@ -177,6 +180,12 @@ const SESSION_TEXT: Record<MarketSession, string> = {
     "post-market": "in after-hours trading",
     closed: "closed",
 };
+
+// What the Full S&P 500 view is colored by, saying so when the chosen period isn't one TradingView has
+const tradingViewColorText = (chosen: string, shown: string) =>
+    `Colored by ${describe(COLOR_OPTIONS, shown)}${shown !== chosen ? ` (TradingView has no ${describe(PERIOD_OPTIONS, chosen)})` : ""}`;
+const tradingViewSessionText = (color: string, session: MarketSession) =>
+    color === "premarket" || color === "postmarket" ? `The US market is ${SESSION_TEXT[session]} now. ` : "";
 
 // The settings that change how the map looks for this viewer (not what it shows), remembered in this browser
 const SettingsPopover = ({ container }: { container: React.RefObject<HTMLElement | null> }) => {
@@ -290,7 +299,8 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const announce = useCallback((text: string) => {
         setAnnouncement("");
         requestAnimationFrame(() => setAnnouncement(text));
-    }, []);
+        // State setters never change; listed because the React Compiler can lose track of that in a component this size
+    }, [setAnnouncement]);
 
     // When the control that had keyboard focus goes away (a button that only shows in one state), focus moves to
     // the map's current stock, or the given fallback, instead of being lost to the page
@@ -314,7 +324,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     // or after hours, the session's latest price against the regular close before it
     const colorPeriod = effective.color;
     const displayStocks = useMemo(
-        () => (colorPeriod === "1d" ? mapStocks : mapStocks.map((stock) => withPeriodChange(stock, colorPeriod))),
+        () => (colorPeriod === "1d" ? mapStocks : mapStocks.map((stock) => shownInPeriod(stock, colorPeriod))),
         [mapStocks, colorPeriod]
     );
     // Priced stocks with no figure for the period (no starting price, or no trade in the extended session)
@@ -334,7 +344,12 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
             missing: statuses.filter((status) => status === "missing").length,
         };
     }, [assessment, mapStocks, state.sector]);
-    const selected = state.symbol ? feed.stocks.find((stock) => stock.symbol === state.symbol) : undefined;
+    // The selected stock's panel shows the same change as its tile (it can be outside a focused sector, so it's
+    // worked out on its own)
+    const selected = useMemo(() => {
+        const stock = state.symbol ? feed.stocks.find((item) => item.symbol === state.symbol) : undefined;
+        return stock && shownInPeriod(stock, colorPeriod);
+    }, [feed.stocks, state.symbol, colorPeriod]);
 
     const onSelect = useCallback(
         (symbol: string) => {
@@ -349,7 +364,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                 if (!window.matchMedia(WIDE_QUERY).matches) sheetHeadingRef.current?.focus({ preventScroll: true });
             });
         },
-        [change, announce]
+        [change, announce, setSheetSide]
     );
 
     const clearSelection = useCallback(() => {
@@ -414,6 +429,8 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const periodOptions = PERIOD_OPTIONS.filter((option) => (interactive ? supports.color.has(option.value) : !!TRADINGVIEW_COLOR[option.value]));
     const sizeOptions = interactive ? interactiveSizeOptions(alpaca) : SIZE_OPTIONS;
     const periodLabel = COLOR_OPTIONS.find((option) => option.value === effective.color)?.label ?? "1D";
+    // The 1-day change needs no label; any other period's change is labeled with it ("1W")
+    const changeLabel = colorPeriod === "1d" ? undefined : periodLabel;
 
     const statusNotes = alpacaNotes(feed.alpaca, alpaca && (effective.size === "volume" || effective.size === "dollar-volume") ? mapStocks : undefined);
     const { noPeriodDataReason, periodDetail } = colorDetails(colorPeriod, periodLabel, extendedShown);
@@ -575,7 +592,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                             action="select"
                             showLogos={settings.logos}
                             periodText={colorPeriod === "1d" ? periodPhrase(period) : HISTORY_PHRASE[colorPeriod]}
-                            changeLabel={colorPeriod === "1d" ? undefined : periodLabel}
+                            changeLabel={changeLabel}
                             label={`Heatmap of ${state.sector ? `${state.sector} stocks among ` : ""}${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}`}
                             selectedSymbol={state.symbol}
                             highlightSector={state.sector ? undefined : highlight}
@@ -586,7 +603,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                             className="h-full"
                         />
                     ) : (
-                        <HeatmapTerminal color={state.color} size={state.size} group={state.group} showMapControls={showMapControls} className="h-full" />
+                        <HeatmapTerminal color={shownColor} size={state.size} group={state.group} showMapControls={showMapControls} className="h-full" />
                     )}
                 </div>
 
@@ -611,8 +628,8 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                     </div>
                 ) : (
                     <p className="border-t border-gray-600 px-4 py-2.5 text-xs leading-relaxed text-gray-500">
-                        Colored by {describe([...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS], state.color)}, sized by {describe(SIZE_OPTIONS, state.size)}, as TradingView
-                        calculates them (delayed). {state.color === "premarket" || state.color === "postmarket" ? `The US market is ${SESSION_TEXT[session]} now. ` : ""}
+                        {tradingViewColorText(state.color, shownColor)}, sized by {describe(SIZE_OPTIONS, state.size)}, as TradingView
+                        calculates them (delayed). {tradingViewSessionText(state.color, session)}
                         Sectors are FactSet&apos;s, so they don&apos;t match the GICS sectors in the list. Hover for TradingView&apos;s card; a click opens the
                         stock here.
                     </p>
@@ -625,6 +642,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                         {selected ? (
                             <StockInspector
                                 stock={selected}
+                                changeLabel={changeLabel}
                                 freshness={assessment.freshness.get(selected.symbol) ?? "missing"}
                                 now={now}
                                 watchlisted={watchlist.has(selected.symbol)}
@@ -669,6 +687,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
                     <div aria-hidden className="mx-auto -mt-1 mb-3 h-1 w-10 rounded-full bg-gray-600 sm:hidden" />
                     <StockInspector
                         stock={selected}
+                        changeLabel={changeLabel}
                         freshness={assessment.freshness.get(selected.symbol) ?? "missing"}
                         now={now}
                         watchlisted={watchlist.has(selected.symbol)}

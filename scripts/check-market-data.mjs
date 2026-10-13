@@ -191,7 +191,13 @@ async function checkStats(symbol, price) {
       statsMissing.set(period, statsMissing.get(period) + 1);
       continue;
     }
-    if (value <= -99 || value > 1000) note(symbol, 'WARN', `stats: ${period} return ${value}% looks wrong`);
+    // The app rejects these (lib/period-change.ts), so the map shows "—" for them
+    if (value <= -99 || value >= 10000) {
+      note(symbol, 'WARN', `stats: ${period} return ${value}% is impossible, so that map shows "—" for this stock`);
+      statsMissing.set(period, statsMissing.get(period) + 1);
+      continue;
+    }
+    if (value > 1000) note(symbol, 'WARN', `stats: ${period} return ${value}% looks wrong`);
     if (price) starts.push(`${period} ${value > 0 ? '+' : ''}${value.toFixed(2)}% (from $${(price / (1 + value / 100)).toFixed(2)})`);
   }
   if (missing.length) note(symbol, 'WARN', `stats: no ${missing.join(', ')} return, so those maps show "—" for this stock`);
