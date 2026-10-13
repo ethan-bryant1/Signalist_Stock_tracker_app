@@ -46,7 +46,7 @@ Built and unit tested (`lib/news.ts`, `tests/news.test.ts`); tsc, lint and 225 t
 - Settings and bookmarks per user in MongoDB `news_prefs` (`lib/news-store.ts`, `lib/actions/news.actions.ts`).
 
 Left to do: browser check and polish (the first screenshot run hit a click timeout on the Earnings tab; not yet
-diagnosed), phone layout check, reuse `NewsRow` on stock pages and in the workspace news widget, a "Market news"
+diagnosed; `pages-check.mjs` still expects the old TradingView News page and fails its 2 News checks), phone layout check, reuse `NewsRow` on stock pages and in the workspace news widget, a "Market news"
 workspace widget, docs (`docs/architecture.md` rows), then a draft PR.
 
 ## Decisions to keep
@@ -69,7 +69,7 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 - Unit: `npm test` (Vitest, `tests/`), 225 passing on the WIP branch.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
-  Last full run before PR #24: 166 checks passing.
+  On the WIP branch: watchlist 48/48, ticker all pass, pages 36/38 (the 2 old News checks, see above).
 - Real provider: owner runs `npm run check:market-data` and `npm run check:stream` in market hours. Still unverified.
 
 ## Next (priority order)
