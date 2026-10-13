@@ -1,6 +1,6 @@
 // Checks the real Finnhub data behind the heatmaps with your own API key, and prints a pass/fail report.
 //
-//   npm run check:market-data                 every heatmap stock and sector ETF (about 3 minutes)
+//   npm run check:market-data                 every heatmap stock and sector ETF (about 4 minutes)
 //   npm run check:market-data -- --quick      the first 10 stocks only
 //   npm run check:market-data -- --symbols=AAPL,BRK.B
 //
@@ -14,6 +14,8 @@
 //   profile: the profile is for this company (another share class's is fine, since the map only uses company-wide
 //            figures); in US dollars; a positive market cap that roughly equals price × shares outstanding; a known
 //            US exchange; an https logo
+//   stats:   Finnhub's daily stats (/stock/metric) have the period returns and average volume the longer-period
+//            and volume maps use, with believable values
 import dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
 
@@ -162,11 +164,54 @@ async function checkProfile(symbol, price) {
   if (listed && profile.name) note(symbol, 'INFO', `name "${profile.name}" (list: "${listed.name}", GICS ${listed.sector}; Finnhub industry "${profile.finnhubIndustry ?? ''}")`);
 }
 
+// The field each longer period uses (keep in step with lib/period-change.ts)
+const RETURN_FIELDS = {
+  '1W': '5DayPriceReturnDaily',
+  MTD: 'monthToDatePriceReturnDaily',
+  '3M': '13WeekPriceReturnDaily',
+  '6M': '26WeekPriceReturnDaily',
+  YTD: 'yearToDatePriceReturnDaily',
+  '1Y': '52WeekPriceReturnDaily',
+};
+const statsMissing = new Map(Object.keys(RETURN_FIELDS).map((period) => [period, 0]));
+
+async function checkStats(symbol, price) {
+  const m = await get(`/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all`);
+  if (m.error) {
+    for (const period of statsMissing.keys()) statsMissing.set(period, statsMissing.get(period) + 1);
+    return note(symbol, 'FAIL', `stats: ${m.error}, so the longer periods and volume sizing have nothing for this stock`);
+  }
+  const metric = m.data?.metric ?? {};
+  const missing = [];
+  const starts = [];
+  for (const [period, field] of Object.entries(RETURN_FIELDS)) {
+    const value = metric[field];
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      missing.push(period);
+      statsMissing.set(period, statsMissing.get(period) + 1);
+      continue;
+    }
+    // The app rejects these (lib/period-change.ts), so the map shows "—" for them
+    if (value <= -99 || value >= 10000) {
+      note(symbol, 'WARN', `stats: ${period} return ${value}% is impossible, so that map shows "—" for this stock`);
+      statsMissing.set(period, statsMissing.get(period) + 1);
+      continue;
+    }
+    if (value > 1000) note(symbol, 'WARN', `stats: ${period} return ${value}% looks wrong`);
+    if (price) starts.push(`${period} ${value > 0 ? '+' : ''}${value.toFixed(2)}% (from $${(price / (1 + value / 100)).toFixed(2)})`);
+  }
+  if (missing.length) note(symbol, 'WARN', `stats: no ${missing.join(', ')} return, so those maps show "—" for this stock`);
+  const volume = metric['10DayAverageTradingVolume'];
+  if (!(volume > 0)) note(symbol, 'WARN', 'stats: no 10-day average volume, so the volume maps leave this stock out');
+  if (starts.length) note(symbol, 'INFO', `stats: ${starts.join(', ')}; average volume ${volume > 0 ? `${volume.toFixed(2)}M shares` : 'none'}`);
+}
+
 for (const [index, symbol] of stocks.entries()) {
   process.stdout.write(`\r${index + 1}/${stocks.length} ${symbol.padEnd(6)}`);
   if (!sp500.has(symbol)) note(symbol, 'FAIL', 'not in lib/data/sp500.ts');
   const quote = await checkQuote(symbol);
   await checkProfile(symbol, quote?.price);
+  await checkStats(symbol, quote?.price);
 }
 for (const [index, symbol] of etfs.entries()) {
   process.stdout.write(`\rETF ${index + 1}/${etfs.length} ${symbol.padEnd(6)}`);
@@ -200,6 +245,7 @@ console.log('\nSummary');
 console.log(`  Requests sent:   ${requests}`);
 console.log(`  Newest price:    ${newest ? ny(newest) : 'none'}`);
 console.log(`  Stale prices:    ${stale} of ${quoteTimes.size}`);
+console.log(`  Period stats:    ${[...statsMissing].map(([period, n]) => `${period} ${stocks.length - n}/${stocks.length}`).join(', ')}`);
 console.log(`  Failures:        ${count('FAIL')}`);
 console.log(`  Warnings:        ${count('WARN')}`);
 console.log(`  Notes:           ${count('INFO')}${args.includes('--verbose') ? '' : ' (add --verbose to list them)'}`);

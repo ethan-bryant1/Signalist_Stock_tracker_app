@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mergeHeatmapStocks } from '@/hooks/useHeatmapFeed';
-import { applyLiveTrades, latestTrades, newerQuote, pickStreamSymbols, STREAM_SYMBOL_LIMIT } from '@/lib/live-trades';
+import { applyExtendedTrades, applyLiveTrades, latestTrades, newerQuote, pickStreamSymbols, STREAM_SYMBOL_LIMIT } from '@/lib/live-trades';
 import type { HeatmapStock } from '@/lib/market-data';
 
 // Mon Oct 12 2026: 10:00, 10:01 and 16:30 in New York (EDT, UTC−4), and the previous Friday's close
@@ -33,7 +33,7 @@ describe('picking the stocks to stream', () => {
 describe("reading Finnhub's trade messages", () => {
   const wanted = new Set(['AAPL', 'MSFT']);
 
-  it('keeps the newest regular-session trade per wanted symbol', () => {
+  it('keeps the newest trade per wanted symbol and session, tagged with the session', () => {
     const trades = latestTrades(
       {
         type: 'trade',
@@ -49,7 +49,10 @@ describe("reading Finnhub's trade messages", () => {
       },
       wanted
     );
-    expect(trades).toEqual([{ symbol: 'AAPL', price: 102, time: AT_1001 }]);
+    expect(trades).toEqual([
+      { symbol: 'AAPL', price: 102, time: AT_1001, session: 'regular' },
+      { symbol: 'MSFT', price: 400, time: AFTER_HOURS, session: 'post-market' },
+    ]);
   });
 
   it('ignores pings and anything that isn\'t a trade list', () => {
@@ -96,5 +99,32 @@ describe('a refresh after live trades', () => {
     const a = stock('AAPL', 1, AT_10).quote;
     const b = stock('AAPL', 2, AT_10).quote;
     expect(newerQuote(a, b)).toBe(b);
+  });
+});
+
+describe('applying extended-hours trades', () => {
+  const live = { reference: 100, live: true, day: '2026-10-12' };
+
+  it("moves a live session's price, and leaves the regular quote alone", () => {
+    const stocks = [stock('MSFT', 100, AT_10, { extended: { 'post-market': { ...live, price: 101, time: AFTER_HOURS - 60_000 } } })];
+    const trades = [{ symbol: 'MSFT', price: 102, time: AFTER_HOURS, session: 'post-market' as const }];
+    const next = applyExtendedTrades(applyLiveTrades(stocks, trades, 5), trades);
+    expect(next[0].extended?.['post-market']).toMatchObject({ price: 102, time: AFTER_HOURS, reference: 100 });
+    expect(next[0].quote).toBe(stocks[0].quote);
+  });
+
+  it('ignores trades for a finished session, another day, an older time, or the regular session', () => {
+    const stocks = [
+      stock('MSFT', 100, AT_10, { extended: { 'post-market': { ...live, live: false } } }),
+      stock('AAPL', 100, AT_10, { extended: { 'post-market': { ...live, day: '2026-10-09' } } }),
+      stock('NVDA', 100, AT_10, { extended: { 'post-market': { ...live, price: 1, time: AFTER_HOURS + 1 } } }),
+    ];
+    const next = applyExtendedTrades(stocks, [
+      { symbol: 'MSFT', price: 102, time: AFTER_HOURS, session: 'post-market' },
+      { symbol: 'AAPL', price: 102, time: AFTER_HOURS, session: 'post-market' },
+      { symbol: 'NVDA', price: 102, time: AFTER_HOURS, session: 'post-market' },
+      { symbol: 'NVDA', price: 102, time: AT_1001, session: 'regular' },
+    ]);
+    expect(next).toBe(stocks);
   });
 });

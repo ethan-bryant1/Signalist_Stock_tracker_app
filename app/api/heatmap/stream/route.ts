@@ -7,7 +7,8 @@ import { latestTrades, pickStreamSymbols, type LiveTrade } from "@/lib/live-trad
 // Live prices for the interactive heatmaps. The server holds Finnhub's trade stream (its key never reaches the
 // browser) and passes the trades on to the page as server-sent events:
 //   event: live      {"symbols": [...]}   the stream is open, with the symbols it covers
-//   event: trades    [{"symbol","price","time"}, ...]   the newest trade per symbol since the last batch
+//   event: trades    [{"symbol","price","time","session"}, ...]   the newest trade per symbol and session since the
+//                    last batch (session is "regular", "pre-market" or "post-market")
 //   event: reconnect {}                   this connection is ending on schedule; open a new one straight away
 //   event: closed    {"reason": "..."}    the stream stopped (no key, Finnhub refused it or dropped it)
 // Each connection lasts a few minutes, inside the hosting platform's time limit for one request, and the page opens
@@ -107,8 +108,9 @@ export async function GET(request: Request) {
                     return finish({ name: "closed", data: { reason: "refused" } });
                 }
                 for (const trade of latestTrades(data, wanted)) {
-                    const seen = pending.get(trade.symbol);
-                    if (!seen || trade.time >= seen.time) pending.set(trade.symbol, trade);
+                    const key = `${trade.symbol} ${trade.session}`;
+                    const seen = pending.get(key);
+                    if (!seen || trade.time >= seen.time) pending.set(key, trade);
                 }
             };
             // Finnhub turns away a wrong key or too many connections by closing (or failing) the socket

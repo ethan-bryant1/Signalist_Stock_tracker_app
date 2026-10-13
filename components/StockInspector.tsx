@@ -20,12 +20,14 @@ type StockInspectorProps = {
     onWatchlistChange: (symbol: string, added: boolean) => void;
     // Gets focus when the panel opens as a bottom sheet
     headingRef?: React.Ref<HTMLHeadingElement>;
+    // The period of the stock's change when it isn't the 1-day change ("1W")
+    changeLabel?: string;
     className?: string;
 };
 
 // The selected stock's details (level two: it stays put while the cursor moves on). Everything here comes from
 // the same Finnhub quote and profile as the tile and hover card. Finnhub's free plan has no volume, so there's none.
-const StockInspector = ({ stock, freshness, now, watchlisted, focusedSector, onClose, onFocusSector, onWatchlistChange, headingRef, className }: StockInspectorProps) => {
+const StockInspector = ({ stock, freshness, now, watchlisted, focusedSector, onClose, onFocusSector, onWatchlistChange, headingRef, changeLabel, className }: StockInspectorProps) => {
     const outsideFocus = focusedSector !== undefined && focusedSector !== stock.sector;
     const sectorFocused = focusedSector === stock.sector;
 
@@ -65,7 +67,7 @@ const StockInspector = ({ stock, freshness, now, watchlisted, focusedSector, onC
             </div>
 
             <div className="mt-3">
-                <QuotePrice stock={stock} large />
+                <QuotePrice stock={stock} large changeLabel={changeLabel} />
                 <QuoteTime stock={stock} freshness={freshness} now={now} className="mt-1" />
             </div>
 

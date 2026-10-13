@@ -5,7 +5,7 @@ import {
   DEFAULT_STATE,
   EXTENDED_HOURS_OPTIONS,
   GROUP_OPTIONS,
-  INTERACTIVE_SUPPORTS,
+  interactiveSupports,
   PERIOD_OPTIONS,
   SIZE_OPTIONS,
   TRADINGVIEW_COLOR,
@@ -57,13 +57,21 @@ describe('heatmap view in the address bar', () => {
 });
 
 describe('what the interactive map can show', () => {
-  it('supports only the 1-day change, and market cap or equal sizes', () => {
-    expect([...INTERACTIVE_SUPPORTS.color]).toEqual(['1d']);
-    expect([...INTERACTIVE_SUPPORTS.size].sort()).toEqual(['cap', 'equal']);
+  it("supports the periods Finnhub's daily stats back, and every size", () => {
+    expect([...interactiveSupports(false).color]).toEqual(['1d', '1w', 'mtd', '3m', '6m', 'ytd', '1y']);
+    expect([...interactiveSupports(false).size].sort()).toEqual(['cap', 'dollar-volume', 'equal', 'volume']);
+  });
+
+  it('adds 1H, 4H, 1M and extended hours with Alpaca', () => {
+    expect([...interactiveSupports(true).color].sort()).toEqual(['1d', '1h', '1m', '1w', '1y', '3m', '4h', '6m', 'mtd', 'postmarket', 'premarket', 'ytd']);
+    expect(interactiveSettings({ ...DEFAULT_STATE, color: '1h' }, true)).toEqual({ color: '1h', size: 'cap', colorFellBack: false, sizeFellBack: false });
+    expect(interactiveSettings({ ...DEFAULT_STATE, color: 'premarket' }, false).colorFellBack).toBe(true);
   });
 
   it('falls back openly, never quietly showing another measure under the chosen label', () => {
-    expect(interactiveSettings({ ...DEFAULT_STATE, color: '1w', size: 'volume' })).toEqual({ color: '1d', size: 'cap', colorFellBack: true, sizeFellBack: true });
+    expect(interactiveSettings({ ...DEFAULT_STATE, color: '1h', size: 'volume' })).toEqual({ color: '1d', size: 'volume', colorFellBack: true, sizeFellBack: false });
+    expect(interactiveSettings({ ...DEFAULT_STATE, color: '1m' })).toEqual({ color: '1d', size: 'cap', colorFellBack: true, sizeFellBack: false });
+    expect(interactiveSettings({ ...DEFAULT_STATE, color: 'ytd' })).toEqual({ color: 'ytd', size: 'cap', colorFellBack: false, sizeFellBack: false });
     expect(interactiveSettings({ ...DEFAULT_STATE, size: 'equal' })).toEqual({ color: '1d', size: 'equal', colorFellBack: false, sizeFellBack: false });
   });
 });
@@ -83,8 +91,11 @@ describe('selection and sector focus', () => {
 });
 
 describe('TradingView settings', () => {
-  it('has a TradingView value for every option the toolbar offers', () => {
-    for (const { value } of [...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS]) expect(TRADINGVIEW_COLOR[value]).toBeTruthy();
+  it('has a TradingView value for every option but month to date, which TradingView lacks', () => {
+    for (const { value } of [...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS]) {
+      if (value === 'mtd') expect(TRADINGVIEW_COLOR[value]).toBeUndefined();
+      else expect(TRADINGVIEW_COLOR[value]).toBeTruthy();
+    }
     for (const { value } of SIZE_OPTIONS) expect(TRADINGVIEW_SIZE[value].blockSize).toBeTruthy();
     for (const { value } of GROUP_OPTIONS) expect(TRADINGVIEW_GROUP[value]).toBeTruthy();
   });

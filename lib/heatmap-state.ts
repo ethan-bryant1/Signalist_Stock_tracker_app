@@ -1,10 +1,12 @@
 // The Heatmap page's view settings, kept in the address bar so Back returns to the same view.
 // One set of settings covers both views; each view uses the options it can back with real data.
 
+import type { HistoryPeriod } from "@/lib/market-data";
+
 export type HeatmapView = "interactive" | "tradingview";
 
 // What the colors show: a period's price change, or a pre-market or after-hours change
-export type ColorBy = "1h" | "4h" | "1d" | "1w" | "1m" | "3m" | "6m" | "ytd" | "1y" | "premarket" | "postmarket";
+export type ColorBy = "1h" | "4h" | "1d" | "1w" | "1m" | "mtd" | "3m" | "6m" | "ytd" | "1y" | "premarket" | "postmarket";
 export type SizeBy = "cap" | "equal" | "volume" | "dollar-volume";
 export type GroupBy = "sector" | "none";
 
@@ -16,6 +18,7 @@ export const PERIOD_OPTIONS: Option<ColorBy>[] = [
     { value: "1d", label: "1D", description: "1-day change" },
     { value: "1w", label: "1W", description: "1-week change" },
     { value: "1m", label: "1M", description: "1-month change" },
+    { value: "mtd", label: "MTD", description: "month-to-date change" },
     { value: "3m", label: "3M", description: "3-month change" },
     { value: "6m", label: "6M", description: "6-month change" },
     { value: "ytd", label: "YTD", description: "year-to-date change" },
@@ -39,15 +42,35 @@ export const GROUP_OPTIONS: Option<GroupBy>[] = [
     { value: "none", label: "None", description: "not grouped" },
 ];
 
-// What the interactive view can show with Finnhub's free plan: today's quote and a daily market cap. It has no
-// price history (for other periods), no extended-hours prices and no volume, so it offers only these options.
-export const INTERACTIVE_SUPPORTS = {
-    color: new Set<ColorBy>(["1d"]),
-    size: new Set<SizeBy>(["cap", "equal"]),
-};
+// What the interactive view can show. With Finnhub's free plan alone: today's quote, a daily market cap, and daily
+// stats with each stock's return over several periods and its 10-day average volume (lib/period-change.ts); it has
+// no 1-month return (only month to date), no intraday history and no extended-hours prices. A free Alpaca account
+// adds 1H, 4H, 1M, pre-market and after hours, and today's volume (lib/alpaca.ts).
+const FINNHUB_COLORS: ColorBy[] = ["1d", "1w", "mtd", "3m", "6m", "ytd", "1y"];
+const ALPACA_COLORS: ColorBy[] = ["1h", "4h", "1m", "premarket", "postmarket"];
+
+export const interactiveSupports = (alpaca: boolean) => ({
+    color: new Set<ColorBy>(alpaca ? [...FINNHUB_COLORS, ...ALPACA_COLORS] : FINNHUB_COLORS),
+    size: new Set<SizeBy>(["cap", "equal", "volume", "dollar-volume"]),
+});
+
+// Without Alpaca the volume sizes are 10-day averages, so the options say so; with it they're today's, like TradingView's
+export const interactiveSizeOptions = (alpaca: boolean): Option<SizeBy>[] =>
+    SIZE_OPTIONS.map((option) =>
+        option.value === "volume"
+            ? alpaca
+                ? { value: "volume", label: "Volume", description: "today's share volume (to 15 minutes ago)" }
+                : { value: "volume", label: "Avg volume", description: "10-day average share volume" }
+            : option.value === "dollar-volume"
+                ? alpaca
+                    ? { value: "dollar-volume", label: "$ Volume", description: "today's dollar volume (to 15 minutes ago)" }
+                    : { value: "dollar-volume", label: "Avg $ volume", description: "10-day average dollar volume (live price × average volume)" }
+                : option
+    );
 
 // TradingView's own names for each setting (its stock heatmap widget's blockColor and blockSize values)
-export const TRADINGVIEW_COLOR: Record<ColorBy, string> = {
+// TradingView has no month-to-date figure, so its view doesn't offer MTD
+export const TRADINGVIEW_COLOR: Partial<Record<ColorBy, string>> = {
     "1h": "change|60",
     "4h": "change|240",
     "1d": "change",
@@ -120,14 +143,19 @@ export function serializeHeatmapState(state: HeatmapState): string {
     return query ? `?${query}` : "";
 }
 
+export type InteractiveColor = "1d" | HistoryPeriod | "premarket" | "postmarket";
+
 // The settings the interactive view actually uses: unsupported choices fall back to 1-day change and market cap,
 // and the toolbar says so instead of quietly showing something else
-export const interactiveSettings = (state: HeatmapState) => ({
-    color: INTERACTIVE_SUPPORTS.color.has(state.color) ? state.color : ("1d" as const),
-    size: INTERACTIVE_SUPPORTS.size.has(state.size) ? (state.size as "cap" | "equal") : ("cap" as const),
-    colorFellBack: !INTERACTIVE_SUPPORTS.color.has(state.color),
-    sizeFellBack: !INTERACTIVE_SUPPORTS.size.has(state.size),
-});
+export const interactiveSettings = (state: HeatmapState, alpaca = false) => {
+    const supports = interactiveSupports(alpaca);
+    return {
+        color: supports.color.has(state.color) ? (state.color as InteractiveColor) : ("1d" as const),
+        size: supports.size.has(state.size) ? state.size : ("cap" as const),
+        colorFellBack: !supports.color.has(state.color),
+        sizeFellBack: !supports.size.has(state.size),
+    };
+};
 
 // Zooming into a sector keeps the selected stock, even one outside that sector, so its details stay open
 export const focusSector = (state: HeatmapState, sector?: string): HeatmapState => ({ ...state, view: "interactive", sector });
