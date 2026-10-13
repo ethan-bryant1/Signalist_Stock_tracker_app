@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { ChevronDown, LogOut } from "lucide-react";
+import { Activity, ChevronDown, LogOut } from "lucide-react";
 import NavItems from "@/components/NavItems";
 import { signOut } from "@/lib/actions/auth.actions";
 import { toast } from "sonner";
@@ -82,6 +82,14 @@ const UserDropdown = ({ user }: { user: User }) => {
                     </DropdownMenuLabel>
 
                     <DropdownMenuSeparator className="bg-gray-600" />
+
+                    <DropdownMenuItem
+                        onClick={() => router.push("/status")}
+                        className="text-md cursor-pointer font-medium text-gray-100 transition-colors focus:bg-transparent focus:text-gray-400"
+                    >
+                        <Activity className="mr-2 hidden h-4 w-4 sm:block" />
+                        Data status
+                    </DropdownMenuItem>
 
                     <DropdownMenuItem
                         onClick={handleSignOut}

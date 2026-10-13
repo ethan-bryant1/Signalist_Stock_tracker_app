@@ -14,7 +14,7 @@ import {
   TRADINGVIEW_SCRIPT_URL,
 } from "@/lib/constants";
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
-import { getCompanyNews, getStockOverview } from "@/lib/actions/finnhub.actions";
+import { getCompanyNews, getStockOverview } from "@/lib/stock-data";
 import { getSession } from "@/lib/better-auth/auth";
 import { cn, formatTimeAgo } from "@/lib/utils";
 

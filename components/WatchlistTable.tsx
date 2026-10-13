@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PriceStamp from "@/components/PriceStamp";
 import WatchlistButton from "@/components/WatchlistButton";
 import { getChangeColorClass } from "@/lib/utils";
 
@@ -50,7 +51,12 @@ const WatchlistTable = ({ watchlist }: { watchlist: StockWithData[] }) => {
                 </Link>
               </td>
               <td className="table-cell px-4 py-3 text-gray-400">{stock.symbol}</td>
-              <td className="table-cell px-4 py-3">{stock.priceFormatted}</td>
+              <td className="table-cell px-4 py-3">
+                <span className="block">{stock.priceFormatted}</span>
+                {stock.checkedAt !== undefined && (
+                  <PriceStamp hasPrice={stock.currentPrice !== undefined} quoteTime={stock.quoteTime} cached={stock.cached} issue={stock.issue} renderedAt={stock.checkedAt} className="whitespace-nowrap" />
+                )}
+              </td>
               <td className={`table-cell px-4 py-3 ${getChangeColorClass(stock.changePercent)}`}>
                 {stock.changeFormatted}
               </td>

@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { getSession } from "@/lib/better-auth/auth";
-import { FINNHUB_STREAM_URL, getFinnhubToken } from "@/lib/finnhub";
+import { finnhubStreamHub } from "@/lib/finnhub-stream";
 import { getHeatmapData } from "@/lib/heatmap-data";
-import { latestTrades, pickStreamSymbols, type LiveTrade } from "@/lib/live-trades";
+import { pickStreamSymbols } from "@/lib/live-trades";
 
 // Live prices for the interactive heatmaps. The server holds Finnhub's trade stream (its key never reaches the
 // browser) and passes the trades on to the page as server-sent events:
@@ -11,6 +11,7 @@ import { latestTrades, pickStreamSymbols, type LiveTrade } from "@/lib/live-trad
 //                    last batch (session is "regular", "pre-market" or "post-market")
 //   event: reconnect {}                   this connection is ending on schedule; open a new one straight away
 //   event: closed    {"reason": "..."}    the stream stopped (no key, Finnhub refused it or dropped it)
+// Every open tab shares the server's one Finnhub socket (lib/finnhub-stream.ts), since Finnhub allows one per key.
 // Each connection lasts a few minutes, inside the hosting platform's time limit for one request, and the page opens
 // the next one. Signed-in viewers only.
 
@@ -18,13 +19,8 @@ export const dynamic = "force-dynamic";
 // Vercel's limit for one request on its free plan (with Fluid compute). The stream ends a little before it.
 export const maxDuration = 300;
 const STREAM_MS = 280_000;
-// Trades are passed on in batches, at most this often, with only each stock's newest price: the busiest stocks
-// trade hundreds of times a second, more than a map can show
-const BATCH_MS = 500;
 // A comment line now and then keeps proxies from closing a quiet connection
 const KEEPALIVE_MS = 15_000;
-
-type CloseReason = "not-configured" | "unsupported" | "refused" | "dropped";
 
 export async function GET(request: Request) {
     try {
@@ -35,23 +31,17 @@ export async function GET(request: Request) {
         return Response.json({ error: "session-check-failed" }, { status: 503 });
     }
 
-    const token = getFinnhubToken();
-    // Node 22 and later have WebSocket built in; older versions can't open the stream, and the page keeps its
-    // once-a-minute refresh
-    const closeReason: CloseReason | undefined = !token ? "not-configured" : typeof WebSocket === "undefined" ? "unsupported" : undefined;
-
+    const hub = finnhubStreamHub();
     // The largest stocks on the map, up to the free plan's limit (from the shared, cached map data)
-    const symbols = closeReason ? [] : pickStreamSymbols((await getHeatmapData()).stocks);
+    const symbols = typeof hub === "string" ? [] : pickStreamSymbols((await getHeatmapData()).stocks);
     const wanted = new Set(symbols);
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({
         start(controller) {
             let finished = false;
-            const pending = new Map<string, LiveTrade>();
-            // The socket to Finnhub, once there is one
-            const finnhub: { socket?: WebSocket } = {};
             const timers: ReturnType<typeof setTimeout>[] = [];
+            let leave = () => {};
 
             const write = (text: string) => {
                 if (finished) return;
@@ -63,61 +53,37 @@ export async function GET(request: Request) {
             };
             const send = (event: string, data: unknown) => write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
-            const flush = () => {
-                if (!pending.size) return;
-                send("trades", [...pending.values()]);
-                pending.clear();
-            };
-
             function finish(event?: { name: string; data: unknown }) {
                 if (finished) return;
-                flush();
                 if (event) send(event.name, event.data);
                 finished = true;
                 timers.forEach((timer) => clearInterval(timer));
                 request.signal.removeEventListener("abort", onAbort);
-                if (finnhub.socket && finnhub.socket.readyState <= WebSocket.OPEN) finnhub.socket.close();
+                leave();
                 try {
                     controller.close();
                 } catch {}
             }
             const onAbort = () => finish();
 
-            if (closeReason) return finish({ name: "closed", data: { reason: closeReason } });
+            if (typeof hub === "string") return finish({ name: "closed", data: { reason: hub } });
 
             request.signal.addEventListener("abort", onAbort);
-            // The URL carries the key, so it's never logged
-            const socket = new WebSocket(`${FINNHUB_STREAM_URL}?token=${encodeURIComponent(token!)}`);
-            finnhub.socket = socket;
-            let opened = false;
+            leave = hub.join(
+                {
+                    onLive: (live) => send("live", { symbols: live.filter((symbol) => wanted.has(symbol)) }),
+                    onTrades: (trades) => {
+                        const mine = trades.filter((trade) => wanted.has(trade.symbol));
+                        if (mine.length) send("trades", mine);
+                    },
+                    onClosed: (reason) => {
+                        if (reason === "refused") console.error("GET /api/heatmap/stream: Finnhub refused the stream");
+                        finish({ name: "closed", data: { reason } });
+                    },
+                },
+                symbols
+            );
 
-            socket.onopen = () => {
-                opened = true;
-                for (const symbol of symbols) socket.send(JSON.stringify({ type: "subscribe", symbol }));
-                send("live", { symbols });
-            };
-            socket.onmessage = (message) => {
-                let data: unknown;
-                try {
-                    data = JSON.parse(typeof message.data === "string" ? message.data : "");
-                } catch {
-                    return;
-                }
-                if ((data as { type?: unknown })?.type === "error") {
-                    console.error("GET /api/heatmap/stream: Finnhub refused the stream");
-                    return finish({ name: "closed", data: { reason: "refused" } });
-                }
-                for (const trade of latestTrades(data, wanted)) {
-                    const key = `${trade.symbol} ${trade.session}`;
-                    const seen = pending.get(key);
-                    if (!seen || trade.time >= seen.time) pending.set(key, trade);
-                }
-            };
-            // Finnhub turns away a wrong key or too many connections by closing (or failing) the socket
-            socket.onerror = () => finish({ name: "closed", data: { reason: opened ? "dropped" : "refused" } });
-            socket.onclose = () => finish({ name: "closed", data: { reason: opened ? "dropped" : "refused" } });
-
-            timers.push(setInterval(flush, BATCH_MS));
             timers.push(setInterval(() => write(": keepalive\n\n"), KEEPALIVE_MS));
             timers.push(setTimeout(() => finish({ name: "reconnect", data: {} }), STREAM_MS));
         },

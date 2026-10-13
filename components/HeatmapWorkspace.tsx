@@ -267,7 +267,8 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     // Trades stream in while the session the map shows is trading (the regular one, or the pre-market or after-hours
     // session on those maps); otherwise prices refresh once a minute
     const streamExtended = alpacaAvailable(initial.alpaca) && ((state.color === "premarket" && session === "pre-market") || (state.color === "postmarket" && session === "post-market"));
-    const feed = useHeatmapFeed(initial, { stream: session === "regular" || (state.view === "interactive" && streamExtended) });
+    // The Full S&P 500 view shows TradingView's map, so ours stops refreshing and streaming while it's hidden
+    const feed = useHeatmapFeed(initial, { stream: session === "regular" || streamExtended, enabled: state.view === "interactive" });
     const alpaca = alpacaAvailable(feed.alpaca);
     const now = useNow(initial.generatedAt);
     const [settings] = useHeatmapSettings();

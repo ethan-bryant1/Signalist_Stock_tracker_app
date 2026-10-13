@@ -2,7 +2,8 @@ import 'server-only';
 
 import { HEATMAP_SYMBOLS } from '@/lib/data/heatmap';
 import { SP500_COMPANIES } from '@/lib/data/sp500';
-import { FINNHUB_BASE_URL, FinnhubError, fetchFinnhub, getFinnhubToken, mapWithLimit, worstIssue } from '@/lib/finnhub';
+import { FINNHUB_CACHE, finnhubGet, getFinnhubToken, worstIssue } from '@/lib/finnhub';
+import { issueOf } from '@/lib/providers/gate';
 import { normalizeQuote, sameCompany, sameListing, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
 import { parseFinnhubStats, periodStarts, statsAnchor } from '@/lib/period-change';
 import { getAlpacaExtras } from '@/lib/alpaca';
@@ -22,21 +23,17 @@ const shortExchange = (exchange?: string) => {
   return undefined;
 };
 
-// Prices are cached for two to three minutes, staggered so they expire a few at a time rather than all at once.
-// Company profiles (name, logo, market cap) change slowly and are cached for a day.
-const QUOTE_SECONDS = (index: number) => 120 + (index % 6) * 15;
-const PROFILE_SECONDS = 24 * 60 * 60;
-// Company stats (period returns, average volume) are worked out from daily closes. They're cached for 6 to 8
-// hours, staggered, so a recompute after the close reaches the map overnight and they don't all reload at once.
-const STATS_SECONDS = (index: number) => 6 * 60 * 60 + (index % 8) * 15 * 60;
+// Prices are reused for two to three minutes, staggered so they expire a few at a time rather than all at once.
+// Company profiles (name, logo, market cap) and stats come from FINNHUB_CACHE (a day and 6 hours, kept in MongoDB).
+const QUOTE_MS = (index: number) => (120 + (index % 6) * 15) * 1000;
 // The cache keeps serving the last good stats while Finnhub fails. Past this age (by the answer's Date header) they
 // may be measured to an older close than the anchor assumes, so they're dropped and the longer periods read "—".
 const STATS_MAX_AGE_MS = 30 * 60 * 60_000;
-// Finnhub's free plan allows 60 requests a minute, so only a few go out at once
-const CONCURRENCY = 4;
-
+// The page waits this long for figures; anything still queued for Finnhub's budget keeps loading in the background
+// and arrives with the next refresh, so an empty cache never holds the page for minutes
+const WAIT_MS = 3000;
 // The interactive heatmaps' data: every stock in the universe with its latest Finnhub quote and profile.
-// Shared by everyone through Next's data cache, so viewers don't add Finnhub requests.
+// Shared by everyone through the Finnhub gate's cache, so viewers and tabs don't add Finnhub requests.
 // Stocks whose figures fail to load are still returned, without them, so the page can say which are missing.
 // Only call this for a signed-in viewer (the dashboard and Heatmap pages, and /api/heatmap, check).
 export async function getHeatmapData(): Promise<HeatmapPayload> {
@@ -54,18 +51,18 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
 
   const issues: FeedIssue[] = [];
   const failed = (error: unknown) => {
-    issues.push(error instanceof FinnhubError ? error.issue : 'network');
+    issues.push(issueOf(error));
     return null;
   };
 
   let statsFailed = 0;
-  const stocks = await mapWithLimit(base, CONCURRENCY, async (stock, index): Promise<HeatmapStock> => {
-    const q = encodeURIComponent(stock.symbol);
+  const stocks = await Promise.all(base.map(async (stock, index): Promise<HeatmapStock> => {
+    const symbol = { symbol: stock.symbol };
     const [quote, profile, stats] = await Promise.all([
-      fetchFinnhub<unknown>(`${FINNHUB_BASE_URL}/quote?symbol=${q}&token=${token}`, QUOTE_SECONDS(index)).catch(failed),
-      fetchFinnhub<FinnhubProfile>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${q}&token=${token}`, PROFILE_SECONDS).catch(failed),
+      finnhubGet<unknown>('/quote', symbol, { ...FINNHUB_CACHE.quote, ttlMs: QUOTE_MS(index), waitMs: WAIT_MS }).catch(failed),
+      finnhubGet<FinnhubProfile>('/stock/profile2', symbol, { ...FINNHUB_CACHE.profile, waitMs: WAIT_MS }).catch(failed),
       // A missing stat only hides that stock's longer-period change, so it isn't counted as a price failure
-      fetchFinnhub<unknown>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${q}&metric=all&token=${token}`, STATS_SECONDS(index)).catch(() => {
+      finnhubGet<unknown>('/stock/metric', { ...symbol, metric: 'all' }, { ...FINNHUB_CACHE.metric, waitMs: WAIT_MS }).catch(() => {
         statsFailed++;
         return null;
       }),
@@ -98,7 +95,7 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
       periodStart: parsed ? periodStarts(parsed, statsAnchor(normalized, generatedAt)) : undefined,
       averageVolume: parsed?.averageVolume,
     };
-  });
+  }));
 
   // What Finnhub's free plan lacks (1H, 4H, 1M, extended hours, today's volume), from Alpaca when its keys are set
   const alpaca = await getAlpacaExtras(stocks, generatedAt);

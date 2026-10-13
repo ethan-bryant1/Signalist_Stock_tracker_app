@@ -86,37 +86,8 @@ declare global {
         onWatchlistChange?: (symbol: string, isAdded: boolean) => void;
     };
 
-    type AlertFormData = {
-        alertName: string;
-        alertType: 'price' | 'volume';
-        condition: 'greater' | 'less';
-        threshold: string;
-    };
 
-    type AlertData = {
-        alertName: string;
-        symbol: string;
-        alertType: 'price' | 'volume';
-        condition: 'greater' | 'less';
-        threshold: number;
-    };
 
-    type AlertModalProps = {
-        isOpen: boolean;
-        onClose: () => void;
-        symbol: string;
-        company: string;
-        currentPrice?: number;
-        alertId?: string;
-        onCreateAlert?: (alertData: AlertData) => Promise<void>;
-        initialValues?: {
-            alertName?: string;
-            alertType?: 'price' | 'volume';
-            condition?: 'greater' | 'less';
-            threshold?: number;
-        };
-        action?: string;
-    };
 
     type RecommendationData = {
         strongBuy: number;
@@ -210,17 +181,6 @@ declare global {
         preferredIndustry?: string;
     };
 
-    type Alert = {
-        id: string;
-        symbol: string;
-        company: string;
-        alertName: string;
-        currentPrice: number;
-        alertType: 'upper' | 'lower' | 'volume';
-        threshold: number;
-        changePercent?: number;
-        frequency: string;
-    };
 
     type StockWithData = {
         _id: string;
@@ -237,6 +197,13 @@ declare global {
         marketCap?: string;
         peRatio?: string;
         tradingViewSymbol?: string;
+        // Finnhub's time for the price and when we received it (ms), whether it came from our cache because a
+        // fresh copy couldn't be fetched, and why it's missing
+        quoteTime?: number;
+        receivedAt?: number;
+        cached?: boolean;
+        checkedAt?: number;
+        issue?: 'not-configured' | 'auth' | 'rate-limit' | 'busy' | 'provider' | 'network';
     };
 
     type FinnhubSearchResult = {

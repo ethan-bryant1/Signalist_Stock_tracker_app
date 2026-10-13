@@ -1,19 +1,18 @@
 import Header from "@/components/Header";
 import { LiveMarketProvider } from "@/components/LiveMarket";
 import {getSession} from "@/lib/better-auth/auth";
-import {getMarketSnapshot} from "@/lib/actions/finnhub.actions";
+import {getMarketSnapshot} from "@/lib/stock-data";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 
 const Layout = async ({ children }: { children : React.ReactNode }) => {
     // Read headers first so Next renders this per request instead of at build time
     const requestHeaders = await headers();
-    const [session, snapshot] = await Promise.all([
-        getSession(requestHeaders),
-        getMarketSnapshot(),
-    ]);
-
+    const session = await getSession(requestHeaders);
     if(!session?.user) redirect('/sign-in');
+
+    // Only after the session check, so a stranger's visit never spends Finnhub requests
+    const snapshot = await getMarketSnapshot();
 
     const user = {
         id: session.user.id,

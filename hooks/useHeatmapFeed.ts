@@ -97,12 +97,15 @@ export const mergeHeatmapStocks = (previous: HeatmapStock[], next: readonly Heat
 // Keeps the interactive heatmap's prices up to date while the tab is visible, and says when refreshing fails
 // With `stream` on (during the regular session), the largest stocks also move with every trade, through
 // /api/heatmap/stream, while the once-a-minute refresh keeps the rest current.
-export const useHeatmapFeed = (initial: HeatmapPayload, { stream = false }: { stream?: boolean } = {}): HeatmapFeed => {
+// With `enabled` off (the map isn't on screen, as in the Full S&P 500 view) it neither refreshes nor streams, so a
+// hidden map spends no Finnhub requests; turned back on, it catches up straight away when its prices are old.
+export const useHeatmapFeed = (initial: HeatmapPayload, { stream = false, enabled = true }: { stream?: boolean; enabled?: boolean } = {}): HeatmapFeed => {
     const [feed, setFeed] = useState<HeatmapFeed>(() => ({ ...initial, lastSuccessAt: initial.generatedAt, live: OFF }));
     const [initialAt] = useState(initial.generatedAt);
 
+    const streaming = stream && enabled;
     useEffect(() => {
-        if (!stream) return;
+        if (!streaming) return;
         let source: EventSource | null = null;
         let timer = 0;
         let stopped = false;
@@ -172,9 +175,10 @@ export const useHeatmapFeed = (initial: HeatmapPayload, { stream = false }: { st
             document.removeEventListener("visibilitychange", onVisibilityChange);
             setLive(OFF);
         };
-    }, [stream]);
+    }, [streaming]);
 
     useEffect(() => {
+        if (!enabled) return;
         // The first prices can be older than this page view (going Back shows the page as it was), so the first
         // refresh comes a minute after they were made, which is straight away when they're already a minute old
         let lastRefresh = Math.min(initialAt, Date.now());
@@ -202,7 +206,9 @@ export const useHeatmapFeed = (initial: HeatmapPayload, { stream = false }: { st
             lastRefresh = Date.now();
             inFlight = new AbortController();
             try {
-                const response = await fetch("/api/heatmap", { cache: "no-store", signal: inFlight.signal });
+                // The route answers "no-store", so the browser never keeps a copy; asking with the default cache mode
+                // also keeps the browser from sending no-cache headers
+                const response = await fetch("/api/heatmap", { signal: inFlight.signal });
                 if (response.status === 401) {
                     // Signed out in another tab, or the session ran out: stop asking and say so
                     stopped = true;
@@ -244,7 +250,7 @@ export const useHeatmapFeed = (initial: HeatmapPayload, { stream = false }: { st
             window.clearTimeout(timer);
             document.removeEventListener("visibilitychange", onVisibilityChange);
         };
-    }, [initialAt]);
+    }, [initialAt, enabled]);
 
     return feed;
 };

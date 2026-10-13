@@ -13,6 +13,7 @@ const ISSUE_TEXT: Record<FeedIssue, string> = {
     "not-configured": "Prices unavailable: the server has no Finnhub API key",
     auth: "Finnhub rejected the API key, so prices couldn't load",
     "rate-limit": "Finnhub's rate limit was hit, so some prices didn't load",
+    busy: "Some figures are still loading within Finnhub's free-plan limit; they fill in on the next refresh",
     provider: "Finnhub returned errors for some prices",
     network: "Finnhub couldn't be reached for some prices",
 };

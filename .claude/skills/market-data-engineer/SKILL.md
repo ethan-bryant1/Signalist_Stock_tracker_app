@@ -21,8 +21,10 @@ Owns the path from a provider's answer to a figure on screen: `lib/finnhub.ts`, 
 - **Say live, delayed or stale.** Use `quoteFreshness` and the session rules in `lib/market-data.ts`. Delayed data
   (TradingView, Alpaca SIP) is labeled as delayed. Old data is striped or flagged, never shown as current.
 - **Budget the rate limits.** Before adding a request, count the requests per refresh and on a cold cache against
-  the limits in providers.md. Use Next's `force-cache` with staggered `revalidate`, `mapWithLimit` for concurrency,
-  and one batched request where the provider supports symbols lists.
+  the limits in providers.md. Every provider call goes through its gate (`finnhubGet` in `lib/finnhub.ts`,
+  `alpacaGet` in `lib/alpaca.ts`; see `lib/providers/gate.ts`): pick a cache entry from `FINNHUB_CACHE`, mark warm-up
+  work `priority: 'background'`, give page renders a `waitMs`, `persist` slow answers, and use one batched request
+  where the provider takes symbol lists. Never call `fetch` on a provider directly. Check the Data status page.
 - **Keep rules pure.** Parsing, windows and calculations go in modules with no server or browser APIs
   (`lib/alpaca-data.ts`, `lib/period-change.ts`), so the server, the page and the tests share them.
 - **Free first.** Don't add a paid provider or plan without the owner's decision. Finnhub's free plan is personal

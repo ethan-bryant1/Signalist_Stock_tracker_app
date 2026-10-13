@@ -3,7 +3,7 @@ import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from "@/li
 import {sendNewsSummaryEmail, sendWelcomeEmail} from "@/lib/nodemailer";
 import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
 import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
-import {getNews} from "@/lib/actions/finnhub.actions";
+import {getNews} from "@/lib/stock-data";
 import {formatDateToday} from "@/lib/utils";
 
 export const sendSignUpEmail = inngest.createFunction(

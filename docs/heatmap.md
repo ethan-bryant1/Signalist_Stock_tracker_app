@@ -100,12 +100,14 @@ the live prices from Finnhub, so nothing on the map is delayed:
 
 ### Requests, caching and refresh
 
-- Each stock needs three requests (quote, profile and stats). On a cache miss at most 4 stocks are fetched at once, so at
-  most 12 requests are in flight. Next refreshes expired cache entries in the background (it serves the old answer
-  straight away), and those background refreshes are not limited by this, so a page view after a long idle spell
-  can send most of the ~162 requests at once.
-- Prices are cached on the server for 2 to 3¼ minutes, staggered so they don't all expire together. Profiles are
-  cached for a day. Next's data cache only keeps successful answers, so a failed refresh leaves the last good one.
+- Each stock needs three requests (quote, profile and stats), all through the Finnhub gate (`lib/providers/`), which
+  keeps the whole app under 55 calls a minute however many pages and tabs ask. Quotes go first; profiles and stats
+  are background work. The page waits 3 seconds at most: anything still queued keeps loading and arrives with the
+  next refresh, and the footer says figures are still loading (`busy`) rather than calling it a rate limit.
+- Prices are reused for 2 to 3¼ minutes, staggered so they don't all expire together. Profiles (a day) and stats
+  (6 hours) are also kept in MongoDB, so a restart doesn't fetch them again. Only successful answers are kept, so a
+  failed refresh leaves the last good one in place until its keep time.
+- While the Full S&P 500 (TradingView) view is showing, the interactive map stops refreshing and streaming.
 - The page asks `/api/heatmap` (a plain GET for signed-in users) every minute while the tab is visible. The first
   ask comes a minute after the page's prices were made, which is straight away when they're older (going Back shows
   the page with the prices it had). After a failure it waits 2, 4, then 5 minutes; the first success goes back to

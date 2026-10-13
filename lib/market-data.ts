@@ -66,8 +66,10 @@ export type HeatmapStock = {
     extended?: Partial<Record<"pre-market" | "post-market", ExtendedPrice>>;
 };
 
-// What went wrong when some figures couldn't be fetched, worst first
-export type FeedIssue = "not-configured" | "auth" | "rate-limit" | "provider" | "network";
+// What went wrong when some figures couldn't be fetched, worst first. "busy" means our own request budget for the
+// provider was used up, so the request is still waiting its turn (it fills the cache for the next refresh);
+// "rate-limit" means the provider itself refused with 429.
+export type FeedIssue = "not-configured" | "auth" | "rate-limit" | "busy" | "provider" | "network";
 
 // Everything the server sends for the interactive heatmaps
 export type HeatmapPayload = {

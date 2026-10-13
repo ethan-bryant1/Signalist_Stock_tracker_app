@@ -28,16 +28,6 @@ export const PREFERRED_INDUSTRIES = [
     { value: 'Consumer Goods', label: 'Consumer Goods' },
 ];
 
-export const ALERT_TYPE_OPTIONS = [
-    { value: 'price', label: 'Price' },
-    { value: 'volume', label: 'Volume' },
-];
-
-export const CONDITION_OPTIONS = [
-    { value: 'greater', label: 'Greater than (>)' },
-    { value: 'less', label: 'Less than (<)' },
-];
-
 // TradingView Charts
 // Start of every TradingView embed script URL; add e.g. 'stock-heatmap.js'
 export const TRADINGVIEW_SCRIPT_URL = 'https://s3.tradingview.com/external-embedding/embed-widget-';

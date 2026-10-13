@@ -1,4 +1,4 @@
-import type { StockOverview } from "@/lib/actions/finnhub.actions";
+import type { StockOverview } from "@/lib/stock-data";
 import { formatCurrency, formatMarketCapValue } from "@/lib/utils";
 
 // Grid of the stock's key figures; anything Finnhub doesn't have shows as a dash
