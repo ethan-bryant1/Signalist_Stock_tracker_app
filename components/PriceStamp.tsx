@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 // Where a price came from and how old it is ("Finnhub · 10:42 AM ET", "Close · Fri, Oct 9, 4:00 PM ET",
 // "Cached · …"), so a cached, delayed or last-session price is never read as a live one.
 // renderedAt is the server's time when the page was made, so the first render matches the server's HTML.
+// warningOnly shows nothing while the price is current, for places where a clock already gives the time.
 const PriceStamp = ({
     hasPrice,
     quoteTime,
@@ -17,6 +18,7 @@ const PriceStamp = ({
     issue,
     renderedAt,
     source,
+    warningOnly = false,
     className,
 }: {
     hasPrice: boolean;
@@ -25,11 +27,13 @@ const PriceStamp = ({
     issue?: FeedIssue;
     renderedAt: number;
     source?: string;
+    warningOnly?: boolean;
     className?: string;
 }) => {
     const { session } = useLiveMarket();
     const now = useNow(renderedAt);
     const stamp = priceStamp({ hasPrice, quoteTime, cached, issue, session, now, source });
+    if (warningOnly && stamp.tone !== "warning") return null;
 
     return (
         <span
