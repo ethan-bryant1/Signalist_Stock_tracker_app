@@ -104,8 +104,8 @@ const fullscreenUnknown = () => null;
 const WIDE_QUERY = "(min-width: 1280px)";
 
 const VIEW_OPTIONS: { value: HeatmapView; label: string; title: string }[] = [
-    { value: "interactive", label: `Interactive · ${HEATMAP_SYMBOLS.length}`, title: `Our map of ${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}: hover, select and focus sectors` },
     { value: "tradingview", label: "Full S&P 500", title: "TradingView's map of every S&P 500 company, with more periods and sizes (delayed data)" },
+    { value: "interactive", label: "Market Snapshot", title: `Our map of ${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}, as on the dashboard: hover, select and focus sectors` },
 ];
 
 const describe = (options: Option<string>[], value: string) => options.find((option) => option.value === value)?.description ?? value;
@@ -243,10 +243,11 @@ type HeatmapWorkspaceProps = {
 };
 
 // The Heatmap page. Two views share one toolbar and the Sector ETFs list:
-// - Interactive (default): our map of the 54 stocks with live Finnhub prices. Hover for a quick look, click to
+// - Full S&P 500 (default): TradingView's map, with every constituent and the periods, after-hours and volume sizing
+//   that Finnhub's free plan can't back. It's a sealed frame, so it has no selection or sector linking; a click on a
+//   stock opens its Loops Watch page through the widget's symbolUrl setting.
+// - Market Snapshot: the dashboard's map of the 54 stocks with live Finnhub prices. Hover for a quick look, click to
 //   select a stock (its panel stays while you look around), and focus a sector from its heading or the list.
-// - Full S&P 500: TradingView's map, with every constituent and the periods, after-hours and volume sizing that
-//   Finnhub's free plan can't back. It's a sealed frame, so it has no selection or sector linking.
 // The view and its settings live in the address bar, so Back from a stock's page returns to the same view.
 const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }: HeatmapWorkspaceProps) => {
     // The view starts from the address bar as the browser has it. After Back from a stock's page, Next restores the
@@ -445,7 +446,7 @@ const HeatmapWorkspace = ({ initial, initialState, watchlist: initialWatchlist }
     const shownSize = interactive ? effective.size : state.size;
     const fellBack = interactive && (effective.colorFellBack || effective.sizeFellBack);
 
-    const title = interactive ? "S&P 500 sector leaders" : showMapControls ? "TradingView heatmap" : "S&P 500";
+    const title = interactive ? "Market Snapshot" : showMapControls ? "TradingView heatmap" : "S&P 500";
     const subtitle = interactive
         ? `${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description} · GICS sectors · prices from ${providers(alpaca, " and ")}`
         : showMapControls

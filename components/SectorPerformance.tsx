@@ -128,14 +128,14 @@ const SectorPerformance = ({ stocks, freshness, focusedSector, onFocusSector, on
                         </button>
                     </>
                 ) : (
-                    <span className="text-gray-500">{tradingViewShown ? "Pick a sector to open it in the interactive map" : "Pick a sector to zoom the map into it"}</span>
+                    <span className="text-gray-500">{tradingViewShown ? "Pick a sector to open it in the Market Snapshot" : "Pick a sector to zoom the map into it"}</span>
                 )}
             </div>
 
             <div className="grid grid-cols-[minmax(0,1fr)_4.25rem_4.75rem] gap-x-2 whitespace-nowrap px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                 <span>Sector · ETF</span>
                 <span className="text-right" title="The ETF's change since the previous close">ETF</span>
-                <span className="text-right" title="Market-cap-weighted change of this sector's stocks on the interactive map">Leaders</span>
+                <span className="text-right" title="Market-cap-weighted change of this sector's stocks in the Market Snapshot">Leaders</span>
             </div>
 
             <ul
@@ -183,7 +183,7 @@ const SectorPerformance = ({ stocks, freshness, focusedSector, onFocusSector, on
                                 </span>
                                 <span
                                     className={cn("text-right text-xs tabular-nums", map.changePercent !== undefined ? getChangeColorClass(map.changePercent) : "text-gray-500")}
-                                    title={`Combined move of ${map.counted} of ${map.total} ${sector} leaders on the interactive map with current prices, weighted by market cap`}
+                                    title={`Combined move of ${map.counted} of ${map.total} ${sector} leaders in the Market Snapshot with current prices, weighted by market cap`}
                                 >
                                     <span className="sr-only">Leaders </span>
                                     {map.changePercent !== undefined ? formatChangePercent(map.changePercent) : "—"}
@@ -223,7 +223,7 @@ const SectorPerformance = ({ stocks, freshness, focusedSector, onFocusSector, on
                 )}
                 <p className="mt-2.5 text-[11px] leading-relaxed text-gray-500">
                     The two figures differ by design. Each ETF holds its whole sector and caps its biggest holdings; Leaders
-                    weights only the interactive map&apos;s stocks in that sector by market cap, counting current prices only.
+                    weights only the Market Snapshot&apos;s stocks in that sector by market cap, counting current prices only.
                     Both use GICS sectors. ETF prices from Finnhub
                     {newestEtf !== undefined ? `, newest ${formatNewYorkMoment(newestEtf, now)}` : ""}
                     {staleEtfs > 0 ? `; ${staleEtfs} stale, left out of the breadth` : ""}.

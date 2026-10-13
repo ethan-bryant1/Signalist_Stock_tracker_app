@@ -11,7 +11,7 @@ import { HEATMAP_LINK_VALUES, HEATMAP_SYMBOLS } from "@/lib/data/heatmap";
 import { getHeatmapData } from "@/lib/heatmap-data";
 import { parseHeatmapState } from "@/lib/heatmap-state";
 
-export const metadata: Metadata = { title: "Stock Heatmap · Loops Watch" };
+export const metadata: Metadata = { title: "S&P 500 Heatmap · Loops Watch" };
 
 export default async function HeatmapPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
     // The layout checks the session too, but it renders alongside this page, so check before asking Finnhub for prices
@@ -36,11 +36,11 @@ export default async function HeatmapPage({ searchParams }: { searchParams: Prom
                 <BackToDashboard />
 
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-semibold tracking-tight text-gray-100 sm:text-3xl">Stock Heatmap</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight text-gray-100 sm:text-3xl">S&amp;P 500 Heatmap</h1>
                     <p className="mt-1 text-sm text-gray-500">
-                        Bigger blocks are bigger companies, and the color shows how far each one moved. The interactive map covers{" "}
-                        {HEATMAP_SYMBOLS.length} large companies with live selection and sector focus; the Full S&amp;P 500 view shows
-                        every company.
+                        Bigger blocks are bigger companies, and the color shows how far each one moved. Full S&amp;P 500 shows every
+                        company through TradingView; Market Snapshot is the dashboard&apos;s map of {HEATMAP_SYMBOLS.length} of the largest,
+                        with live prices, stock selection and sector focus.
                     </p>
                 </div>
 

@@ -22,9 +22,9 @@ const known = { sectors: new Set<string>(SECTOR_ETFS.map((s) => s.sector)), symb
 const parse = (query: string) => parseHeatmapState(new URLSearchParams(query), known);
 
 describe('heatmap view in the address bar', () => {
-  it('opens the interactive map at 1 day, market cap, by sector', () => {
+  it("opens TradingView's full map at 1 day, market cap, by sector", () => {
     expect(parse('')).toEqual(DEFAULT_STATE);
-    expect(DEFAULT_STATE).toEqual({ view: 'interactive', color: '1d', size: 'cap', group: 'sector' });
+    expect(DEFAULT_STATE).toEqual({ view: 'tradingview', color: '1d', size: 'cap', group: 'sector' });
   });
 
   it('reads every setting', () => {
@@ -40,6 +40,13 @@ describe('heatmap view in the address bar', () => {
 
   it('falls back to defaults for anything unknown, so an old or edited link still works', () => {
     expect(parse('view=canvas&color=2d&size=float&group=industry&sector=Crypto&symbol=ZZZZ')).toEqual(DEFAULT_STATE);
+  });
+
+  it('opens the Market Snapshot for a link naming a sector or stock, unless the link names a view', () => {
+    expect(parse('sector=Energy').view).toBe('interactive');
+    expect(parse('symbol=AAPL').view).toBe('interactive');
+    expect(parse('view=interactive').view).toBe('interactive');
+    expect(parse('view=tradingview&sector=Energy').view).toBe('tradingview');
   });
 
   it('only accepts stocks that are on the map', () => {

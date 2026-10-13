@@ -11,9 +11,9 @@ import { assessStocks, periodPhrase, type HeatmapPayload } from "@/lib/market-da
 
 const sectorHref = (sector: string) => `/heatmap?sector=${encodeURIComponent(sector)}`;
 
-// The dashboard's heatmap: a quick read of the market. Hovering shows a stock's quote, clicking opens its page,
+// The dashboard's Market Snapshot: a quick read of the market. Hovering shows a stock's quote, clicking opens its page,
 // and a sector heading opens that sector on the Heatmap page. The figures, colors and status line are the same
-// as on the Heatmap page's interactive view.
+// as on the Heatmap page's Market Snapshot view.
 const DashboardHeatmap = ({ initial }: { initial: HeatmapPayload }) => {
     const { session } = useLiveMarket();
     // Trades stream in only while the regular session trades; otherwise prices refresh once a minute

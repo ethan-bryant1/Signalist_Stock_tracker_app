@@ -1,11 +1,13 @@
 # Heatmaps: where every figure comes from
 
-Loops Watch has two heatmaps. This page records what each one shows, where the numbers come from, how they're
+Loops Watch has two heatmaps: the Market Snapshot (our map of 54 large companies, on the dashboard and as a view on
+the Heatmap page) and TradingView's Full S&P 500 map (the Heatmap page's default view). The dashboard's "Full S&P 500
+map" link opens the Heatmap page; a sector heading on the dashboard opens that sector in the Market Snapshot. This page records what each one shows, where the numbers come from, how they're
 calculated, how old they can be, and what the app does when data is missing. Read it before changing either map.
 
 ## The two maps
 
-| | Dashboard map, and the Heatmap page's **Interactive** view | Heatmap page's **Full S&P 500** view |
+| | **Market Snapshot**: the dashboard map, and the Heatmap page's second view | Heatmap page's **Full S&P 500** view (the page's default) |
 |---|---|---|
 | Stocks | 54 of the largest S&P 500 companies in each GICS sector, 3 to 8 per sector (`lib/data/heatmap.ts`, ranked 2026-10-09) | Every S&P 500 constituent, as TradingView lists them |
 | Drawn by | Our own code (`components/StockHeatmap.tsx`) | TradingView's stock heatmap widget, a sealed frame from tradingview.com |
@@ -14,8 +16,9 @@ calculated, how old they can be, and what the app does when data is missing. Rea
 | Size | Market cap, equal, 10-day average volume or dollar volume (dashboard: market cap) | Market cap, equal, volume, dollar volume (TradingView's figures) |
 | Sectors | GICS, matching the Sector ETFs list | FactSet's 20 sectors (for example GOOGL is "Technology Services") |
 | Hover, select, sector focus | Yes | TradingView's own hover card only; the page can't see inside the frame |
+| Click a stock | Opens its Loops Watch page (dashboard) or selects it (Heatmap page) | Opens its Loops Watch page, through the widget's documented `symbolUrl` setting (`hooks/useTradingViewWidget.ts`) |
 
-The interactive view only offers what our data can back. 1H, 4H, 1M, extended hours and today's volume aren't shown
+The Market Snapshot only offers what our data can back. 1H, 4H, 1M, extended hours and today's volume aren't shown
 there. A link that asks for one gets the 1-day change (or market cap), with a note that offers the Full S&P 500 view.
 
 ## Data sources
@@ -196,7 +199,7 @@ Every stock on our maps is **fresh**, **stale** or **missing** (`quoteFreshness`
 - The rows keep their order while the pointer or keyboard focus is in the list, so a refresh can't move a row out
   from under the cursor; they re-sort when you leave.
 - TradingView's map uses FactSet's sectors, which don't line up with GICS, so the list can't link to it. Choosing a
-  sector there switches to the interactive view.
+  sector there switches to the Market Snapshot.
 
 ## Interaction
 

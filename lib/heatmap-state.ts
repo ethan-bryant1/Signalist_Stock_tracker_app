@@ -103,7 +103,8 @@ export type HeatmapState = {
     symbol?: string;
 };
 
-export const DEFAULT_STATE: HeatmapState = { view: "interactive", color: "1d", size: "cap", group: "sector" };
+// The Heatmap page opens on TradingView's full S&P 500 map; the dashboard already shows the Market Snapshot
+export const DEFAULT_STATE: HeatmapState = { view: "tradingview", color: "1d", size: "cap", group: "sector" };
 
 const COLOR_VALUES = new Set<string>([...PERIOD_OPTIONS, ...EXTENDED_HOURS_OPTIONS].map(({ value }) => value));
 const SIZE_VALUES = new Set<string>(SIZE_OPTIONS.map(({ value }) => value));
@@ -118,22 +119,27 @@ export function parseHeatmapState(params: Params, known: { sectors: ReadonlySet<
     const color = params.get("color");
     const size = params.get("size");
     const group = params.get("group");
-    const sector = params.get("sector");
-    const symbol = params.get("symbol")?.toUpperCase();
+    const rawSector = params.get("sector");
+    const rawSymbol = params.get("symbol")?.toUpperCase();
+    const sector = rawSector && known.sectors.has(rawSector) ? rawSector : undefined;
+    const symbol = rawSymbol && known.symbols.has(rawSymbol) ? rawSymbol : undefined;
     return {
-        view: view === "tradingview" ? "tradingview" : "interactive",
+        // A link naming a sector or stock (like the dashboard's sector headings) means the Market Snapshot, which
+        // is the view that can focus them
+        view: view === "tradingview" || view === "interactive" ? view : sector || symbol ? "interactive" : DEFAULT_STATE.view,
         color: color && COLOR_VALUES.has(color) ? (color as ColorBy) : DEFAULT_STATE.color,
         size: size && SIZE_VALUES.has(size) ? (size as SizeBy) : DEFAULT_STATE.size,
         group: group && GROUP_VALUES.has(group) ? (group as GroupBy) : DEFAULT_STATE.group,
-        sector: sector && known.sectors.has(sector) ? sector : undefined,
-        symbol: symbol && known.symbols.has(symbol) ? symbol : undefined,
+        sector,
+        symbol,
     };
 }
 
 // The query string for these settings, leaving out defaults so links stay short
 export function serializeHeatmapState(state: HeatmapState): string {
     const params = new URLSearchParams();
-    if (state.view !== DEFAULT_STATE.view) params.set("view", state.view);
+    // A sector or stock in the link implies the Market Snapshot, so the view is written whenever one is there
+    if (state.view !== DEFAULT_STATE.view || state.sector || state.symbol) params.set("view", state.view);
     if (state.color !== DEFAULT_STATE.color) params.set("color", state.color);
     if (state.size !== DEFAULT_STATE.size) params.set("size", state.size);
     if (state.group !== DEFAULT_STATE.group) params.set("group", state.group);

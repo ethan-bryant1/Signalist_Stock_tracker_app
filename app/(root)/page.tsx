@@ -49,9 +49,10 @@ const Home = async () => {
                     />
                 </Panel>
                 <Panel
-                    title="Stock heatmap"
+                    title="Market Snapshot"
                     description={`${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}, sized by market cap, colored by 1-day change`}
                     href="/heatmap"
+                    linkLabel="Full S&P 500 map"
                     className="xl:col-span-2"
                 >
                     {/* Only for a signed-in viewer: the layout's check renders alongside this page, and an empty price cache
