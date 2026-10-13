@@ -63,6 +63,18 @@ export function normalizeArticle(raw: ProviderArticle, feed: NewsFeed, now: numb
     return { id, headline, summary, source, url, datetime, feed, tickers };
 }
 
+// An article from the older company-news shape (seconds, one related symbol) as a page row
+export const fromCompanyArticle = (article: MarketNewsArticle): NewsItem => ({
+    id: `c${article.id}`,
+    headline: article.headline,
+    summary: article.summary,
+    source: article.source,
+    url: article.url,
+    datetime: article.datetime * 1000,
+    feed: "company",
+    tickers: parseTickers(article.related),
+});
+
 // The link without tracking parameters, fragment, "www." or a trailing slash, so the same story from two feeds matches
 export const canonicalUrl = (url: string) => {
     try {

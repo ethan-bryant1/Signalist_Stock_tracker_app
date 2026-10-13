@@ -21,7 +21,7 @@ Last updated: 2026-10-13, after PR #24.
 - `main` = `ae21f10` (PR #24 merged). Everything below "Done" is on `main`.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
-- Work in progress: branch `claude/project-thread-g500zn`, commit `054c848`, News page redesign (no PR yet).
+- In review: News page redesign on `claude/project-thread-g500zn` (pull request open, see below).
 
 ### Done
 
@@ -34,20 +34,15 @@ Last updated: 2026-10-13, after PR #24.
 - Watchlists: several named lists, sortable/configurable grid, details panel, phone cards (`/watchlist`).
 - Request gate: shared Finnhub budget (50/min), memory + MongoDB cache, freshness labels, Data status page.
 
-### In progress: News & Intelligence (`/top-stories`)
+### In review: News & Intelligence (`/top-stories`), branch `claude/project-thread-g500zn`
 
-Built and unit tested (`lib/news.ts`, `tests/news.test.ts`); tsc, lint and 225 tests pass:
-
-- Native Finnhub feed (`lib/news-data.ts`, `app/api/news`): market + M&A headlines (2 calls / 10 min), watchlist
-  company news (1 call per symbol / 30 min, 12 symbols per request), earnings calendar (1 call / 6 h).
-- `components/news/`: `NewsCenter` (tabs All, Markets, M&A, My watchlists, Earnings, Saved; search, order, density,
-  15-minute visible-only refresh), `NewsRow`/`NewsList` (shared rows), `EarningsTable`, `EconomicCalendar`
-  (TradingView `events.js` with importance and region settings; Finnhub's economic calendar is paid).
-- Settings and bookmarks per user in MongoDB `news_prefs` (`lib/news-store.ts`, `lib/actions/news.actions.ts`).
-
-Left to do: browser check and polish (the first screenshot run hit a click timeout on the Earnings tab; not yet
-diagnosed; `pages-check.mjs` still expects the old TradingView News page and fails its 2 News checks), phone layout check, reuse `NewsRow` on stock pages and in the workspace news widget, a "Market news"
-workspace widget, docs (`docs/architecture.md` rows), then a draft PR.
+- Native Finnhub feed: tabs All, Markets, M&A, My watchlists, Earnings, Saved; search, order, row height, bookmarks
+  and settings saved per user (MongoDB `news_prefs`); 15-minute refresh only while visible.
+- Calls: 2 per 10 minutes for headlines, 1 per watchlist symbol per 30 minutes (only when that tab opens), 1 per
+  6 hours for earnings; a revisit makes 0 (measured on mock data).
+- Economic calendar stays TradingView (`events.js`, importance and region settings); Finnhub's is paid.
+- `NewsRow` is shared by the News page, stock pages and the workspace's Company news and new Market news widgets.
+- Not built (no free source): Economy and Sectors news categories.
 
 ## Decisions to keep
 
@@ -66,15 +61,15 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Tests
 
-- Unit: `npm test` (Vitest, `tests/`), 225 passing on the WIP branch.
+- Unit: `npm test` (Vitest, `tests/`), 226 passing.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
-  On the WIP branch: watchlist 48/48, ticker all pass, pages 36/38 (the 2 old News checks, see above).
+  On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases.
 - Real provider: owner runs `npm run check:market-data` and `npm run check:stream` in market hours. Still unverified.
 
 ## Next (priority order)
 
-1. Finish and PR the News page (above).
+1. Owner reviews and merges the News pull request.
 2. Owner checks: run the two `check:*` scripts in market hours; confirm Data status stays under 50 calls/min.
 3. Deploy prep: set `BETTER_AUTH_URL`, `ALLOWED_EMAILS`, keys on Vercel; owner deploys.
 4. Economic indicators from FRED (needs the owner's free FRED key).

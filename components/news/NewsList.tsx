@@ -29,7 +29,7 @@ const NewsList = ({ items, now, density, showFeed, grouped = true, savedUrls, on
             {groups.map((group) => (
                 <section key={group.day} aria-label={group.label || undefined}>
                     {group.label && (
-                        <h3 className="sticky top-0 z-[1] border-b border-gray-600 bg-gray-800/95 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500 backdrop-blur">
+                        <h3 className="border-b border-gray-600 bg-gray-900/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                             {group.label}
                         </h3>
                     )}

@@ -13,6 +13,9 @@ import { useNow } from "@/hooks/useHeatmapFeed";
 import { getCompanyNewsForWidget, getStockQuote, type StockQuote } from "@/lib/actions/finnhub.actions";
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
 import WatchlistGrid from "@/components/watchlist/WatchlistGrid";
+import NewsList from "@/components/news/NewsList";
+import { formatNewsTime, fromCompanyArticle } from "@/lib/news";
+import type { NewsResult } from "@/lib/news-data";
 import { useWatchRows } from "@/components/watchlist/useWatchRows";
 import type { ColumnKey } from "@/lib/watchlists";
 import {
@@ -26,7 +29,7 @@ import {
     TRADINGVIEW_SCRIPT_URL,
 } from "@/lib/constants";
 import type { HeatmapPayload } from "@/lib/market-data";
-import { cn, formatChangePercent, formatCurrency, formatSignedNumber, formatTimeAgo, getChangeColorClass } from "@/lib/utils";
+import { cn, formatChangePercent, formatCurrency, formatSignedNumber, getChangeColorClass } from "@/lib/utils";
 import type { WidgetType } from "@/lib/workspace";
 
 export type WidgetProps = {
@@ -174,6 +177,7 @@ const QuoteWidget = ({ symbol }: WidgetProps) => {
 };
 
 const NewsWidget = ({ symbol }: WidgetProps) => {
+    const now = useNow(useLiveMarket().checkedAt);
     const [result, setResult] = useState<{ symbol: string; articles: MarketNewsArticle[] | null } | null>(null);
     useEffect(() => {
         let current = true;
@@ -184,26 +188,39 @@ const NewsWidget = ({ symbol }: WidgetProps) => {
             current = false;
         };
     }, [symbol]);
+    const items = useMemo(() => result?.articles?.map(fromCompanyArticle) ?? [], [result]);
     if (result?.symbol !== symbol) return <Loading />;
     if (result.articles === null) return <Message>News couldn&apos;t load right now.</Message>;
-    if (result.articles.length === 0) return <Message>No news about {symbol} in the past week.</Message>;
+    if (items.length === 0) return <Message>No news about {symbol} in the past week.</Message>;
+    return <NewsList items={items} now={now} density="compact" grouped={false} label={`${symbol} news`} />;
+};
+
+// Finnhub's market and M&A headlines from the News page's shared feed (reused for 10 minutes on the server)
+const MarketNewsWidget = () => {
+    const now = useNow(useLiveMarket().checkedAt);
+    const [result, setResult] = useState<NewsResult | "failed" | null>(null);
+    useEffect(() => {
+        let current = true;
+        fetch("/api/news?feed=market", { cache: "no-store" })
+            .then((response) => (response.ok ? (response.json() as Promise<NewsResult>) : Promise.reject(new Error("failed"))))
+            .catch(() => "failed" as const)
+            .then((next) => current && setResult(next));
+        return () => {
+            current = false;
+        };
+    }, []);
+    if (result === null) return <Loading />;
+    if (result === "failed" || (result.items.length === 0 && result.issue)) return <Message>Headlines couldn&apos;t load right now.</Message>;
+    if (result.items.length === 0) return <Message>Finnhub sent no headlines.</Message>;
     return (
-        <ul className="divide-y divide-gray-600">
-            {result.articles.map((article) => (
-                <li key={`${article.id}-${article.url}`}>
-                    <a href={article.url} target="_blank" rel="noopener noreferrer" className="group flex flex-col gap-1 px-4 py-2.5 transition-colors hover:bg-gray-700/50 focus-visible:bg-gray-700/50 focus-visible:outline-none">
-                        <span className="flex items-center gap-2 text-[11px] text-gray-500">
-                            <span className="truncate font-medium text-gray-400">{article.source}</span>
-                            <span aria-hidden>·</span>
-                            <time dateTime={new Date(article.datetime * 1000).toISOString()} className="shrink-0">
-                                {formatTimeAgo(article.datetime)}
-                            </time>
-                        </span>
-                        <span className="line-clamp-2 text-[13px] font-semibold leading-snug text-gray-100">{article.headline}</span>
-                    </a>
-                </li>
-            ))}
-        </ul>
+        <>
+            {(result.stale || result.issue) && (
+                <p className="border-b border-gray-600 px-4 py-1.5 text-[11px] font-medium text-gray-100">
+                    Couldn&apos;t refresh · headlines from {result.fetchedAt ? formatNewsTime(result.fetchedAt, now) : "earlier"}
+                </p>
+            )}
+            <NewsList items={result.items} now={now} density="compact" showFeed grouped={false} label="Market news" />
+        </>
     );
 };
 
@@ -268,6 +285,7 @@ export const WIDGET_CONTENT: Record<WidgetType, { component: React.ComponentType
     chart: { component: ChartWidget, scroll: false },
     quote: { component: QuoteWidget, scroll: true },
     news: { component: NewsWidget, scroll: true },
+    marketNews: { component: MarketNewsWidget, scroll: true },
     technicals: { component: TechnicalsWidget, scroll: false },
     profile: { component: ProfileWidget, scroll: false },
     financials: { component: FinancialsWidget, scroll: false },

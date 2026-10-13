@@ -261,6 +261,11 @@ const NewsCenter = ({ initialMarket, watchlistSymbols, initialPrefs, initialSave
 
     const busy = tab === "watchlist" ? watch.loading : tab === "earnings" ? earningsLoading : marketLoading;
 
+    // On a narrow screen the open category may start out of view
+    useEffect(() => {
+        tabsRef.current?.querySelector<HTMLElement>(`[data-tab="${tab}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }, [tab]);
+
     const onTabKeys = (event: KeyboardEvent<HTMLDivElement>) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
@@ -361,7 +366,7 @@ const NewsCenter = ({ initialMarket, watchlistSymbols, initialPrefs, initialSave
                     <label htmlFor={`${ids}-search`} className="sr-only">
                         {tab === "earnings" ? "Search earnings by symbol or company" : "Search loaded headlines"}
                     </label>
-                    <div className="relative min-w-0 flex-1 sm:max-w-xs">
+                    <div className="relative min-w-0 basis-full sm:max-w-xs sm:flex-1 sm:basis-auto">
                         <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
                         <input
                             id={`${ids}-search`}

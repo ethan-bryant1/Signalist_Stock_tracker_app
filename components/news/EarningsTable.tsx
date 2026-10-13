@@ -13,7 +13,8 @@ const formatSurprise = (value: number | undefined) => (value === undefined ? "" 
 const Result = ({ actual, estimate, format, label, reported }: { actual?: number; estimate?: number; format: (value: number | undefined) => string; label: string; reported: boolean }) => {
     const diff = surprise(actual, estimate);
     return (
-        <span className="flex flex-col items-end tabular-nums" aria-label={`${label}: ${actual !== undefined ? format(actual) : reported ? "not given" : "not reported yet"}, estimate ${format(estimate)}`}>
+        <span className="flex flex-col items-end tabular-nums">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 sm:sr-only">{label}</span>
             <span className={cn("text-sm font-semibold", actual === undefined ? "text-gray-500" : "text-gray-100")}>
                 {actual !== undefined ? format(actual) : reported ? "—" : <span className="text-xs font-medium">Not reported yet</span>}
             </span>
@@ -50,7 +51,7 @@ const EarningsTable = ({ events, today, names }: Props) => {
             </div>
             {days.map(({ day, events: dayEvents }) => (
                 <section key={day} aria-label={formatCalendarDay(day)}>
-                    <h3 className="sticky top-0 z-[1] flex items-center justify-between border-b border-gray-600 bg-gray-800/95 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500 backdrop-blur">
+                    <h3 className="flex items-center justify-between border-b border-gray-600 bg-gray-900/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                         <span>
                             {formatCalendarDay(day)}
                             {day === today && <span className="ml-2 text-gray-100">Today</span>}

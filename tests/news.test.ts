@@ -5,6 +5,7 @@ import {
     canonicalUrl,
     countByTicker,
     formatEps,
+    fromCompanyArticle,
     formatNewsAge,
     formatNewsTime,
     formatRevenue,
@@ -227,5 +228,12 @@ describe("earnings", () => {
         expect(formatRevenue(94_930_000_000)).toBe("$94.93B");
         expect(formatRevenue(812_000_000)).toBe("$812.0M");
         expect(formatRevenue(undefined)).toBe("—");
+    });
+});
+
+describe("fromCompanyArticle", () => {
+    it("turns the stock page's article shape into a row", () => {
+        const row = fromCompanyArticle({ id: 3, headline: "H", summary: "S", source: "X", url: "https://x.com", datetime: 1_700_000_000, category: "company", related: "AAPL", image: "" });
+        expect(row).toMatchObject({ id: "c3", datetime: 1_700_000_000_000, feed: "company", tickers: ["AAPL"] });
     });
 });

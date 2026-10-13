@@ -13,6 +13,7 @@ export type WidgetType =
     | "chart"
     | "quote"
     | "news"
+    | "marketNews"
     | "watchlist"
     | "snapshot"
     | "sectors"
@@ -51,6 +52,7 @@ export const WIDGETS: Record<WidgetType, CatalogEntry> = {
     snapshot: { title: "Market Snapshot", description: "54 of the largest S&P 500 companies by sector", symbolic: false, source: "Finnhub", w: 8, h: 16, minW: 6, minH: 12 },
     sectors: { title: "Sector ETFs", description: "1-day move of each sector fund", symbolic: false, source: "Finnhub", w: 4, h: 16, minW: 3, minH: 12 },
     indexes: { title: "Indexes", description: "S&P 500, Nasdaq 100, Dow 30 and Russell 2000 funds", symbolic: false, source: "Finnhub", w: 12, h: 7, minW: 6, minH: 7 },
+    marketNews: { title: "Market news", description: "Market and M&A headlines with their tickers", symbolic: false, source: "Finnhub", w: 4, h: 14, minW: 3, minH: 6 },
     headlines: { title: "Top stories", description: "Market headlines", symbolic: false, source: "TradingView", w: 4, h: 14, minW: 3, minH: 8 },
     calendar: { title: "Economic calendar", description: "US releases of medium and high importance", symbolic: false, source: "TradingView", w: 4, h: 14, minW: 3, minH: 8 },
     screener: { title: "Screener", description: "Every US-listed stock, with filters", symbolic: false, source: "TradingView", w: 12, h: 16, minW: 6, minH: 10 },

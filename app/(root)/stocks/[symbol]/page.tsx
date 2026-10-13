@@ -17,7 +17,7 @@ import {
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
 import { getCompanyNews, getStockOverview } from "@/lib/stock-data";
 import { getSession } from "@/lib/better-auth/auth";
-import { cn, formatTimeAgo } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export async function generateMetadata({ params }: StockDetailsPageProps): Promise<Metadata> {
   const { symbol } = await params;
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: StockDetailsPageProps): Promi
 }
 
 // Loads the company's news separately, so the rest of the page doesn't wait for it
-async function NewsList({ symbol }: { symbol: string }) {
+async function NewsList({ symbol, renderedAt }: { symbol: string; renderedAt: number }) {
   const articles = await getCompanyNews(symbol);
 
   if (articles === null) {
@@ -35,7 +35,7 @@ async function NewsList({ symbol }: { symbol: string }) {
     return <p className="px-4 py-3 text-sm text-gray-500">No news about {symbol} in the past week.</p>;
   }
 
-  return <CompanyNews articles={articles.map((article) => ({ ...article, timeAgo: formatTimeAgo(article.datetime) }))} />;
+  return <CompanyNews articles={articles} renderedAt={renderedAt} />;
 }
 
 const NewsLoading = () => (
@@ -70,7 +70,7 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
         </div>
         <Panel title="Latest news" description={`${symbol} headlines from the past week · Finnhub`}>
           <Suspense fallback={<NewsLoading />}>
-            <NewsList symbol={symbol} />
+            <NewsList symbol={symbol} renderedAt={overview.checkedAt ?? overview.quoteTime ?? 0} />
           </Suspense>
         </Panel>
       </div>

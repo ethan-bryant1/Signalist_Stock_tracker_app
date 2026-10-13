@@ -2,7 +2,7 @@
 
 | Provider | Plan | What it gives | Limits | Notes |
 |---|---|---|---|---|
-| Finnhub | Free | `/quote`, `/stock/profile2`, `/stock/metric?metric=all`, `/company-news`, `/search`, `/stock/market-status`; WebSocket trades | 60 requests/min; 50 streamed symbols; one stream per key | Personal use only. No candles (`/stock/candle` is paid), no batch quotes, no volume on `/quote`. Quote `t` is not in the published schema. Metric returns have no as-of date. Answers BRK.B with BRK.A's profile. |
+| Finnhub | Free | `/quote`, `/stock/profile2`, `/stock/metric?metric=all`, `/company-news` (US companies), `/news` (general, merger), `/calendar/earnings` (US, about a month), `/search`, `/stock/market-status`; WebSocket trades | 60 requests/min; 50 streamed symbols; one stream per key | Personal use only. No candles (`/stock/candle` is paid), no economic calendar (`/calendar/economic` is paid), no batch quotes, no volume on `/quote`. Quote `t` is not in the published schema. Metric returns have no as-of date. Answers BRK.B with BRK.A's profile. |
 | Alpaca | Free (Basic) | SIP bars and trades for any range ending ≥15 min ago; IEX real time (latest trades/quotes, stream) | 200 requests/min; 30 streamed symbols | Keys in `APCA-API-KEY-ID` / `APCA-API-SECRET-KEY` headers. Bars: `limit` counts across all symbols per page. Real-time SIP costs $99/mo (Algo Trader Plus). |
 | TradingView widgets | Free embeds | Charts, heatmap, screener, quotes | n/a | Delayed. Keep the attribution line. The page can't read data out of a widget. |
 
