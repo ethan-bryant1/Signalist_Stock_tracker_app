@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import ReactGridLayout, { useContainerWidth, type Layout } from "react-grid-layout";
 import { Check, Copy, LayoutGrid, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { ToolButton } from "@/components/ToolButton";
@@ -52,6 +52,13 @@ const LOCAL_KEY = "loops-watch-workspaces";
 const SAVE_DELAY_MS = 800;
 // Below this width the widgets stack in one column (no dragging: on a phone, a drag would fight scrolling)
 const STACK_BELOW = 768;
+const STACKED_MAX = 620;
+// Stacked on a phone, a list (quotes, news, sectors) grows to fit its rows up to a cap, so short lists don't scroll
+// inside a box; charts and maps keep their grid height
+const stackedStyle = (h: number, fitsContent: boolean): CSSProperties =>
+    fitsContent
+        ? { maxHeight: STACKED_MAX + 100, display: "flex", flexDirection: "column" }
+        : { height: Math.min(Math.max(h * ROW_HEIGHT + (h - 1) * GRID_MARGIN, 220), STACKED_MAX) };
 
 type SaveState = "saved" | "saving" | "local" | "failed";
 
@@ -178,7 +185,7 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
             const Content = WIDGET_CONTENT[widget.type].component;
             const index = ordered.indexOf(item);
             return (
-                <div key={widget.id} style={stackedHeight ? { height: Math.min(Math.max(item.h * ROW_HEIGHT + (item.h - 1) * GRID_MARGIN, 220), 620) } : undefined}>
+                <div key={widget.id} style={stackedHeight ? stackedStyle(item.h, WIDGET_CONTENT[widget.type].scroll) : undefined}>
                     <WidgetFrame
                         widget={widget}
                         symbol={symbol}
