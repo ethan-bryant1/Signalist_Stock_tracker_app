@@ -6,13 +6,15 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 
 | Area | Files |
 |---|---|
-| Pages | `app/(root)/` (dashboard `page.tsx`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `watchlist`, `stocks/[symbol]`), `app/(auth)/` (sign in/up) |
+| Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `watchlist`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
+| Workspaces | `components/workspace/` (`WorkspaceApp` grid and toolbar, `WidgetFrame`, `widgets.tsx` contents, `SymbolField`), `lib/workspace.ts` (catalog, templates, layout moves, validation; pure), `lib/actions/workspace.actions.ts` + `database/models/workspace.model.ts` (one saved store per user) |
+| Shared UI | `components/Panel.tsx` (titled frame), `components/PageHeader.tsx`, `components/ToolButton.tsx` (tool and full-screen buttons), `hooks/useFullscreen.ts` |
 | API routes | `app/api/market` (index and sector fund prices), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
 | Request gate (every provider call) | `lib/providers/gate.ts` (budget, cache, merging, usage; pure), `lib/providers/registry.ts` (one gate per provider), `lib/providers/mongo-store.ts` (slow answers kept in MongoDB) |
 | Provider clients (server only) | `lib/finnhub.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
 | Data assembly (server only) | `lib/stock-data.ts` (quotes, overviews, news, market strip), `lib/heatmap-data.ts` (the map) |
-| Browser-callable actions | `lib/actions/finnhub.actions.ts` (search and its quote preview only, signed-in) |
-| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
+| Browser-callable actions | `lib/actions/finnhub.actions.ts` (search, its quote preview and the workspace's quote and news widgets; signed-in), `lib/actions/workspace.actions.ts` |
+| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/instrument.ts` (stock, fund or other, and the figures each lists), `lib/workspace.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
 | Diagnostics | `app/(root)/status` (Data status page: calls per minute, cache share, failures, stream) |
 | Static data | `lib/data/sp500.ts` (GICS list), `lib/data/heatmap.ts` (map universe), `lib/data/markets.ts` (ETFs) |
 | Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `proxy.ts` (Next 16 middleware) |
@@ -43,6 +45,12 @@ connection per key. Every price shows its source and age (`components/PriceStamp
 separate, delayed embeds; the S&P 500 Heatmap page (`components/SP500Heatmap.tsx`) is TradingView's map with our
 toolbar and makes no Finnhub requests for the map.
 
+Workspaces: the page loads the user's saved store on the server (`getWorkspaceStore`) and the browser saves changes
+800 ms after they settle (`saveWorkspaceStore`), plus a copy in `localStorage` that takes over when the database
+can't be reached. Every read and write goes through `parseStore`, which drops anything unknown or out of range.
+Widgets that show Finnhub figures call the signed-in actions once per symbol through the shared cache (no polling);
+the Market Snapshot widget reads `/api/heatmap`; TradingView widgets are embeds with their own data.
+
 ## Libraries
 
 Evaluated 2026-10-13. Add one only when a feature needs it.
@@ -53,7 +61,7 @@ Evaluated 2026-10-13. Add one only when a feature needs it.
 | TradingView Lightweight Charts | Add when the app draws its own price charts (Alpaca bars). Free, Apache-2.0, ~45 kB. |
 | SQLite | Not used: Vercel's disk doesn't persist between requests. MongoDB (Atlas free, 512 MB) keeps slow provider answers (`provider_cache`) and will keep daily bars. |
 | Indicator library | Not yet: no indicators are computed. Write simple ones in `lib/` with tests; revisit for a full set. |
-| React Grid Layout | Not yet: no user-arranged panels. Revisit if the dashboard becomes customizable. |
+| React Grid Layout | Used by the Workspace page (2.2.4, pinned): drag and resize only. Layout rules (compaction, moves, validation) are our own in `lib/workspace.ts` so they're tested without the library. Its stylesheet isn't imported; `globals.css` styles the grid in the app's grays. |
 | NumPy, pandas, SciPy, statsmodels, Backtrader | Not in the app: it runs as Next.js on Vercel. Revisit only for an offline research or backtesting tool kept apart from the app. |
 
 ## Development and cost

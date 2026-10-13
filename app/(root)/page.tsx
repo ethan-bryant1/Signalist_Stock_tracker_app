@@ -73,7 +73,7 @@ const Home = async () => {
                         height={600}
                     />
                 </Panel>
-                <Panel title="Market data" description="Live quotes for popular stocks" href="/market-data" className="xl:col-span-2">
+                <Panel title="Market data" description="Quotes for popular stocks · TradingView, may be delayed" href="/market-data" className="xl:col-span-2">
                     <TradingViewWidget
                         scriptUrl={`${TRADINGVIEW_SCRIPT_URL}market-quotes.js`}
                         config={MARKET_DATA_WIDGET_CONFIG}

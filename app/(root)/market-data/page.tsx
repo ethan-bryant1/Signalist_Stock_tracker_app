@@ -12,7 +12,7 @@ export default async function MarketDataPage({ searchParams }: { searchParams: P
 
     return (
         <div className="flex min-h-screen flex-col gap-6">
-            <PageHeader title="Markets" description="TradingView's screener of every US-listed stock, or live quotes for an S&P 500 sector or search. TradingView's data, which may be delayed." />
+            <PageHeader title="Markets" description="TradingView's screener of every US-listed stock, or quotes for an S&P 500 sector or search. TradingView's data, which may be delayed." />
             <MarketDataExplorer initialSector={initialSector} />
         </div>
     );
