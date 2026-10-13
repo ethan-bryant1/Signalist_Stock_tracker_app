@@ -11,7 +11,6 @@ const LABELS: Record<KeyStat, string> = {
     peRatio: "P/E ratio (TTM)",
     eps: "EPS (TTM)",
     dividendYield: "Dividend yield",
-    beta: "Beta",
 };
 
 // Grid of the figures that apply to this kind of instrument (a fund has no P/E or EPS); anything Finnhub doesn't
@@ -31,7 +30,6 @@ const StockKeyStats = ({ overview }: { overview: StockOverview }) => {
         peRatio: overview.peRatio?.toFixed(2),
         eps: money(overview.eps),
         dividendYield: overview.dividendYield !== undefined ? `${overview.dividendYield.toFixed(2)}%` : undefined,
-        beta: overview.beta?.toFixed(2),
     };
 
     return (

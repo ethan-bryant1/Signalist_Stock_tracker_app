@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import ReactGridLayout, { useContainerWidth, type Layout } from "react-grid-layout";
 import { Check, Copy, LayoutGrid, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { ToolButton } from "@/components/ToolButton";
@@ -49,6 +49,8 @@ import { cn } from "@/lib/utils";
 
 // The browser keeps a copy too, so a layout survives when the database can't be reached
 const LOCAL_KEY = "loops-watch-workspaces";
+// Changes the account hasn't confirmed yet; the next visit sends them before anything else
+const PENDING_KEY = "loops-watch-workspaces-pending";
 const SAVE_DELAY_MS = 800;
 // Below this width the widgets stack in one column (no dragging: on a phone, a drag would fight scrolling)
 const STACK_BELOW = 768;
@@ -69,20 +71,28 @@ const SAVE_TEXT: Record<SaveState, string> = {
     failed: "Couldn't save; kept in this browser",
 };
 
-const readLocal = (): WorkspaceStore | undefined => {
+const readLocal = (key = LOCAL_KEY): WorkspaceStore | undefined => {
     try {
-        const raw = window.localStorage.getItem(LOCAL_KEY);
+        const raw = window.localStorage.getItem(key);
         return raw ? parseStore(JSON.parse(raw)) : undefined;
     } catch {
         return undefined;
     }
 };
 
-const writeLocal = (store: WorkspaceStore) => {
+const writeLocal = (store: WorkspaceStore, key = LOCAL_KEY) => {
     try {
-        window.localStorage.setItem(LOCAL_KEY, JSON.stringify(store));
+        window.localStorage.setItem(key, JSON.stringify(store));
     } catch {
         // Private windows and full storage: the database copy still saves
+    }
+};
+
+const clearPending = () => {
+    try {
+        window.localStorage.removeItem(PENDING_KEY);
+    } catch {
+        // Nothing to clear
     }
 };
 
@@ -102,29 +112,49 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [saveState, setSaveState] = useState<SaveState>(source === "unavailable" ? "local" : "saved");
     const { width, containerRef, mounted } = useContainerWidth();
+    // The latest store, so a change and its save use the same value
+    const storeRef = useRef(store);
     const saveTimer = useRef<number | undefined>(undefined);
+    const unsent = useRef<WorkspaceStore | null>(null);
+    // One account save at a time, in order, so an older layout can never land after a newer one
+    const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
     const accountReachable = useRef(source !== "unavailable");
 
     const workspace = activeWorkspace(store);
 
-    // Saves after changes settle: to the account when it can, and always to this browser
-    const persist = useCallback((next: WorkspaceStore) => {
-        writeLocal(next);
-        window.clearTimeout(saveTimer.current);
-        if (!accountReachable.current) {
-            setSaveState("local");
-            return;
-        }
-        setSaveState("saving");
-        saveTimer.current = window.setTimeout(() => {
+    const sendToAccount = useCallback((next: WorkspaceStore) => {
+        unsent.current = null;
+        saveQueue.current = saveQueue.current.then(() =>
             saveWorkspaceStore(next)
-                .then(({ ok }) => setSaveState(ok ? "saved" : "failed"))
-                .catch(() => setSaveState("failed"));
-        }, SAVE_DELAY_MS);
+                .then(({ ok }) => {
+                    // A newer edit keeps its own pending copy and save
+                    if (storeRef.current !== next) return;
+                    if (ok) clearPending();
+                    setSaveState(ok ? "saved" : "failed");
+                })
+                .catch(() => {
+                    if (storeRef.current === next) setSaveState("failed");
+                })
+        );
     }, []);
 
-    // The latest store, so a change and its save use the same value
-    const storeRef = useRef(store);
+    // Saves after changes settle: to the account when it can, and always to this browser
+    const persist = useCallback(
+        (next: WorkspaceStore) => {
+            writeLocal(next);
+            window.clearTimeout(saveTimer.current);
+            if (!accountReachable.current) {
+                setSaveState("local");
+                return;
+            }
+            writeLocal(next, PENDING_KEY);
+            unsent.current = next;
+            setSaveState("saving");
+            saveTimer.current = window.setTimeout(() => sendToAccount(next), SAVE_DELAY_MS);
+        },
+        [sendToAccount]
+    );
+
     const update = useCallback(
         (change: (current: WorkspaceStore) => WorkspaceStore) => {
             const next = change(storeRef.current);
@@ -139,6 +169,23 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
     const updateWorkspace = useCallback((change: (current: Workspace) => Workspace) => update((current) => replaceWorkspace(current, change(activeWorkspace(current)))), [update]);
 
     // Without an account copy, this browser's copy (if any) takes over once the page has loaded
+    // An account copy loses to changes this browser made but couldn't confirm (the page closed or the save failed).
+    // Read before any passive effect runs: the grid reports its layout on mount, and that save would overwrite it.
+    const pendingAtLoad = useRef<WorkspaceStore | undefined>(undefined);
+    useLayoutEffect(() => {
+        if (source === "account") pendingAtLoad.current = readLocal(PENDING_KEY);
+    }, [source]);
+    useEffect(() => {
+        const pending = pendingAtLoad.current;
+        pendingAtLoad.current = undefined;
+        if (!pending) return;
+        Promise.resolve().then(() => {
+            storeRef.current = pending;
+            setStore(pending);
+            persist(pending);
+        });
+    }, [source, persist]);
+
     useEffect(() => {
         if (source === "account") return;
         const local = readLocal();
@@ -152,7 +199,14 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
         });
     }, [source, persist]);
 
-    useEffect(() => () => window.clearTimeout(saveTimer.current), []);
+    // Leaving the page within the save delay sends the change now instead of dropping it
+    useEffect(
+        () => () => {
+            window.clearTimeout(saveTimer.current);
+            if (unsent.current) sendToAccount(unsent.current);
+        },
+        [sendToAccount]
+    );
 
     const pickSymbol = useCallback((symbol: string) => updateWorkspace((current) => ({ ...current, symbol })), [updateWorkspace]);
 

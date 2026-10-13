@@ -35,7 +35,7 @@ export const KNOWN_FUNDS: Record<string, { name: string; tradingViewExchange: "A
 export const instrumentKind = (symbol: string, hasCompanyProfile: boolean): InstrumentKind =>
     hasCompanyProfile ? "stock" : symbol.toUpperCase() in KNOWN_FUNDS ? "fund" : "other";
 
-export type KeyStat = "previousClose" | "open" | "dayRange" | "week52Range" | "marketCap" | "peRatio" | "eps" | "dividendYield" | "beta";
+export type KeyStat = "previousClose" | "open" | "dayRange" | "week52Range" | "marketCap" | "peRatio" | "eps" | "dividendYield";
 
 // The figures each kind's page lists. A fund has no earnings, so P/E and EPS don't apply; Finnhub's free plan has
 // no fund assets or expense ratio, so a fund shows its price figures only. "Other" shows what any listing has.
