@@ -31,7 +31,7 @@ export default async function WorkspacePage() {
                         linked widget, and choose Edit layout to add, drag and resize widgets.
                     </p>
                 </div>
-                <WorkspaceApp initialStore={initialStore} source={source} />
+                <WorkspaceApp initialStore={initialStore} source={source} userId={session.user.id} />
             </div>
         </IncludeSectorPrices>
     );

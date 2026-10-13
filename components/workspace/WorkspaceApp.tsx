@@ -47,10 +47,11 @@ import {
 } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 
-// The browser keeps a copy too, so a layout survives when the database can't be reached
-const LOCAL_KEY = "loops-watch-workspaces";
+// The browser keeps a copy too, so a layout survives when the database can't be reached. Both keys carry the user's
+// id, so on a shared browser one account's layouts are never shown to or saved over another's.
+const localKey = (userId: string) => `loops-watch-workspaces:${userId}`;
 // Changes the account hasn't confirmed yet; the next visit sends them before anything else
-const PENDING_KEY = "loops-watch-workspaces-pending";
+const pendingKey = (userId: string) => `loops-watch-workspaces-pending:${userId}`;
 const SAVE_DELAY_MS = 800;
 // Below this width the widgets stack in one column (no dragging: on a phone, a drag would fight scrolling)
 const STACK_BELOW = 768;
@@ -71,7 +72,7 @@ const SAVE_TEXT: Record<SaveState, string> = {
     failed: "Couldn't save; kept in this browser",
 };
 
-const readLocal = (key = LOCAL_KEY): WorkspaceStore | undefined => {
+const readLocal = (key: string): WorkspaceStore | undefined => {
     try {
         const raw = window.localStorage.getItem(key);
         return raw ? parseStore(JSON.parse(raw)) : undefined;
@@ -80,7 +81,7 @@ const readLocal = (key = LOCAL_KEY): WorkspaceStore | undefined => {
     }
 };
 
-const writeLocal = (store: WorkspaceStore, key = LOCAL_KEY) => {
+const writeLocal = (store: WorkspaceStore, key: string) => {
     try {
         window.localStorage.setItem(key, JSON.stringify(store));
     } catch {
@@ -88,9 +89,9 @@ const writeLocal = (store: WorkspaceStore, key = LOCAL_KEY) => {
     }
 };
 
-const clearPending = () => {
+const clearPending = (key: string) => {
     try {
-        window.localStorage.removeItem(PENDING_KEY);
+        window.localStorage.removeItem(key);
     } catch {
         // Nothing to clear
     }
@@ -104,7 +105,9 @@ const sameLayout = (a: readonly LayoutItem[], b: readonly LayoutItem[]) =>
 
 // Mosaic-style workspaces: tabs of saved layouts, each a grid of widgets that can be added, removed, dragged and
 // resized while editing, with one linked symbol. Saved to the account (MongoDB) and to this browser.
-const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; source: "account" | "default" | "unavailable" }) => {
+const WorkspaceApp = ({ initialStore, source, userId }: { initialStore: WorkspaceStore; source: "account" | "default" | "unavailable"; userId: string }) => {
+    const localCopyKey = localKey(userId);
+    const pendingCopyKey = pendingKey(userId);
     const [store, setStore] = useState(initialStore);
     const [editing, setEditing] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -129,30 +132,30 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
                 .then(({ ok }) => {
                     // A newer edit keeps its own pending copy and save
                     if (storeRef.current !== next) return;
-                    if (ok) clearPending();
+                    if (ok) clearPending(pendingCopyKey);
                     setSaveState(ok ? "saved" : "failed");
                 })
                 .catch(() => {
                     if (storeRef.current === next) setSaveState("failed");
                 })
         );
-    }, []);
+    }, [pendingCopyKey]);
 
     // Saves after changes settle: to the account when it can, and always to this browser
     const persist = useCallback(
         (next: WorkspaceStore) => {
-            writeLocal(next);
+            writeLocal(next, localCopyKey);
             window.clearTimeout(saveTimer.current);
             if (!accountReachable.current) {
                 setSaveState("local");
                 return;
             }
-            writeLocal(next, PENDING_KEY);
+            writeLocal(next, pendingCopyKey);
             unsent.current = next;
             setSaveState("saving");
             saveTimer.current = window.setTimeout(() => sendToAccount(next), SAVE_DELAY_MS);
         },
-        [sendToAccount]
+        [sendToAccount, localCopyKey, pendingCopyKey]
     );
 
     const update = useCallback(
@@ -173,8 +176,8 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
     // Read before any passive effect runs: the grid reports its layout on mount, and that save would overwrite it.
     const pendingAtLoad = useRef<WorkspaceStore | undefined>(undefined);
     useLayoutEffect(() => {
-        if (source === "account") pendingAtLoad.current = readLocal(PENDING_KEY);
-    }, [source]);
+        if (source === "account") pendingAtLoad.current = readLocal(pendingCopyKey);
+    }, [source, pendingCopyKey]);
     useEffect(() => {
         const pending = pendingAtLoad.current;
         pendingAtLoad.current = undefined;
@@ -188,7 +191,7 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
 
     useEffect(() => {
         if (source === "account") return;
-        const local = readLocal();
+        const local = readLocal(localCopyKey);
         if (!local) return;
         // After the first render, so the server's HTML and the first client render match
         Promise.resolve().then(() => {
@@ -197,7 +200,7 @@ const WorkspaceApp = ({ initialStore, source }: { initialStore: WorkspaceStore; 
             // An account that has never saved gets this browser's layouts
             if (source === "default") persist(local);
         });
-    }, [source, persist]);
+    }, [source, persist, localCopyKey]);
 
     // Leaving the page within the save delay sends the change now instead of dropping it
     useEffect(
