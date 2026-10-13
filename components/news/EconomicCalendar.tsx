@@ -43,8 +43,10 @@ type Props = {
 };
 
 // TradingView's economic calendar (Finnhub's is a paid endpoint): release time, event, forecast, previous and
-// actual figures as TradingView publishes them. Its rows are drawn inside TradingView's frame, so only its documented
-// settings change here: which importance levels and which economies it lists.
+// actual figures as TradingView publishes them. Its rows are drawn inside TradingView's frame, which the browser
+// doesn't let this page style or read, so only its documented settings change here (importance levels, economies).
+// A grayscale filter on our own container turns its blue importance bars, red "now" line and flags gray to match
+// the monochrome design; it changes no figures.
 const EconomicCalendar = ({ importance, region, onChange, className }: Props) => {
     const zone = useSyncExternalStore(noSubscribe, browserZone, () => "");
     const config = useMemo(
@@ -63,7 +65,7 @@ const EconomicCalendar = ({ importance, region, onChange, className }: Props) =>
                 <Choice label="Importance" value={importance} options={["high", "medium", "all"] as const} labels={IMPORTANCE_LABELS} onChange={(value) => onChange({ importance: value })} />
                 <Choice label="Economies" value={region} options={["us", "major"] as const} labels={REGION_LABELS} onChange={(value) => onChange({ region: value })} />
             </div>
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 flex-1 grayscale">
                 <TradingViewWidget scriptUrl={`${TRADINGVIEW_SCRIPT_URL}events.js`} config={config} height="fill" />
             </div>
         </Panel>
