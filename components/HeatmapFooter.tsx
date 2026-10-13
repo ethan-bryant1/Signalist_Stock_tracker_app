@@ -145,7 +145,7 @@ export const HeatmapStatus = ({
                     <span
                         data-live-badge
                         className="inline-flex items-center gap-1.5 font-semibold text-gray-100"
-                        title={`Every trade moves ${streamed === total ? "these stocks" : `${streamed} of these stocks`} within a second or two${total > streamed ? `; the other ${total - streamed} ${total - streamed === 1 ? "updates" : "update"} every minute` : ""}`}
+                        title={`Every trade moves ${streamed === total ? "these stocks" : `${streamed} of these stocks`} within a second or two${total > streamed ? `; the other ${total - streamed} ${total - streamed === 1 ? "updates" : "update"} about every 5 minutes` : ""}`}
                     >
                         <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-100 motion-reduce:animate-none" />
                         Live
@@ -157,7 +157,7 @@ export const HeatmapStatus = ({
             {feed.live.state === "off" && feed.live.reason && !feed.refreshError && (
                 <>
                     <span className="text-gray-400" title={STREAM_OFF_TEXT[feed.live.reason] ?? STREAM_OFF_TEXT.dropped}>
-                        Live stream off · updating every minute
+                        Live stream off · updating every 5 minutes
                     </span>
                     <span aria-hidden>·</span>
                 </>

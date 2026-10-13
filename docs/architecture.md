@@ -23,7 +23,7 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 
 Every Finnhub and Alpaca REST call goes through that provider's gate (`lib/providers/registry.ts`):
 
-- **Budget.** A sliding one-minute window set under the free plan (Finnhub 55/min and 20/s, Alpaca 180/min). Callers
+- **Budget.** A sliding one-minute window set under the free plan (Finnhub 50/min and 20/s, Alpaca 180/min). Callers
   queue; what someone is looking at goes before background refreshes. A call holds its slot until its answer lands and
   is counted from then, so a slow call can't let the next minute's calls overlap it at the provider. Each call gives up
   after 10 s. A 429 pauses the provider for 30 s.

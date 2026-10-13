@@ -4,7 +4,7 @@ import { HEATMAP_SYMBOLS } from '@/lib/data/heatmap';
 import { SP500_COMPANIES } from '@/lib/data/sp500';
 import { FINNHUB_CACHE, finnhubGet, getFinnhubToken, worstIssue } from '@/lib/finnhub';
 import { issueOf } from '@/lib/providers/gate';
-import { normalizeQuote, sameCompany, sameListing, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
+import { marketTtlMs, normalizeQuote, sameCompany, sameListing, type FeedIssue, type HeatmapPayload, type HeatmapStock } from '@/lib/market-data';
 import { parseFinnhubStats, periodStarts, statsAnchor } from '@/lib/period-change';
 import { getAlpacaExtras } from '@/lib/alpaca';
 
@@ -23,9 +23,11 @@ const shortExchange = (exchange?: string) => {
   return undefined;
 };
 
-// Prices are reused for two to three minutes, staggered so they expire a few at a time rather than all at once.
-// Company profiles (name, logo, market cap) and stats come from FINNHUB_CACHE (a day and 6 hours, kept in MongoDB).
-const QUOTE_MS = (index: number) => (120 + (index % 6) * 15) * 1000;
+// In the regular session prices are reused for about 5 minutes (4½ to 5½, staggered so they expire a few at a time);
+// the live stream moves the largest stocks between refreshes. Outside it a quote doesn't move, so it's reused for 15
+// minutes (never past the next open). Company profiles (name, logo, market cap) and stats come from FINNHUB_CACHE
+// (a day and 6 hours, kept in MongoDB).
+const QUOTE_MS = (index: number, now: number) => marketTtlMs(now, (270 + (index % 5) * 15) * 1000, 15 * 60_000);
 // The cache keeps serving the last good stats while Finnhub fails. Past this age (by the answer's Date header) they
 // may be measured to an older close than the anchor assumes, so they're dropped and the longer periods read "—".
 const STATS_MAX_AGE_MS = 30 * 60 * 60_000;
@@ -59,7 +61,7 @@ export async function getHeatmapData(): Promise<HeatmapPayload> {
   const stocks = await Promise.all(base.map(async (stock, index): Promise<HeatmapStock> => {
     const symbol = { symbol: stock.symbol };
     const [quote, profile, stats] = await Promise.all([
-      finnhubGet<unknown>('/quote', symbol, { ...FINNHUB_CACHE.quote, ttlMs: QUOTE_MS(index), waitMs: WAIT_MS }).catch(failed),
+      finnhubGet<unknown>('/quote', symbol, { ...FINNHUB_CACHE.quote, ttlMs: QUOTE_MS(index, generatedAt), waitMs: WAIT_MS }).catch(failed),
       // The map is sized by the profile's market cap, so it loads with the prices rather than behind them
       finnhubGet<FinnhubProfile>('/stock/profile2', symbol, { ...FINNHUB_CACHE.profile, priority: 'interactive', waitMs: WAIT_MS }).catch(failed),
       // A missing stat only hides that stock's longer-period change, so it isn't counted as a price failure

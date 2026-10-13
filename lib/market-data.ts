@@ -171,6 +171,17 @@ export const sessionFromClock = (ms: number): MarketSession => {
     return "closed";
 };
 
+// How long a price may be reused: `regularMs` while the regular session trades, otherwise `otherMs` (a quote doesn't
+// move outside the session), but never past the next 9:30 open, so the first prices of the day aren't held back.
+// Never under a minute.
+export const marketTtlMs = (now: number, regularMs: number, otherMs: number): number => {
+    if (sessionFromClock(now) === "regular") return regularMs;
+    const { weekday, minutes } = newYorkClock(now);
+    const open = 9 * 60 + 30;
+    const untilOpen = weekday !== "Sat" && weekday !== "Sun" && minutes < open ? (open - minutes) * 60_000 : Infinity;
+    return Math.max(60_000, Math.min(otherMs, untilOpen));
+};
+
 const NY_TIME = new Intl.DateTimeFormat("en-US", { timeZone: NEW_YORK, hour: "numeric", minute: "2-digit" });
 const NY_DAY = new Intl.DateTimeFormat("en-US", { timeZone: NEW_YORK, weekday: "short", month: "short", day: "numeric" });
 

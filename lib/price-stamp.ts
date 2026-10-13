@@ -57,7 +57,7 @@ export function priceStamp({ hasPrice, quoteTime, cached, issue, session, now, s
         return {
             text: `${source} · ${moment}`,
             tone: "normal",
-            detail: `Last trade time reported by ${source}, refreshed about once a minute. ${source} doesn't publish which exchanges its free quote covers, so treat it as near real-time, not a consolidated feed.`,
+            detail: `Last trade time reported by ${source}. ${source} doesn't publish which exchanges its free quote covers, so treat it as near real-time, not a consolidated feed.`,
         };
     }
     // Outside the session Finnhub's quote is the regular session's close (4:00 PM ET)

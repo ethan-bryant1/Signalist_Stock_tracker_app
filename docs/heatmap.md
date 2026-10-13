@@ -101,10 +101,12 @@ the live prices from Finnhub, so nothing on the map is delayed:
 ### Requests, caching and refresh
 
 - Each stock needs three requests (quote, profile and stats), all through the Finnhub gate (`lib/providers/`), which
-  keeps the whole app under 55 calls a minute however many pages and tabs ask. Quotes go first; profiles and stats
+  keeps the whole app under 50 calls a minute however many pages and tabs ask. Quotes go first; profiles and stats
   are background work. The page waits 3 seconds at most: anything still queued keeps loading and arrives with the
   next refresh, and the footer says figures are still loading (`busy`) rather than calling it a rate limit.
-- Prices are reused for 2 to 3¼ minutes, staggered so they don't all expire together. Profiles (a day) and stats
+- Prices are reused for about 5 minutes during the regular session, staggered so they don't all expire together; the
+  live stream moves the largest stocks in between. Outside the session a quote doesn't move, so it is reused for 15
+  minutes, never past the next 9:30 open. Profiles (a day) and stats
   (6 hours) are also kept in MongoDB, so a restart doesn't fetch them again. Only successful answers are kept, so a
   failed refresh leaves the last good one in place until its keep time.
 - While the Full S&P 500 (TradingView) view is showing, the interactive map stops refreshing and streaming.

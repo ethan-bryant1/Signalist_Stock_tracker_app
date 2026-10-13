@@ -3,7 +3,7 @@ import 'server-only';
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { INDEX_ETFS, MACRO_ETFS, SECTOR_ETFS } from '@/lib/data/markets';
 import { FINNHUB_CACHE, finnhubData, finnhubGet, mapWithLimit, worstIssue } from '@/lib/finnhub';
-import { normalizeQuote, sameListing, sessionFromClock, type FeedIssue, type MarketSession } from '@/lib/market-data';
+import { marketTtlMs, normalizeQuote, sameListing, sessionFromClock, type FeedIssue, type MarketSession } from '@/lib/market-data';
 import { issueOf } from '@/lib/providers/gate';
 
 // Stock and market figures for server components, routes and jobs. Server only, and not server actions: pages
@@ -13,6 +13,10 @@ import { issueOf } from '@/lib/providers/gate';
 // How long a page waits for Finnhub's budget before showing what it has; the request still completes in the
 // background and fills the cache
 const PAGE_WAIT_MS = 6000;
+// Outside the regular session a quote doesn't move, so it's reused for 15 minutes (never past the next open)
+const CLOSED_QUOTE_MS = 15 * 60_000;
+// The header strip and sector list are an overview, so their prices refresh every 5 minutes in the session
+const OVERVIEW_QUOTE_MS = 5 * 60_000;
 
 // ---------- News ----------
 
@@ -178,7 +182,7 @@ export const getStockQuoteData = async (sym: string): Promise<StockQuote> => {
   const params = { symbol: sym };
   let issue: FeedIssue | undefined;
   const [quote, profile] = await Promise.all([
-    finnhubGet<FinnhubFullQuote>('/quote', params, { ...FINNHUB_CACHE.quote, waitMs: PAGE_WAIT_MS }).catch((e) => {
+    finnhubGet<FinnhubFullQuote>('/quote', params, { ...FINNHUB_CACHE.quote, ttlMs: marketTtlMs(Date.now(), 60_000, CLOSED_QUOTE_MS), waitMs: PAGE_WAIT_MS }).catch((e) => {
       issue = issueOf(e);
       console.error('Error fetching quote for', sym, issue);
       return null;
@@ -295,8 +299,10 @@ export async function getMarketSnapshot(includeSectors = false): Promise<MarketS
   };
 
   const [status, quotes] = await Promise.all([
-    finnhubData<FinnhubMarketStatus>('/stock/market-status', { exchange: 'US' }, { ...FINNHUB_CACHE.marketStatus, waitMs: 3000 }).catch(failed),
-    Promise.all(symbols.map((symbol) => finnhubGet<FinnhubFullQuote>('/quote', { symbol }, { ...FINNHUB_CACHE.quote, waitMs: 3000 }).catch(failed))),
+    finnhubData<FinnhubMarketStatus>('/stock/market-status', { exchange: 'US' }, { ...FINNHUB_CACHE.marketStatus, ttlMs: 5 * 60_000, waitMs: 3000 }).catch(failed),
+    Promise.all(symbols.map((symbol) =>
+      finnhubGet<FinnhubFullQuote>('/quote', { symbol }, { ...FINNHUB_CACHE.quote, ttlMs: marketTtlMs(Date.now(), OVERVIEW_QUOTE_MS, CLOSED_QUOTE_MS), waitMs: 3000 }).catch(failed)
+    )),
   ]);
 
   const checkedAt = Date.now();
