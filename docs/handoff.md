@@ -3,7 +3,7 @@
 The state of Loops Watch for whoever picks up the next task, human or Claude. Keep it short and current: update
 the "Status" and "Next" sections in the same pull request as any feature. Details live in the linked docs, not here.
 
-Last updated: 2026-10-13, after PR #24.
+Last updated: 2026-10-14, after PR #27.
 
 ## Read only what the task needs
 
@@ -18,7 +18,7 @@ Last updated: 2026-10-13, after PR #24.
 
 ## Status
 
-- `main` = `ae21f10` (PR #24 merged). Everything below "Done" is on `main`.
+- `main` = `a40dce4` (PR #27 merged). Everything below "Done" is on `main`.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
 - In review: News page redesign on `claude/project-thread-g500zn` (pull request open, see below).
@@ -34,6 +34,7 @@ Last updated: 2026-10-13, after PR #24.
 - Workspaces: drag/resize grid, templates, several saved layouts, linked symbol (`/workspace`).
 - Watchlists: several named lists, sortable/configurable grid, details panel, phone cards (`/watchlist`).
 - Request gate: shared Finnhub budget (50/min), memory + MongoDB cache, freshness labels, Data status page.
+- Economy page: US indicators from FRED (PR #27; needs `FRED_API_KEY`, check with `npm run check:fred`).
 
 ### In review: News (`/top-stories`, Dashboard, stock pages), branch `claude/project-thread-g500zn`
 
@@ -81,9 +82,8 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 1. Owner reviews and merges the News pull request (run `npm run check:events` first).
 2. Owner checks: run the two `check:*` scripts in market hours; confirm Data status stays under 50 calls/min.
 3. Deploy prep: set `BETTER_AUTH_URL`, `ALLOWED_EMAILS`, keys on Vercel; owner deploys.
-4. Economic indicators from FRED (needs the owner's free FRED key).
-5. Portfolio analytics and backtesting (needs a free daily-price source; decide provider first).
-6. Our own charts with Lightweight Charts once daily bars exist.
+4. Portfolio analytics and backtesting (needs a free daily-price source; decide provider first).
+5. Our own charts with Lightweight Charts once daily bars exist.
 
 ## Working efficiently (for Claude threads)
 

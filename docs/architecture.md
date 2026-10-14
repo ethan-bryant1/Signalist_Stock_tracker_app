@@ -6,17 +6,17 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 
 | Area | Files |
 |---|---|
-| Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `watchlist`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
+| Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `economy`, `watchlist`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
 | Workspaces | `components/workspace/` (`WorkspaceApp` grid and toolbar, `WidgetFrame`, `widgets.tsx` contents, `SymbolField`), `lib/workspace.ts` (catalog, templates, layout moves, validation; pure), `lib/actions/workspace.actions.ts` + `database/models/workspace.model.ts` (one saved store per user) |
 | Watchlists | `components/watchlist/` (`WatchlistApp` page, `WatchlistGrid` quote grid also used by the workspace widget, `ListTabs`, `ColumnsMenu`, `InspectPanel`, `WatchCards` for phones, `useWatchRows`), `lib/watchlists.ts` (lists, columns, sorting, validation; pure), `lib/watchlist-format.ts` (cell text; pure), `lib/watchlist-store.ts` + `database/models/watchlist-lists.model.ts` (one document per user, migrated from the older `watchlists` collection, which is left as it was), `lib/watchlist-data.ts` (rows from the shared cache), `lib/actions/watchlist.actions.ts` |
 | News | `components/news/` (`NewsCenter` page body, `NewsRow`/`NewsList` rows shared with stock pages and workspace widgets, `EarningsTable`, `EconomicCalendar` TradingView tab, `UpcomingEvents` Fed and economic-data schedule panel, `DashboardNews`; `hooks/useMarketNews.ts` shared headline loader), `lib/news.ts` (normalizing, de-duplicating, search, times, settings, bookmarks, earnings rows; pure), `lib/news-data.ts` (Finnhub market, M&A, company news and earnings calendar through the gate), `lib/events.ts` (Fed calendar and BLS/BEA iCalendar parsing, selection; pure) + `lib/events-data.ts` (fetches the three schedules through the gate), `lib/news-store.ts` + `database/models/news-prefs.model.ts` (settings and bookmarks per user), `lib/actions/news.actions.ts` |
 | Shared UI | `components/Panel.tsx` (titled frame), `components/PageHeader.tsx`, `components/ToolButton.tsx` (tool and full-screen buttons), `hooks/useFullscreen.ts` |
 | API routes | `app/api/market` (index and sector fund prices), `app/api/watchlist/rows` (watchlist grid figures; signed-in), `app/api/news` (market, watchlist and earnings feeds; signed-in), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
 | Request gate (every provider call) | `lib/providers/gate.ts` (budget, cache, merging, usage; pure), `lib/providers/registry.ts` (one gate per provider), `lib/providers/mongo-store.ts` (slow answers kept in MongoDB) |
-| Provider clients (server only) | `lib/finnhub.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
-| Data assembly (server only) | `lib/stock-data.ts` (quotes, overviews, news, market strip), `lib/heatmap-data.ts` (the map) |
+| Provider clients (server only) | `lib/fred.ts` (FRED economic data), `lib/finnhub.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
+| Data assembly (server only) | `lib/stock-data.ts` (quotes, overviews, news, market strip), `lib/heatmap-data.ts` (the map), `lib/indicator-data.ts` (Economy page and widget, from FRED) |
 | Browser-callable actions | `lib/actions/finnhub.actions.ts` (search, its quote preview and the workspace's quote and news widgets; signed-in), `lib/actions/workspace.actions.ts` |
-| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/watchlists.ts`, `lib/watchlist-format.ts`, `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/instrument.ts` (stock, fund or other, and the figures each lists), `lib/workspace.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
+| Pure rules (tested) | `lib/indicators.ts` (FRED series list, parsing, period and value labels), `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/watchlists.ts`, `lib/watchlist-format.ts`, `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/instrument.ts` (stock, fund or other, and the figures each lists), `lib/workspace.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
 | Diagnostics | `app/(root)/status` (Data status page: calls per minute, cache share, failures, stream) |
 | Static data | `lib/data/sp500.ts` (GICS list), `lib/data/heatmap.ts` (map universe), `lib/data/markets.ts` (ETFs) |
 | Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `proxy.ts` (Next 16 middleware) |
@@ -65,6 +65,13 @@ calendar is 1 call reused 6 hours. All are also kept in MongoDB. The open page a
 visible. Finnhub's economic calendar is paid, so the side panel lists upcoming events from free public schedules instead:
 the Federal Reserve Board's calendar (FOMC, speeches, testimony, Beige Book) and the BLS and BEA release schedules
 (major releases only), each fetched at most every 6 hours and kept in MongoDB. Times only, no forecasts.
+
+Economy: `getIndicators` asks FRED for 14 series through FRED's own gate (100/min budget; FRED allows 120). On a cold
+cache that is about 44 calls (observations, series details, release calendar); after that answers are reused for
+6 to 12 hours (release ids for 30 days) and kept in MongoDB, so a visit usually costs nothing. FRED computes the
+year-over-year and month-over-month figures itself (`units`); the app only compares the two newest values. No key set
+(`FRED_API_KEY`) shows a setup notice and makes no calls. The workspace widget reads the same cache through a
+signed-in server action.
 
 Widgets that show Finnhub figures call the signed-in actions once per symbol through the shared cache (no polling);
 the Market Snapshot widget reads `/api/heatmap`; TradingView widgets are embeds with their own data.

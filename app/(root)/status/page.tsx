@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import BackToDashboard from "@/components/BackToDashboard";
 import { getFinnhubToken } from "@/lib/finnhub";
+import { getFredKey } from "@/lib/fred";
 import { finnhubStreamHub } from "@/lib/finnhub-stream";
 import { formatNewYorkMoment } from "@/lib/market-data";
 import { ISSUE_WORDS } from "@/lib/price-stamp";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 const PROVIDER_LABELS: Record<string, { name: string; limit: string }> = {
     finnhub: { name: "Finnhub", limit: "free plan: about 60 calls a minute" },
+    fred: { name: "FRED", limit: "free key: 120 calls a minute" },
 };
 
 const Stat = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) => (
@@ -62,7 +64,7 @@ const ProviderCard = ({ usage, configured, now }: { usage: GateUsage; configured
 export default function StatusPage() {
     const { now, usage } = providerUsage();
     const hub = finnhubStreamHub();
-    const configured: Record<string, boolean> = { finnhub: !!getFinnhubToken() };
+    const configured: Record<string, boolean> = { finnhub: !!getFinnhubToken(), fred: !!getFredKey() };
 
     return (
         <div className="flex flex-col gap-6">
