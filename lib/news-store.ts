@@ -18,16 +18,23 @@ export const saveNewsPrefs = async (userId: string, prefs: Prefs) => {
 };
 
 // Removes the article when it's saved, otherwise saves it first in the list (the oldest drop off past MAX_SAVED).
-// Each step is one atomic update, so two tabs can't lose each other's bookmarks.
+// Both steps are conditional single-document updates: the add only matches a list without this link, so two tabs
+// saving the same article at once can't store it twice (the second one finds it there, or, for a user with no
+// document yet, loses the insert race on the unique userId and does nothing).
 export const toggleSavedArticle = async (userId: string, article: SavedArticle): Promise<SavedArticle[]> => {
   await connectToDatabase();
   const removed = await NewsPrefs.updateOne({ userId, 'saved.url': article.url }, { $pull: { saved: { url: article.url } }, $set: { updatedAt: new Date() } });
   if (removed.matchedCount === 0) {
-    await NewsPrefs.updateOne(
-      { userId },
-      { $push: { saved: { $each: [article], $position: 0, $slice: MAX_SAVED } }, $set: { updatedAt: new Date() } },
-      { upsert: true }
-    );
+    try {
+      await NewsPrefs.updateOne(
+        { userId, 'saved.url': { $ne: article.url } },
+        { $push: { saved: { $each: [article], $position: 0, $slice: MAX_SAVED } }, $set: { updatedAt: new Date() } },
+        { upsert: true }
+      );
+    } catch (e) {
+      // The list already has it (saved from another tab a moment ago), so the upsert tried a second document
+      if ((e as { code?: number })?.code !== 11000) throw e;
+    }
   }
   return (await loadNewsPrefs(userId)).saved;
 };

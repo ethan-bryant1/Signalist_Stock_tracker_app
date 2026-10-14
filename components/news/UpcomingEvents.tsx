@@ -16,13 +16,16 @@ type Props = {
     filter: EventFilter;
     onFilterChange: (filter: EventFilter) => void;
     now: number;
+    // Asks the server again (its copy, so no outside calls unless that copy is 6 hours old)
+    onRetry: () => void;
+    loading: boolean;
     className?: string;
 };
 
 // Upcoming market-moving events from the agencies' own public schedules (lib/events.ts): FOMC decisions and press
 // conferences, speeches and testimony by Fed governors, the Beige Book, and the major jobs, inflation and GDP
 // releases. Only when things happen; no forecasts or results. Times are New York time.
-const UpcomingEvents = ({ result, filter, onFilterChange, now, className }: Props) => {
+const UpcomingEvents = ({ result, filter, onFilterChange, now, onRetry, loading, className }: Props) => {
     const groups = useMemo(() => groupEventsByDay(filterEvents(result.events, filter), now), [result.events, filter, now]);
     const failed = result.sources.filter((s) => s.issue);
     const stale = result.sources.filter((s) => !s.issue && s.stale && s.fetchedAt);
@@ -72,12 +75,23 @@ const UpcomingEvents = ({ result, filter, onFilterChange, now, className }: Prop
             <footer className="flex flex-col gap-0.5 border-t border-gray-600 px-4 py-2 text-[11px] leading-4 text-gray-500">
                 {failed.map((s) => (
                     <p key={s.source} role="status" className="text-gray-300">
-                        {SOURCE_NAMES[s.source]} schedule couldn&apos;t be loaded; its events are missing.
+                        {SOURCE_NAMES[s.source]} schedule couldn&apos;t be loaded
+                        {result.events.some((event) => event.source === s.source) ? "; showing the last copy this page had." : "; its events are missing."}
                     </p>
                 ))}
+                {failed.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        disabled={loading}
+                        className="self-start cursor-pointer rounded-sm font-semibold text-gray-100 underline decoration-gray-500 underline-offset-2 hover:decoration-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-100 disabled:cursor-default disabled:opacity-60"
+                    >
+                        {loading ? "Trying again…" : "Try again"}
+                    </button>
+                )}
                 {stale.map((s) => (
                     <p key={s.source}>
-                        {SOURCE_NAMES[s.source]} schedule as of {formatNewYorkMoment(s.fetchedAt!, now)} (couldn&apos;t refresh).
+                        {SOURCE_NAMES[s.source]} schedule last updated {formatNewYorkMoment(s.fetchedAt!, now)}.
                     </p>
                 ))}
                 <p>Sources: Federal Reserve Board, BLS, BEA. Schedules can change; forecasts aren&apos;t listed.</p>

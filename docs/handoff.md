@@ -27,8 +27,8 @@ Last updated: 2026-10-14, after PR #27.
 
 - Auth (Better Auth), owner-only access via `ALLOWED_EMAILS`, welcome and daily news emails (Inngest, Gemini text).
 - Header: tabs, search (Ctrl+K), looping price ticker, session and New York clock.
-- Dashboard: index funds, 54-stock Market Snapshot (Finnhub, live trades in session), sector funds, Market news
-  (on the News branch), TradingView panels.
+- Dashboard: index funds, 54-stock Market Snapshot (Finnhub, live trades in session), sector funds,
+  TradingView panels (the Market news panel is in review, below).
 - S&P 500 Heatmap page (TradingView map only), Markets page (TradingView screener + S&P 500 lists).
 - Stock and ETF pages: Finnhub quote, key figures, company news; TradingView chart, profile, financials.
 - Workspaces: drag/resize grid, templates, several saved layouts, linked symbol (`/workspace`).

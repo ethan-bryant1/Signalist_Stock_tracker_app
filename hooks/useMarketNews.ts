@@ -24,7 +24,7 @@ export function useMarketNews(initial: NewsResult | null): MarketNewsState {
             const response = await fetch("/api/news?feed=market", { cache: "no-store" });
             if (!response.ok) throw new Error("failed");
             const next = (await response.json()) as NewsResult;
-            setResult((previous) => (next.items.length > 0 || !previous || previous.items.length === 0 ? next : { ...previous, issue: next.issue ?? "provider" }));
+            setResult((previous) => (next.items.length > 0 || !previous || previous.items.length === 0 || !next.issue ? next : { ...previous, issue: next.issue, stale: true }));
             setFailed(false);
         } catch {
             setFailed(true);

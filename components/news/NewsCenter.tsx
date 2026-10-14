@@ -7,7 +7,7 @@ import { AlertTriangle, RefreshCw, Search } from "lucide-react";
 import EarningsTable from "@/components/news/EarningsTable";
 import UpcomingEvents from "@/components/news/UpcomingEvents";
 import EconomicCalendar from "@/components/news/EconomicCalendar";
-import type { EventsResult } from "@/lib/events";
+import { upcomingEvents, type EventsResult } from "@/lib/events";
 import NewsList from "@/components/news/NewsList";
 import { useNow } from "@/hooks/useHeatmapFeed";
 import { saveNewsSettings, toggleBookmark } from "@/lib/actions/news.actions";
@@ -71,12 +71,14 @@ type Props = {
 
 // The News page: market, M&A and watchlist headlines from Finnhub with search and bookmarks, the earnings calendar,
 // and upcoming Fed and economic-data events beside them. Settings and bookmarks are saved with the account.
-const NewsCenter = ({ initialMarket, events, watchlistSymbols, initialPrefs, initialSaved, prefsUnavailable, renderedAt }: Props) => {
+const NewsCenter = ({ initialMarket, events: initialEvents, watchlistSymbols, initialPrefs, initialSaved, prefsUnavailable, renderedAt }: Props) => {
     const ids = useId();
     const now = useNow(renderedAt);
     const [prefs, setPrefs] = useState(initialPrefs);
     const [query, setQuery] = useState("");
     const [market, setMarket] = useState(initialMarket);
+    const [events, setEvents] = useState(initialEvents);
+    const [eventsLoading, setEventsLoading] = useState(false);
     const [marketLoading, setMarketLoading] = useState(false);
     const [marketFailed, setMarketFailed] = useState(false);
     const [watch, setWatch] = useState<WatchState>({ items: [], status: {}, stale: false, loading: false, failed: false });
@@ -112,8 +114,9 @@ const NewsCenter = ({ initialMarket, events, watchlistSymbols, initialPrefs, ini
         setMarketLoading(true);
         try {
             const next = await getJson<NewsResult>("/api/news?feed=market");
-            // A failed refresh keeps what's on screen (and says so) instead of emptying the page
-            setMarket((previous) => (next.items.length > 0 || previous.items.length === 0 ? next : { ...previous, issue: next.issue ?? "provider", stale: true }));
+            // A failed refresh keeps what's on screen (and says so) instead of emptying the page; a successful empty
+            // answer replaces it
+            setMarket((previous) => (next.items.length > 0 || previous.items.length === 0 || !next.issue ? next : { ...previous, issue: next.issue, stale: true }));
             setMarketFailed(false);
         } catch {
             setMarketFailed(true);
@@ -122,13 +125,19 @@ const NewsCenter = ({ initialMarket, events, watchlistSymbols, initialPrefs, ini
         }
     }, []);
 
+    // Each load gets a number; when a newer one starts (another watchlist, a refresh), the older one stops and its
+    // answers are dropped, so two runs never mix their results or clear each other's loading state
+    const watchRun = useRef(0);
     const loadWatch = useCallback(async (symbols: readonly string[]) => {
         if (symbols.length === 0) return;
+        const run = ++watchRun.current;
         setWatch((previous) => ({ ...previous, loading: true, failed: false }));
         let failed = false;
         for (const part of chunk(symbols, WATCHLIST_CHUNK)) {
+            if (run !== watchRun.current) return;
             try {
                 const got = await getJson<Omit<WatchState, "loading" | "failed">>(`/api/news?feed=watchlist&symbols=${encodeURIComponent(part.join(","))}`);
+                if (run !== watchRun.current) return;
                 setWatch((previous) => ({
                     ...previous,
                     items: mergeNews([got.items, previous.items]),
@@ -142,7 +151,27 @@ const NewsCenter = ({ initialMarket, events, watchlistSymbols, initialPrefs, ini
                 break;
             }
         }
-        setWatch((previous) => ({ ...previous, loading: false, failed }));
+        if (run === watchRun.current) setWatch((previous) => ({ ...previous, loading: false, failed }));
+    }, []);
+
+    // The event schedules come from the server's copy (fetched from the agencies at most every 6 hours), so asking
+    // again on each refresh costs no outside calls and picks up a recovered source or a new day's events
+    const loadEvents = useCallback(async () => {
+        setEventsLoading(true);
+        try {
+            const next = await getJson<EventsResult>("/api/news?feed=events");
+            // Keep a source's events on screen when this answer couldn't load them
+            setEvents((previous) => {
+                const kept = next.sources.filter((s) => s.issue).map((s) => s.source);
+                if (kept.length === 0) return next;
+                const keep = previous.events.filter((event) => kept.includes(event.source));
+                return keep.length === 0 ? next : { ...next, events: upcomingEvents([...next.events, ...keep], next.checkedAt) };
+            });
+        } catch {
+            // The panel keeps what it has
+        } finally {
+            setEventsLoading(false);
+        }
     }, []);
 
     const loadEarnings = useCallback(async () => {
@@ -181,12 +210,13 @@ const NewsCenter = ({ initialMarket, events, watchlistSymbols, initialPrefs, ini
     const refresh = useCallback(
         (manual: boolean) => {
             lastRefresh.current = Date.now();
+            void loadEvents();
             if (tab === "watchlist") void loadWatch(watchlistSymbols);
             else if (tab === "earnings") {
                 if (manual) void loadEarnings();
             } else void loadMarket();
         },
-        [tab, loadWatch, loadEarnings, loadMarket, watchlistSymbols]
+        [tab, loadWatch, loadEarnings, loadMarket, loadEvents, watchlistSymbols]
     );
 
     // Every 15 minutes while the page is visible; a tab that sat hidden catches up when shown again
@@ -519,6 +549,8 @@ const NewsCenter = ({ initialMarket, events, watchlistSymbols, initialPrefs, ini
 
             <UpcomingEvents
                 result={events}
+                loading={eventsLoading}
+                onRetry={() => void loadEvents()}
                 filter={prefs.events}
                 onFilterChange={(filter) => changePrefs({ events: filter })}
                 now={now}
