@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import Panel from "@/components/Panel";
 import StockChartPanel from "@/components/StockChartPanel";
@@ -15,7 +15,7 @@ import {
   TRADINGVIEW_SCRIPT_URL,
 } from "@/lib/constants";
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
-import { getStockOverview } from "@/lib/stock-data";
+import { getStockOverview, isValidSymbol } from "@/lib/stock-data";
 import { getCompanyNewsItems } from "@/lib/news-data";
 import { getSession } from "@/lib/better-auth/auth";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,8 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
 
   const { symbol: rawSymbol } = await params;
   const symbol = rawSymbol.toUpperCase();
+  // Anything that can't be a ticker would only spend Finnhub calls and leave junk in the cache
+  if (!isValidSymbol(symbol)) notFound();
   const [overview, isInWatchlist] = await Promise.all([getStockOverview(symbol), isStockInWatchlist(symbol)]);
   // TradingView's profile and financials stay blank without the exchange (NASDAQ:AAPL), which Finnhub
   // doesn't give for funds it has no profile for, so those panels only show when it's known

@@ -1,13 +1,11 @@
 'use server';
 
-import { connectToDatabase } from '@/database/mongoose';
 import { getSession } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { loadWatchlists, newListId, updateWatchlists } from '@/lib/watchlist-store';
 import {
   activeList,
   addItem,
-  allSymbols,
   createList,
   deleteList,
   moveItem,
@@ -19,30 +17,6 @@ import {
   type OpResult,
   type WatchlistDoc,
 } from '@/lib/watchlists';
-
-// Every symbol in the user's lists, for the daily news email
-export async function getWatchlistSymbolsByEmail(email: string): Promise<string[]> {
-  if (!email) return [];
-
-  try {
-    const mongoose = await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('MongoDB connection not found');
-
-    // Better Auth stores users in the "user" collection
-    const user = await db.collection('user').findOne<{ _id?: unknown; id?: string; email?: string }>({ email });
-
-    if (!user) return [];
-
-    const userId = (user.id as string) || String(user._id || '');
-    if (!userId) return [];
-
-    return allSymbols(await loadWatchlists(userId));
-  } catch (err) {
-    console.error('getWatchlistSymbolsByEmail error:', err);
-    return [];
-  }
-}
 
 // Returns the signed-in user's id, or null when nobody is signed in
 async function getCurrentUserId(): Promise<string | null> {

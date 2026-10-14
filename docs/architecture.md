@@ -22,7 +22,7 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 | Pure rules (tested) | `lib/indicators.ts` (FRED series list, parsing, period and value labels), `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/watchlists.ts`, `lib/watchlist-format.ts`, `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/instrument.ts` (stock, fund or other, and the figures each lists), `lib/workspace.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts`, `lib/backtest.ts`, `lib/portfolio.ts`, `lib/daily-bars.ts`, `lib/price-chart.ts` |
 | Diagnostics | `app/(root)/status` (Data status page: calls per minute, cache share, failures, stream) |
 | Static data | `lib/data/sp500.ts` (GICS list), `lib/data/heatmap.ts` (map universe), `lib/data/markets.ts` (ETFs) |
-| Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `lib/app-url.ts` (live address for auth and email links), `proxy.ts` (Next 16 middleware) |
+| Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `lib/sign-in-limit.ts` + `lib/sign-in-attempts.ts` (wrong-password pause, MongoDB `sign_in_failures`), `lib/app-url.ts` (live address for auth and email links), `proxy.ts` (Next 16 middleware) |
 | Email jobs | `lib/inngest/` (welcome and daily news emails; Gemini writes the text only) |
 | Checks | `tests/` (Vitest), `scripts/check-*.mjs` (real-provider checks with the owner's keys) |
 
