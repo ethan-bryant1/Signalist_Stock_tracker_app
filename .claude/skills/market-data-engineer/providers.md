@@ -7,4 +7,5 @@
 | TradingView widgets | Free embeds | Charts, heatmap, screener, quotes | n/a | Delayed. Keep the attribution line. The page can't read data out of a widget. |
 
 Request budget for the interactive heatmap: Finnhub 3 per stock (54 stocks ≈ 162 on a cold cache, cached 2 min to
-24 h); Alpaca 6–7 per refresh for all stocks. Check scripts: `check:market-data`, `check:stream`, `check:alpaca`.
+24 h); Alpaca 6–7 per refresh for all stocks. Check scripts: `check:market-data`, `check:stream`, `check:portfolio` (Alpaca daily bars; `check:alpaca` was removed with the heatmap's Alpaca code).
+Portfolio backtests: Alpaca 1Day SIP bars, `adjustment=all`, since 2016, one call per symbol (~2,800 bars, one page), kept until the next session's bar is final; `end` must be at least 15 minutes ago or the free plan answers 403.

@@ -6,16 +6,17 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 
 | Area | Files |
 |---|---|
-| Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `watchlist`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
+| Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `watchlist`, `portfolio`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
 | Workspaces | `components/workspace/` (`WorkspaceApp` grid and toolbar, `WidgetFrame`, `widgets.tsx` contents, `SymbolField`), `lib/workspace.ts` (catalog, templates, layout moves, validation; pure), `lib/actions/workspace.actions.ts` + `database/models/workspace.model.ts` (one saved store per user) |
 | Watchlists | `components/watchlist/` (`WatchlistApp` page, `WatchlistGrid` quote grid also used by the workspace widget, `ListTabs`, `ColumnsMenu`, `InspectPanel`, `WatchCards` for phones, `useWatchRows`), `lib/watchlists.ts` (lists, columns, sorting, validation; pure), `lib/watchlist-format.ts` (cell text; pure), `lib/watchlist-store.ts` + `database/models/watchlist-lists.model.ts` (one document per user, migrated from the older `watchlists` collection, which is left as it was), `lib/watchlist-data.ts` (rows from the shared cache), `lib/actions/watchlist.actions.ts` |
+| Portfolio and backtests | `components/portfolio/` (`PortfolioApp` page, `BacktestResults`, `ValueChart` SVG line chart), `lib/backtest.ts` (simulation and statistics; pure), `lib/portfolio.ts` (saved portfolios, settings, ranges; pure), `lib/daily-bars.ts` (Alpaca daily bars, which days are final; pure), `lib/alpaca.ts` (daily history; server only), `lib/actions/portfolio.actions.ts` + `database/models/portfolio.model.ts` (one document per user) |
 | Shared UI | `components/Panel.tsx` (titled frame), `components/PageHeader.tsx`, `components/ToolButton.tsx` (tool and full-screen buttons), `hooks/useFullscreen.ts` |
-| API routes | `app/api/market` (index and sector fund prices), `app/api/watchlist/rows` (watchlist grid figures; signed-in), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
+| API routes | `app/api/market` (index and sector fund prices), `app/api/watchlist/rows` (watchlist grid figures; signed-in), `app/api/portfolio/bars` (daily history for backtests; signed-in), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
 | Request gate (every provider call) | `lib/providers/gate.ts` (budget, cache, merging, usage; pure), `lib/providers/registry.ts` (one gate per provider), `lib/providers/mongo-store.ts` (slow answers kept in MongoDB) |
-| Provider clients (server only) | `lib/finnhub.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
+| Provider clients (server only) | `lib/finnhub.ts`, `lib/alpaca.ts` (daily bars), `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
 | Data assembly (server only) | `lib/stock-data.ts` (quotes, overviews, news, market strip), `lib/heatmap-data.ts` (the map) |
 | Browser-callable actions | `lib/actions/finnhub.actions.ts` (search, its quote preview and the workspace's quote and news widgets; signed-in), `lib/actions/workspace.actions.ts` |
-| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/watchlists.ts`, `lib/watchlist-format.ts`, `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/instrument.ts` (stock, fund or other, and the figures each lists), `lib/workspace.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts` |
+| Pure rules (tested) | `lib/market-data.ts` (quotes, sessions, freshness, cache times), `lib/watchlists.ts`, `lib/watchlist-format.ts`, `lib/market-calendar.ts` (exchange holidays and early closes), `lib/price-stamp.ts` (source and age labels), `lib/instrument.ts` (stock, fund or other, and the figures each lists), `lib/workspace.ts`, `lib/live-trades.ts`, `lib/treemap.ts`, `lib/heatmap-state.ts`, `lib/backtest.ts`, `lib/portfolio.ts`, `lib/daily-bars.ts` |
 | Diagnostics | `app/(root)/status` (Data status page: calls per minute, cache share, failures, stream) |
 | Static data | `lib/data/sp500.ts` (GICS list), `lib/data/heatmap.ts` (map universe), `lib/data/markets.ts` (ETFs) |
 | Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `proxy.ts` (Next 16 middleware) |
@@ -58,6 +59,13 @@ action and undoes it if saving fails. Prices come with the page for the first 10
 with its price but missing key figures asks for the figures only). Lists over 10 symbols load key figures behind
 prices.
 
+Portfolio: a portfolio is symbols with target weights (the app has no holdings or trades), saved per user in MongoDB
+`portfolios`. The page asks `/api/portfolio/bars` only for symbols it hasn't loaded; the server keeps each symbol's
+adjusted Alpaca daily history since 2016 (one call per symbol) in memory and `provider_cache` until the next session's
+bar is final (8:20 PM New York), so a symbol costs at most one Alpaca call a day. The backtest runs in the browser
+(`lib/backtest.ts`, milliseconds for 20 symbols × 10 years, so no Web Worker), and every setting change recomputes
+without a request. No Finnhub calls.
+
 Widgets that show Finnhub figures call the signed-in actions once per symbol through the shared cache (no polling);
 the Market Snapshot widget reads `/api/heatmap`; TradingView widgets are embeds with their own data.
 
@@ -69,7 +77,7 @@ Evaluated 2026-10-13. Add one only when a feature needs it.
 |---|---|
 | Playwright | Use for browser checks. It is preinstalled in Claude's cloud environment; add `@playwright/test` as a dev dependency when browser tests move into the repo. |
 | TradingView Lightweight Charts | Add when the app draws its own price charts (Alpaca bars). Free, Apache-2.0, ~45 kB. |
-| SQLite | Not used: Vercel's disk doesn't persist between requests. MongoDB (Atlas free, 512 MB) keeps slow provider answers (`provider_cache`) and will keep daily bars. |
+| SQLite | Not used: Vercel's disk doesn't persist between requests. MongoDB (Atlas free, 512 MB) keeps slow provider answers (`provider_cache`), daily bars included (about 200 kB per symbol). |
 | Indicator library | Not yet: no indicators are computed. Write simple ones in `lib/` with tests; revisit for a full set. |
 | React Grid Layout | Used by the Workspace page (2.2.4, pinned): drag and resize only. Layout rules (compaction, moves, validation) are our own in `lib/workspace.ts` so they're tested without the library. Its stylesheet isn't imported; `globals.css` styles the grid in the app's grays. |
 | NumPy, pandas, SciPy, statsmodels, Backtrader | Not in the app: it runs as Next.js on Vercel. Revisit only for an offline research or backtesting tool kept apart from the app. |

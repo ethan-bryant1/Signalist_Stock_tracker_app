@@ -9,14 +9,16 @@ import { mongoSlowStore } from '@/lib/providers/mongo-store';
 // Budgets sit a little under each free plan's limit (see .claude/skills/market-data-engineer/providers.md):
 //   Finnhub: about 60 calls a minute (widely cited; its pricing page couldn't be read), 30 a second documented.
 //            50 leaves room for the check scripts and anything else using the same key.
+//   Alpaca:  200 calls a minute on the free plan. Backtests ask for one symbol's daily history per call, kept a day.
 // On Vercel each running server instance has its own gate, so two busy instances could together pass a budget;
 // the slow store keeps that rare by sharing the expensive answers.
 
 // Add a provider here (with its budget) when the app starts using one.
-export type ProviderName = 'finnhub';
+export type ProviderName = 'finnhub' | 'alpaca';
 
 const BUDGETS: Record<ProviderName, { perMinute: number; perSecond: number }> = {
   finnhub: { perMinute: 50, perSecond: 20 },
+  alpaca: { perMinute: 180, perSecond: 10 },
 };
 
 const gates = ((globalThis as { __loopsGates?: Map<ProviderName, RequestGate> }).__loopsGates ??= new Map());
