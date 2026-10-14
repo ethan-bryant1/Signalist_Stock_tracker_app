@@ -9,9 +9,10 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 | Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data` (Markets), `market-overview`, `top-stories`, `economy`, `watchlist`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
 | Workspaces | `components/workspace/` (`WorkspaceApp` grid and toolbar, `WidgetFrame`, `widgets.tsx` contents, `SymbolField`), `lib/workspace.ts` (catalog, templates, layout moves, validation; pure), `lib/actions/workspace.actions.ts` + `database/models/workspace.model.ts` (one saved store per user) |
 | Watchlists | `components/watchlist/` (`WatchlistApp` page, `WatchlistGrid` quote grid also used by the workspace widget, `ListTabs`, `ColumnsMenu`, `InspectPanel`, `WatchCards` for phones, `useWatchRows`), `lib/watchlists.ts` (lists, columns, sorting, validation; pure), `lib/watchlist-format.ts` (cell text; pure), `lib/watchlist-store.ts` + `database/models/watchlist-lists.model.ts` (one document per user, migrated from the older `watchlists` collection, which is left as it was), `lib/watchlist-data.ts` (rows from the shared cache), `lib/actions/watchlist.actions.ts` |
+| News | `components/news/` (`NewsCenter` page body, `NewsRow`/`NewsList` rows shared with stock pages and workspace widgets, `EarningsTable`, `EconomicCalendar` TradingView tab, `UpcomingEvents` Fed and economic-data schedule panel, `DashboardNews`; `hooks/useMarketNews.ts` shared headline loader), `lib/news.ts` (normalizing, de-duplicating, search, times, settings, bookmarks, earnings rows; pure), `lib/news-data.ts` (Finnhub market, M&A, company news and earnings calendar through the gate), `lib/events.ts` (Fed calendar and BLS/BEA iCalendar parsing, selection; pure) + `lib/events-data.ts` (fetches the three schedules through the gate), `lib/news-store.ts` + `database/models/news-prefs.model.ts` (settings and bookmarks per user), `lib/actions/news.actions.ts` |
 | Markets screener | `components/markets/` (`MarketsApp` page, `TvScreener` TradingView embed, `useScreenerTable` watchlist rows, `PresetsMenu`, `FiltersMenu`, `AddToList`, `ScreenerWidget` for workspaces), `lib/screener.ts` (universes, TradingView screens and views, figure ranges, presets, address; pure), `lib/actions/markets.actions.ts` + `database/models/markets-prefs.model.ts` (`markets_prefs`, one document per user). Reuses the watchlist grid, columns menu, details panel and `/api/watchlist/rows` |
 | Shared UI | `components/Panel.tsx` (titled frame), `components/PageHeader.tsx`, `components/ToolButton.tsx` (tool and full-screen buttons), `hooks/useFullscreen.ts` |
-| API routes | `app/api/market` (index and sector fund prices), `app/api/watchlist/rows` (watchlist grid figures; signed-in), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
+| API routes | `app/api/market` (index and sector fund prices), `app/api/watchlist/rows` (watchlist grid figures; signed-in), `app/api/news` (market, watchlist, earnings and events feeds; signed-in), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
 | Request gate (every provider call) | `lib/providers/gate.ts` (budget, cache, merging, usage; pure), `lib/providers/registry.ts` (one gate per provider), `lib/providers/mongo-store.ts` (slow answers kept in MongoDB) |
 | Provider clients (server only) | `lib/fred.ts` (FRED economic data), `lib/finnhub.ts`, `lib/finnhub-stream.ts` + `lib/stream-hub.ts` (one shared Finnhub socket) |
 | Data assembly (server only) | `lib/stock-data.ts` (quotes, overviews, news, market strip), `lib/heatmap-data.ts` (the map), `lib/indicator-data.ts` (Economy page and widget, from FRED) |
@@ -58,6 +59,14 @@ action and undoes it if saving fails. Prices come with the page for the first 10
 `/api/watchlist/rows` in chunks of 40, each symbol once; Refresh and "Retry incomplete rows" are the only repeats (a row
 with its price but missing key figures asks for the figures only). Lists over 10 symbols load key figures behind
 prices.
+
+News (`/top-stories`): market and M&A headlines come with the page (2 Finnhub calls, reused 10 minutes); company news for
+watchlist symbols loads when its tab opens, 12 symbols per request (1 call per symbol, reused 30 minutes); the earnings
+calendar is 1 call reused 6 hours. All are also kept in MongoDB. The open page asks again every 15 minutes only while
+visible. Finnhub's economic calendar is paid, so the side panel lists upcoming events from free public schedules instead:
+the Federal Reserve Board's calendar (FOMC, speeches, testimony, Beige Book) and the BLS and BEA release schedules
+(major releases only), each fetched at most every 6 hours and kept in MongoDB. Times only, no forecasts. The panel asks
+`/api/news?feed=events` again with each page refresh (the server's copy, no outside calls).
 
 Markets: two universes kept apart. All US = TradingView's screener embed, driven only by its documented `defaultScreen`
 and `defaultColumn` (0 Finnhub calls). Watchlists = the user's lists with the Watchlist page's figures through

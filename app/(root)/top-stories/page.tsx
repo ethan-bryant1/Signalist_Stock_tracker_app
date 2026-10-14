@@ -1,24 +1,55 @@
 import type { Metadata } from "next";
-import TradingViewWidget from "@/components/TradingViewWidget";
-import Panel from "@/components/Panel";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
-import { ECONOMIC_CALENDAR_WIDGET_CONFIG, TOP_STORIES_PAGE_WIDGET_CONFIG, TRADINGVIEW_SCRIPT_URL } from "@/lib/constants";
+import NewsCenter from "@/components/news/NewsCenter";
+import { getSession } from "@/lib/better-auth/auth";
+import { DEFAULT_NEWS_PREFS, type NewsPrefs, type SavedArticle } from "@/lib/news";
+import { getUpcomingEvents } from "@/lib/events-data";
+import { getMarketNews } from "@/lib/news-data";
+import { loadNewsPrefs } from "@/lib/news-store";
+import { loadWatchlists } from "@/lib/watchlist-store";
+import { allSymbols } from "@/lib/watchlists";
 
 export const metadata: Metadata = { title: "News · Loops Watch" };
 
-// Market headlines beside the week's US economic releases, both TradingView embeds (no Finnhub requests)
-export default function TopStoriesPage() {
+// Market, M&A and watchlist headlines with the earnings calendar (Finnhub, through the shared cache), beside
+// upcoming Fed and economic-data events from the agencies' public schedules. The URL stays /top-stories so links and bookmarks keep working.
+export default async function NewsPage() {
+    const session = await getSession(await headers());
+    if (!session?.user) redirect("/sign-in");
+    const userId = session.user.id;
+
+    const [market, events, lists, stored] = await Promise.all([
+        getMarketNews(),
+        getUpcomingEvents(),
+        loadWatchlists(userId).catch((e) => {
+            console.error("News page: couldn't read the watchlists", e);
+            return null;
+        }),
+        loadNewsPrefs(userId).catch((e) => {
+            console.error("News page: couldn't read the news settings", e);
+            return null;
+        }),
+    ]);
+    const prefs: NewsPrefs = stored?.prefs ?? DEFAULT_NEWS_PREFS;
+    const saved: SavedArticle[] = stored?.saved ?? [];
+
     return (
         <div className="flex flex-col gap-6">
-            <PageHeader title="News" description="The latest market headlines, and the US economic releases that move the market. From TradingView." />
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <Panel title="Top stories" description="Market headlines" className="xl:col-span-2">
-                    <TradingViewWidget scriptUrl={`${TRADINGVIEW_SCRIPT_URL}timeline.js`} config={TOP_STORIES_PAGE_WIDGET_CONFIG} height={800} />
-                </Panel>
-                <Panel title="Economic calendar" description="US releases of medium and high importance">
-                    <TradingViewWidget scriptUrl={`${TRADINGVIEW_SCRIPT_URL}events.js`} config={ECONOMIC_CALENDAR_WIDGET_CONFIG} height={800} />
-                </Panel>
-            </div>
+            <PageHeader
+                title="News & Intelligence"
+                description="Market headlines, company news for your watchlists, earnings reports and upcoming Fed and economic events. Headlines and earnings from Finnhub; events from the Federal Reserve, BLS and BEA schedules."
+            />
+            <NewsCenter
+                initialMarket={market}
+                events={events}
+                watchlistSymbols={lists ? allSymbols(lists) : []}
+                initialPrefs={prefs}
+                initialSaved={saved}
+                prefsUnavailable={stored === null}
+                renderedAt={market.checkedAt}
+            />
         </div>
     );
 }

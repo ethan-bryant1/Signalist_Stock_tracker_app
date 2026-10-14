@@ -4,18 +4,33 @@ import TradingViewWidget from "@/components/TradingViewWidget";
 import Panel from "@/components/Panel";
 import IndexTiles from "@/components/IndexTiles";
 import DashboardHeatmap from "@/components/DashboardHeatmap";
+import DashboardNews from "@/components/news/DashboardNews";
+import { getMarketNews } from "@/lib/news-data";
 import { HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/data/heatmap";
 import { getHeatmapData } from "@/lib/heatmap-data";
 import { getSession } from "@/lib/better-auth/auth";
 import {
     MARKET_DATA_WIDGET_CONFIG,
     MARKET_OVERVIEW_WIDGET_CONFIG,
-    TOP_STORIES_WIDGET_CONFIG,
     TRADINGVIEW_SCRIPT_URL,
 } from "@/lib/constants";
 
 // Loads the heatmap's prices without holding up the rest of the dashboard
 const HeatmapWithData = async () => <DashboardHeatmap initial={await getHeatmapData()} />;
+
+// The newest market headlines from the News page's cached feed, without holding up the rest of the dashboard
+const NewsWithData = async () => <DashboardNews initial={await getMarketNews()} />;
+
+const NewsLoading = () => (
+    <div aria-label="Loading headlines" role="status" className="flex flex-col divide-y divide-gray-600/70">
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <div key={i} className="flex flex-col gap-2 px-4 py-2.5">
+                <div className="h-3 w-40 animate-pulse rounded bg-gray-700 motion-reduce:animate-none" />
+                <div className="h-4 w-4/5 animate-pulse rounded bg-gray-700 motion-reduce:animate-none" />
+            </div>
+        ))}
+    </div>
+);
 
 // Each panel's "Open" link shows that widget on its own, larger page
 const Home = async () => {
@@ -66,12 +81,12 @@ const Home = async () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <Panel title="Top stories" description="The latest market headlines" href="/top-stories">
-                    <TradingViewWidget
-                        scriptUrl={`${TRADINGVIEW_SCRIPT_URL}timeline.js`}
-                        config={TOP_STORIES_WIDGET_CONFIG}
-                        height={600}
-                    />
+                <Panel title="Market news" description="Latest market and M&A headlines · Finnhub" href="/top-stories" linkLabel="View all news">
+                    {session?.user && (
+                        <Suspense fallback={<NewsLoading />}>
+                            <NewsWithData />
+                        </Suspense>
+                    )}
                 </Panel>
                 <Panel title="Market data" description="Quotes for popular stocks · TradingView, may be delayed" href="/market-data" className="xl:col-span-2">
                     <TradingViewWidget

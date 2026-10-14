@@ -65,43 +65,6 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
   return unique.map((a, idx) => formatArticle(a, false, undefined, idx));
 }
 
-// Recent news about one company from the past week, newest first, without repeated headlines.
-// Returns null when the news can't be loaded, so the page can say so instead of "no news".
-export async function getCompanyNews(symbol: string, limit = 20): Promise<MarketNewsArticle[] | null> {
-  const sym = symbol.toUpperCase();
-  const range = getDateRange(7);
-
-  try {
-    const articles = await finnhubData<RawNewsArticle[]>('/company-news', { symbol: sym, from: range.from, to: range.to }, { ...FINNHUB_CACHE.news, waitMs: PAGE_WAIT_MS });
-    const seen = new Set<string>();
-    return (Array.isArray(articles) ? articles : [])
-      // Only keep complete articles whose link is a normal web address
-      .filter((a) => a.headline?.trim() && a.datetime && a.url && /^https?:\/\//i.test(a.url))
-      .filter((a) => {
-        const key = a.headline!.trim().toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .sort((a, b) => b.datetime! - a.datetime!)
-      .slice(0, limit)
-      .map((a) => ({
-        id: a.id,
-        headline: a.headline!.trim(),
-        summary: a.summary?.trim() ?? '',
-        source: a.source || 'Company News',
-        url: a.url!,
-        datetime: a.datetime!,
-        category: 'company',
-        related: sym,
-        image: a.image || '',
-      }));
-  } catch (e) {
-    console.error('Error fetching company news for', sym, e);
-    return null;
-  }
-}
-
 // ---------- One stock ----------
 
 // Turns Finnhub's exchange name (like "NASDAQ NMS - GLOBAL MARKET") into TradingView's prefix
