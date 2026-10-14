@@ -194,8 +194,9 @@ export const ECONOMIC_CALENDAR_WIDGET_CONFIG = {
     height: 800,
 };
 
-// The Market Data page shows TradingView's stock screener: every US-listed stock, biggest first,
-// with tabs for performance, valuation and more, and a toolbar to sort and filter
+// TradingView's stock screener of every US-listed stock (Markets page "All US" and the workspace widget). The Markets
+// toolbar replaces defaultScreen and defaultColumn (components/markets/TvScreener.tsx); TradingView's own toolbar
+// inside the frame sorts and filters
 export const MARKET_DATA_PAGE_WIDGET_CONFIG = {
     width: '100%',
     height: 800,
@@ -206,16 +207,6 @@ export const MARKET_DATA_PAGE_WIDGET_CONFIG = {
     colorTheme: 'dark',
     isTransparent: true,
     locale: 'en',
-};
-
-// Live price list the Market Data page shows for a picked sector or a search.
-// The page fills in symbolsGroups with the matching stocks.
-export const MARKET_DATA_LIST_WIDGET_CONFIG = {
-    width: '100%',
-    locale: 'en',
-    showSymbolLogo: true,
-    colorTheme: 'dark',
-    isTransparent: true,
 };
 
 // Full chart on the Market Overview page. Its top toolbar lets you switch between

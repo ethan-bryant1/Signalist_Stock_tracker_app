@@ -31,6 +31,7 @@ export type ColumnKey =
     | "dividendYield"
     | "avgVolume"
     | "industry"
+    | "sector"
     | "exchange"
     | "time";
 
@@ -41,6 +42,8 @@ export type WatchRow = {
     name?: string;
     exchange?: string;
     industry?: string;
+    // GICS sector, only for S&P 500 constituents (from lib/data/sp500.ts); the Markets screener fills it in
+    sector?: string;
     currency: string;
     price?: number;
     change?: number;
@@ -101,11 +104,13 @@ export const COLUMNS: Record<ColumnKey, ColumnDef> = {
     dividendYield: { label: "Dividend yield", short: "Div yld", align: "right", fromMetrics: true, value: (row) => row.dividendYield },
     avgVolume: { label: "Average volume (10 days)", short: "Avg vol 10D", align: "right", fromMetrics: true, value: (row) => row.avgVolume },
     industry: { label: "Industry", short: "Industry", align: "left", value: (row) => row.industry },
+    sector: { label: "Sector (S&P 500)", short: "Sector", align: "left", value: (row) => row.sector },
     exchange: { label: "Exchange", short: "Exch", align: "left", value: (row) => row.exchange },
     time: { label: "Price time", short: "Time", align: "right", value: (row) => row.quoteTime },
 };
 
-export const COLUMN_KEYS = Object.keys(COLUMNS) as ColumnKey[];
+// The watchlist's own column choices (the sector column belongs to the Markets screener's S&P 500 view)
+export const COLUMN_KEYS = (Object.keys(COLUMNS) as ColumnKey[]).filter((key) => key !== "sector");
 export const DEFAULT_COLUMNS: ColumnKey[] = ["name", "last", "change", "changePercent", "dayLow", "dayHigh", "marketCap", "peRatio", "avgVolume", "time"];
 
 // Whether a figure applies to this kind of instrument: a fund has no market cap, earnings or P/E of its own
@@ -137,9 +142,9 @@ export const parsePrefs = (value: unknown): WatchlistPrefs => {
 };
 
 // Shows or hides a column; a shown column goes back where the default order puts it
-export const toggleColumn = (columns: readonly ColumnKey[], key: ColumnKey): ColumnKey[] => {
+export const toggleColumn = (columns: readonly ColumnKey[], key: ColumnKey, order: readonly ColumnKey[] = COLUMN_KEYS): ColumnKey[] => {
     if (columns.includes(key)) return columns.filter((column) => column !== key);
-    const rank = (column: ColumnKey) => COLUMN_KEYS.indexOf(column);
+    const rank = (column: ColumnKey) => order.indexOf(column);
     const at = columns.findIndex((column) => rank(column) > rank(key));
     return at === -1 ? [...columns, key] : [...columns.slice(0, at), key, ...columns.slice(at)];
 };
