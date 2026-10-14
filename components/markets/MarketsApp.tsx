@@ -342,7 +342,7 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
                                 <label htmlFor={`${ids}-sort`} className="sr-only">
                                     Sort by
                                 </label>
-                                <select id={`${ids}-sort`} value={state.sort.key} onChange={(event) => update({ sort: nextScreenSort({ key: "symbol", dir: "asc" }, event.target.value as SortKey) })} className={selectClass}>
+                                <select id={`${ids}-sort`} value={state.sort.key} onChange={(event) => update({ sort: nextScreenSort({ key: "manual", dir: "asc" }, event.target.value as SortKey) })} className={selectClass}>
                                     {sortSelect.map((key) => (
                                         <option key={key} value={key}>
                                             {key === "symbol" ? "Symbol" : COLUMNS[key].label}
