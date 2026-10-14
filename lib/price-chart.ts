@@ -66,6 +66,50 @@ export function simpleMovingAverage(values: readonly number[], length: number): 
     return out;
 }
 
+// Bollinger Bands: the `length`-session simple average of the close (middle) plus and minus `width` standard
+// deviations of the same closes (upper, lower). The standard deviation is the population one (divide by `length`), as
+// Bollinger defines it and TradingView draws it. Undefined until there are `length` closes.
+export const BOLLINGER = { length: 20, width: 2 } as const;
+
+export type Bands = { upper: number; middle: number; lower: number };
+
+export function bollingerBands(values: readonly number[], length: number = BOLLINGER.length, width: number = BOLLINGER.width): (Bands | undefined)[] {
+    return simpleMovingAverage(values, length).map((middle, i) => {
+        if (middle === undefined) return undefined;
+        let squares = 0;
+        for (let j = i - length + 1; j <= i; j++) squares += (values[j] - middle) ** 2;
+        const spread = width * Math.sqrt(squares / length);
+        return { upper: middle + spread, middle, lower: middle - spread };
+    });
+}
+
+// Wilder's Relative Strength Index, 0 to 100. The first average gain and loss are the simple averages of the first
+// `length` session changes; after that each is smoothed as (previous × (length − 1) + today) / length. RSI is
+// 100 − 100 / (1 + average gain / average loss); with no losses it is 100 and with no gains 0 (TradingView's
+// convention, also when the closes never move). Undefined for the first `length` sessions.
+export const RSI_LENGTH = 14;
+export const RSI_LEVELS = [70, 30] as const;
+
+export function relativeStrengthIndex(values: readonly number[], length: number = RSI_LENGTH): (number | undefined)[] {
+    const out: (number | undefined)[] = values.map(() => undefined);
+    let gain = 0;
+    let loss = 0;
+    for (let i = 1; i < values.length; i++) {
+        const change = values[i] - values[i - 1];
+        const up = Math.max(change, 0);
+        const down = Math.max(-change, 0);
+        if (i <= length) {
+            gain += up / length;
+            loss += down / length;
+        } else {
+            gain = (gain * (length - 1) + up) / length;
+            loss = (loss * (length - 1) + down) / length;
+        }
+        if (i >= length) out[i] = loss === 0 ? 100 : gain === 0 ? 0 : 100 - 100 / (1 + gain / loss);
+    }
+    return out;
+}
+
 // A session's change from the previous session's close, (c1 − c0) / c0, as a percentage; undefined for the first bar
 export function dayChangePercent(close: readonly number[], index: number): number | undefined {
     if (index <= 0 || index >= close.length) return undefined;
@@ -81,9 +125,14 @@ export type ChartSettings = {
     style: "candles" | "line";
     // Moving averages shown, by length
     averages: number[];
+    // Studies shown: Bollinger Bands on the price, RSI in its own pane (both off until chosen)
+    indicators: ChartIndicator[];
 };
 
-export const DEFAULT_CHART_SETTINGS: ChartSettings = { source: "tradingview", range: DEFAULT_RANGE, style: "candles", averages: [50, 200] };
+export const CHART_INDICATORS = ["bollinger", "rsi"] as const;
+export type ChartIndicator = (typeof CHART_INDICATORS)[number];
+
+export const DEFAULT_CHART_SETTINGS: ChartSettings = { source: "tradingview", range: DEFAULT_RANGE, style: "candles", averages: [50, 200], indicators: [] };
 
 // Settings from storage; anything unknown falls back to its default
 export function parseChartSettings(raw: unknown): ChartSettings {
@@ -96,5 +145,6 @@ export function parseChartSettings(raw: unknown): ChartSettings {
         range: isChartRange(value.range) ? value.range : DEFAULT_RANGE,
         style: value.style === "line" ? "line" : "candles",
         averages,
+        indicators: Array.isArray(value.indicators) ? CHART_INDICATORS.filter((id) => (value.indicators as unknown[]).includes(id)) : [],
     };
 }

@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { DEFAULT_CHART_SETTINGS, parseChartSettings, type ChartSettings } from "@/lib/price-chart";
 
-// The stock page chart's source, range, style and moving averages, remembered in this browser (they change how the
+// The stock page chart's source, range, style, moving averages and indicators, remembered in this browser (they change how the
 // chart looks, not the data)
 const KEY = "stock-chart-settings";
 const listeners = new Set<() => void>();

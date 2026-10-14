@@ -46,7 +46,9 @@ Last updated: 2026-10-14, after the daily chart (PR #30), with the daily chart w
 - News page, Dashboard Market news panel, upcoming events (PR #25, details below).
 - Deploy: Vercel production with Atlas and Inngest (PR #29, `docs/deploy.md`).
 - Daily chart on stock pages: "TradingView | Daily" switch, Lightweight Charts on Alpaca adjusted daily bars since 2016
-  (PR #30; `components/chart/PriceChart.tsx`, `/api/chart`, `lib/price-chart.ts`).
+  (PR #30; `components/chart/PriceChart.tsx`, `/api/chart`, `lib/price-chart.ts`). Also a workspace widget (PR #31).
+  Optional Bollinger Bands (20, 2) and RSI (14, Wilder) buttons, off by default, computed in the browser from the
+  loaded bars (0 extra calls; RSI matches StockCharts' published example in `tests/price-chart.test.ts`).
 - Portfolio page: target-weight backtests on Alpaca free daily bars (PR #28; `lib/backtest.ts`, `lib/portfolio.ts`,
   `lib/daily-bars.ts`, `lib/alpaca.ts`; Alpaca gate 180/min, 1 call per symbol per day; needs the Alpaca keys, check
   with `npm run check:portfolio`).
@@ -100,7 +102,8 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 2. Owner checks the daily chart on the live site: a stock page's "Daily" view against a known recent close (the bars
    are adjusted, so old prices differ from what traded then), and after merging the widget pull request, a workspace
    with the Daily chart widget added.
-3. Possible follow-up, only if wanted: more indicators (each as tested pure code in `lib/price-chart.ts`).
+3. Owner glances at the BB and RSI buttons on a stock's Daily view after merging the indicators pull request.
+4. Possible follow-up, only if wanted: more indicators (each as tested pure code in `lib/price-chart.ts`).
 
 ## Working efficiently (for Claude threads)
 
