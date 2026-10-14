@@ -13,6 +13,10 @@ import { useNow } from "@/hooks/useHeatmapFeed";
 import { getCompanyNewsForWidget, getStockQuote, type StockQuote } from "@/lib/actions/finnhub.actions";
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
 import ScreenerWidget from "@/components/markets/ScreenerWidget";
+import { getIndicatorsForWidget } from "@/lib/actions/indicator.actions";
+import FredKeyNotice from "@/components/economy/FredKeyNotice";
+import { ChangeText } from "@/components/economy/IndicatorsBoard";
+import { FRED_NOTICE, INDICATORS, formatIndicatorValue, formatPeriod, type IndicatorsPayload } from "@/lib/indicators";
 import WatchlistGrid from "@/components/watchlist/WatchlistGrid";
 import { useWatchRows } from "@/components/watchlist/useWatchRows";
 import type { ColumnKey } from "@/lib/watchlists";
@@ -264,6 +268,53 @@ const IndexesWidget = () => (
     </div>
 );
 
+// The Economy page's indicators as a compact list: latest figure, its period and the change from the period before.
+// Loaded once from the server's FRED cache (shared with the Economy page): no polling, no Finnhub calls.
+const IndicatorsWidget = () => {
+    const [payload, setPayload] = useState<IndicatorsPayload | null | "failed">(null);
+    useEffect(() => {
+        let current = true;
+        getIndicatorsForWidget()
+            .then((data) => current && setPayload(data ?? "failed"))
+            .catch(() => current && setPayload("failed"));
+        return () => {
+            current = false;
+        };
+    }, []);
+    if (payload === null) return <Loading rows={6} />;
+    if (payload === "failed") return <Message>Economic indicators couldn&apos;t load right now.</Message>;
+    if (!payload.configured) return <FredKeyNotice compact />;
+    const byId = new Map(payload.readings.map((reading) => [reading.id, reading]));
+    return (
+        <div className="flex min-h-full flex-col">
+            <ul className="divide-y divide-gray-600">
+                {INDICATORS.map((def) => {
+                    const reading = byId.get(def.id);
+                    return (
+                        <li key={def.id} className="flex items-center justify-between gap-3 px-4 py-2 text-[13px]">
+                            <span className="min-w-0">
+                                <span className="block truncate font-medium text-gray-100">{def.label}</span>
+                                <span className="block truncate text-[11px] text-gray-500">{reading?.latest ? formatPeriod(reading.latest.date, def.frequency) : "No figure"}</span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                                <span className="block font-semibold tabular-nums text-gray-100">{formatIndicatorValue(reading?.latest?.value, def.unit)}</span>
+                                <ChangeText change={reading?.change} unit={def.unit} className="text-[11px] text-gray-500" />
+                            </span>
+                        </li>
+                    );
+                })}
+            </ul>
+            <div className="mt-auto flex flex-col gap-1 border-t border-gray-600 px-4 py-2 text-[11px] text-gray-500">
+                <Link href="/economy" className="inline-flex items-center gap-1 font-medium text-gray-400 hover:text-gray-100">
+                    Economy page
+                    <ArrowUpRight aria-hidden className="h-3 w-3" />
+                </Link>
+                <span>{FRED_NOTICE}</span>
+            </div>
+        </div>
+    );
+};
+
 // ---------- Catalog ----------
 
 export const WIDGET_CONTENT: Record<WidgetType, { component: React.ComponentType<WidgetProps>; scroll: boolean }> = {
@@ -281,4 +332,5 @@ export const WIDGET_CONTENT: Record<WidgetType, { component: React.ComponentType
     calendar: { component: () => <TradingViewFill script="events.js" config={{ ...ECONOMIC_CALENDAR_WIDGET_CONFIG, ...fill }} />, scroll: false },
     screener: { component: ScreenerWidget, scroll: false },
     overview: { component: () => <TradingViewFill script="market-overview.js" config={{ ...MARKET_OVERVIEW_WIDGET_CONFIG, ...fill }} />, scroll: false },
+    indicators: { component: IndicatorsWidget, scroll: true },
 };

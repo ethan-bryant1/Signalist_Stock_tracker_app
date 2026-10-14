@@ -23,7 +23,8 @@ export type WidgetType =
     | "headlines"
     | "calendar"
     | "screener"
-    | "overview";
+    | "overview"
+    | "indicators";
 
 type CatalogEntry = {
     title: string;
@@ -38,7 +39,7 @@ type CatalogEntry = {
     minH: number;
 };
 
-// Every widget a workspace can hold. Finnhub widgets read the app's shared cache, so adding one adds no polling;
+// Every widget a workspace can hold. Finnhub and FRED widgets read the app's shared cache, so adding one adds no polling;
 // TradingView widgets are embeds with TradingView's own (often delayed) data.
 export const WIDGETS: Record<WidgetType, CatalogEntry> = {
     chart: { title: "Chart", description: "TradingView's chart with indicators and drawing tools", symbolic: true, source: "TradingView", w: 8, h: 14, minW: 4, minH: 8 },
@@ -55,6 +56,7 @@ export const WIDGETS: Record<WidgetType, CatalogEntry> = {
     calendar: { title: "Economic calendar", description: "US releases of medium and high importance", symbolic: false, source: "TradingView", w: 4, h: 14, minW: 3, minH: 8 },
     screener: { title: "Screener", description: "Markets presets: TradingView's US screener, or a watchlist; a pick loads linked widgets", symbolic: false, source: "TradingView · Finnhub", w: 12, h: 16, minW: 6, minH: 10 },
     overview: { title: "Market overview", description: "Top stocks by sector over the past 12 months", symbolic: false, source: "TradingView", w: 4, h: 16, minW: 3, minH: 12 },
+    indicators: { title: "Economic indicators", description: "Rates, inflation, jobs and growth, each with its period", symbolic: false, source: "FRED", w: 4, h: 14, minW: 3, minH: 8 },
 };
 
 export const WIDGET_TYPES = Object.keys(WIDGETS) as WidgetType[];
