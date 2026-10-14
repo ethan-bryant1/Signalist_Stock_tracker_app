@@ -51,21 +51,17 @@ Loops Watch shows Finnhub prices and news, and Finnhub's free plan is licensed f
 
 ## Deploy to Vercel
 
-You need the same accounts as for running locally (MongoDB Atlas, Finnhub, Gemini, a Gmail App Password), plus free [Vercel](https://vercel.com) and [Inngest](https://www.inngest.com) accounts.
+Everything stays on free plans: Vercel Hobby, MongoDB Atlas free tier, Inngest free tier and the free Finnhub, FRED
+and Alpaca keys. The full beginner guide, with every setting and a checklist for after the deploy, is
+[docs/deploy.md](docs/deploy.md). In short:
 
-1. **Let Vercel reach your database.** In MongoDB Atlas, open **Network Access**, click **Add IP Address**, choose **Allow access from anywhere** (0.0.0.0/0) and confirm. Vercel's servers don't have fixed addresses, so Atlas has to accept connections from any address. Your database password still protects it.
-2. **Import the project.** Sign in to Vercel with GitHub, click **Add New… → Project**, and import this repository. Name the project `loops-watch` (or anything you like). The live address will be `https://<project-name>.vercel.app`.
-3. **Add the environment variables.** Under **Environment Variables**, paste the contents of your `.env` file into the first **Key** box. Vercel splits it into one variable per line. Then make two changes:
-   - delete `NODE_ENV`, because Vercel sets it itself
-   - change `BETTER_AUTH_URL` to your live address, like `https://loops-watch.vercel.app`
-   - check that `ALLOWED_EMAILS` holds your email, or nobody will be able to sign in
-4. **Deploy.** Click **Deploy** and wait for the build to finish. If the address Vercel gives you differs from the one you used for `BETTER_AUTH_URL`, update the variable under **Settings → Environment Variables** and redeploy.
-5. **Connect Inngest so emails send.** Install the [Inngest integration for Vercel](https://vercel.com/integrations/inngest) and pick this project. It adds `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` for you. Then redeploy: open **Deployments**, click **⋯** on the latest one and choose **Redeploy**. In the [Inngest dashboard](https://app.inngest.com), the app should list two functions: the welcome email and the daily news summary.
-6. **Try it.** Open your live address and sign in. If you use a new database, sign up with your `ALLOWED_EMAILS` email and check that the welcome email arrives. New senders often land in spam at first.
+1. In MongoDB Atlas, allow access from anywhere (`0.0.0.0/0`) under **Network Access**.
+2. Import the repository as a new Vercel project.
+3. Add the variables from your `.env`, without `NODE_ENV`, with `BETTER_AUTH_URL` set to the live address and your
+   email in `ALLOWED_EMAILS`.
+4. Deploy, then install the Inngest integration for Vercel and redeploy so the emails send.
 
-Every push to `main` deploys again automatically.
-
-While a heatmap is open during market hours, its live price stream keeps a Vercel function running. Each connection lasts under five minutes (the Hobby plan's limit) and then reconnects, and it closes when you switch tabs or the market closes. That counts toward Vercel's free function usage, which is plenty for one person.
+Every merge into `main` deploys again automatically.
 
 ## Project layout
 

@@ -3,7 +3,7 @@
 The state of Loops Watch for whoever picks up the next task, human or Claude. Keep it short and current: update
 the "Status" and "Next" sections in the same pull request as any feature. Details live in the linked docs, not here.
 
-Last updated: 2026-10-14, after PRs #26 and #27.
+Last updated: 2026-10-14, after PRs #25 to #28, with the deploy prep pull request.
 
 ## Read only what the task needs
 
@@ -15,20 +15,18 @@ Last updated: 2026-10-14, after PRs #26 and #27.
 | Workspaces, ETF pages, checkpoint, usage numbers | `docs/final-polish.md` |
 | Watchlists (lists, grid, storage, loading) | `docs/watchlist-redesign.md` |
 | Specialist checklists | `.claude/skills/*/SKILL.md` (data engineer, quant, UX, data QA) |
+| Deploying (Vercel, Atlas, Inngest, env vars) | `docs/deploy.md` |
 
 ## Status
 
-- `main` = `1666f77` (PR #26 merged). Everything below "Done" is on `main`.
+- `main` = `74b7359` (PRs #25 News, #26 Markets, #27 Economy, #28 Portfolio merged). Everything below "Done" is on
+  `main`.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
-- In review: News page redesign on `claude/project-thread-g500zn` (pull request open, see below).
-- In review: Portfolio page (backtesting) on `claude/portfolio-backtesting-dyqocn`, PR #28. A portfolio = symbols with
-  target weights (saved per user, MongoDB `portfolios`), backtested against a benchmark on Alpaca free daily bars (SIP,
-  adjusted, since 2016): rebalancing, costs, optional moving-average trend filter, in/out-of-sample split, next-open
-  fills, assumptions listed on the page. `lib/backtest.ts`, `lib/portfolio.ts`, `lib/daily-bars.ts`, `lib/alpaca.ts`,
-  `/api/portfolio/bars`, `components/portfolio/`. Alpaca gate 180/min, 1 call per symbol per day (memory + MongoDB),
-  0 Finnhub calls; no keys = setup notice. Owner adds `ALPACA_API_KEY_ID`/`ALPACA_API_SECRET_KEY`, runs
-  `npm run check:portfolio` (real Alpaca unverified). Browser check: `dev-harness/portfolio-check.mjs` + `mock_alpaca.py`.
+- In review: deploy prep on `claude/vercel-deploy-prep-ub3dut`. Beginner deploy guide `docs/deploy.md` (Vercel,
+  Atlas network access, every env var, Inngest integration, checks after deploy). Email links and Better Auth use
+  `lib/app-url.ts` (`BETTER_AUTH_URL`, else Vercel's production address, else localhost); `package.json` asks for
+  Node 22+ so Vercel runs a Node with built-in WebSocket.
 
 ### Done
 
@@ -43,8 +41,12 @@ Last updated: 2026-10-14, after PRs #26 and #27.
 - Watchlists: several named lists, sortable/configurable grid, details panel, phone cards (`/watchlist`).
 - Request gate: shared Finnhub budget (50/min), memory + MongoDB cache, freshness labels, Data status page.
 - Economy page: US indicators from FRED (PR #27; needs `FRED_API_KEY`, check with `npm run check:fred`).
+- News page, Dashboard Market news panel, upcoming events (PR #25, details below).
+- Portfolio page: target-weight backtests on Alpaca free daily bars (PR #28; `lib/backtest.ts`, `lib/portfolio.ts`,
+  `lib/daily-bars.ts`, `lib/alpaca.ts`; Alpaca gate 180/min, 1 call per symbol per day; needs the Alpaca keys, check
+  with `npm run check:portfolio`).
 
-### In review: News (`/top-stories`, Dashboard, stock pages), branch `claude/project-thread-g500zn`
+### News (`/top-stories`, Dashboard, stock pages), PR #25
 
 - One shared Finnhub news system (`lib/news-data.ts`): market + M&A headlines (2 calls, reused 10 minutes) feed the
   News page, the Dashboard's Market news panel (8 newest, at most 2 M&A) and the workspace widget; company news
@@ -77,7 +79,7 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Tests
 
-- Unit: `npm test` (Vitest, `tests/`), 273 passing.
+- Unit: `npm test` (Vitest, `tests/`), 301 passing.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
   On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases, events 19/19, integration 21/21 plus
@@ -87,11 +89,11 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Next (priority order)
 
-1. Owner reviews and merges the News pull request (run `npm run check:events` first).
-2. Owner checks: run the two `check:*` scripts in market hours; confirm Data status stays under 50 calls/min.
-3. Deploy prep: set `BETTER_AUTH_URL`, `ALLOWED_EMAILS`, keys on Vercel; owner deploys.
-4. Portfolio and backtesting: PR #28; owner adds free Alpaca keys, runs `npm run check:portfolio`, merges.
-5. Our own charts with Lightweight Charts once daily bars exist.
+1. Owner checks in market hours: `npm run check:market-data`, `npm run check:stream`; Data status stays under
+   50 calls/min. Any time: `npm run check:events`, `npm run check:fred`, `npm run check:portfolio`.
+2. Owner merges the deploy prep pull request and deploys by following `docs/deploy.md`, then runs its checklist
+   (section 6) on the live site.
+3. Our own charts with Lightweight Charts on the Alpaca daily bars.
 
 ## Working efficiently (for Claude threads)
 
