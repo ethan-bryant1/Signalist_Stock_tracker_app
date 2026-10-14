@@ -256,7 +256,7 @@ const WorkspaceApp = ({ initialStore, source, userId }: { initialStore: Workspac
                         onLink={(linked) => updateWorkspace((current) => updateWidget(current, widget.id, linked ? { linked: true } : { linked: false, symbol: current.symbol }))}
                         onOwnSymbol={(own) => updateWorkspace((current) => updateWidget(current, widget.id, { symbol: own }))}
                     >
-                        <Content symbol={symbol} onPickSymbol={pickSymbol} />
+                        <Content widgetId={widget.id} symbol={symbol} onPickSymbol={pickSymbol} />
                     </WidgetFrame>
                 </div>
             );

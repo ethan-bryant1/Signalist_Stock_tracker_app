@@ -12,6 +12,7 @@ import TradingViewWidget from "@/components/TradingViewWidget";
 import { useNow } from "@/hooks/useHeatmapFeed";
 import { getCompanyNewsForWidget, getStockQuote, type StockQuote } from "@/lib/actions/finnhub.actions";
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
+import ScreenerWidget from "@/components/markets/ScreenerWidget";
 import { getIndicatorsForWidget } from "@/lib/actions/indicator.actions";
 import FredKeyNotice from "@/components/economy/FredKeyNotice";
 import { ChangeText } from "@/components/economy/IndicatorsBoard";
@@ -23,7 +24,6 @@ import {
     COMPANY_FINANCIALS_WIDGET_CONFIG,
     COMPANY_PROFILE_WIDGET_CONFIG,
     ECONOMIC_CALENDAR_WIDGET_CONFIG,
-    MARKET_DATA_PAGE_WIDGET_CONFIG,
     MARKET_OVERVIEW_WIDGET_CONFIG,
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
     TOP_STORIES_WIDGET_CONFIG,
@@ -34,6 +34,8 @@ import { cn, formatChangePercent, formatCurrency, formatSignedNumber, formatTime
 import type { WidgetType } from "@/lib/workspace";
 
 export type WidgetProps = {
+    // The widget's id in the workspace, for settings a widget keeps itself (the screener's preset)
+    widgetId: string;
     symbol: string;
     // Loads a symbol into the workspace's linked widgets
     onPickSymbol: (symbol: string) => void;
@@ -328,7 +330,7 @@ export const WIDGET_CONTENT: Record<WidgetType, { component: React.ComponentType
     indexes: { component: IndexesWidget, scroll: true },
     headlines: { component: () => <TradingViewFill script="timeline.js" config={{ ...TOP_STORIES_WIDGET_CONFIG, ...fill }} />, scroll: false },
     calendar: { component: () => <TradingViewFill script="events.js" config={{ ...ECONOMIC_CALENDAR_WIDGET_CONFIG, ...fill }} />, scroll: false },
-    screener: { component: () => <TradingViewFill script="screener.js" config={{ ...MARKET_DATA_PAGE_WIDGET_CONFIG, ...fill }} />, scroll: false },
+    screener: { component: ScreenerWidget, scroll: false },
     overview: { component: () => <TradingViewFill script="market-overview.js" config={{ ...MARKET_OVERVIEW_WIDGET_CONFIG, ...fill }} />, scroll: false },
     indicators: { component: IndicatorsWidget, scroll: true },
 };

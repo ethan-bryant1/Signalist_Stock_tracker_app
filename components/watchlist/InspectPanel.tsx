@@ -41,20 +41,26 @@ const InspectPanel = ({
     canMoveUp,
     canMoveDown,
     listName,
+    actions,
+    emptyText = "Select a row to see its figures here.",
 }: {
     row: GridRow | null;
     variant: "side" | "inline";
     otherLists: string[];
-    onRemove: (symbol: string) => void;
+    // Watchlist only; the Markets screener has no list to remove from
+    onRemove?: (symbol: string) => void;
     onMove?: (symbol: string, direction: -1 | 1) => void;
     canMoveUp: boolean;
     canMoveDown: boolean;
-    listName: string;
+    listName?: string;
+    // More buttons after "Open" (the Markets screener's "Add to watchlist")
+    actions?: React.ReactNode;
+    emptyText?: string;
 }) => {
     if (!row) {
         return variant === "side" ? (
             <aside aria-label="Selected stock" className="flex min-h-40 items-center justify-center rounded-xl border border-gray-600 bg-gray-800 p-4 text-center text-xs text-gray-500">
-                Select a row to see its figures here.
+                {emptyText}
             </aside>
         ) : null;
     }
@@ -127,10 +133,13 @@ const InspectPanel = ({
                         </button>
                     </>
                 )}
-                <button type="button" onClick={() => onRemove(row.symbol)} title={`Remove from ${listName} (you can undo)`} className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-gray-600 px-3 text-xs font-semibold text-gray-400 hover:text-gray-100">
-                    <Trash2 aria-hidden className="h-3.5 w-3.5" />
-                    Remove
-                </button>
+                {actions}
+                {onRemove && (
+                    <button type="button" onClick={() => onRemove(row.symbol)} title={`Remove from ${listName} (you can undo)`} className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-gray-600 px-3 text-xs font-semibold text-gray-400 hover:text-gray-100">
+                        <Trash2 aria-hidden className="h-3.5 w-3.5" />
+                        Remove
+                    </button>
+                )}
             </div>
         </aside>
     );

@@ -54,7 +54,7 @@ export const WIDGETS: Record<WidgetType, CatalogEntry> = {
     indexes: { title: "Indexes", description: "S&P 500, Nasdaq 100, Dow 30 and Russell 2000 funds", symbolic: false, source: "Finnhub", w: 12, h: 7, minW: 6, minH: 7 },
     headlines: { title: "Top stories", description: "Market headlines", symbolic: false, source: "TradingView", w: 4, h: 14, minW: 3, minH: 8 },
     calendar: { title: "Economic calendar", description: "US releases of medium and high importance", symbolic: false, source: "TradingView", w: 4, h: 14, minW: 3, minH: 8 },
-    screener: { title: "Screener", description: "Every US-listed stock, with filters", symbolic: false, source: "TradingView", w: 12, h: 16, minW: 6, minH: 10 },
+    screener: { title: "Screener", description: "Markets presets: TradingView's US screener, or a watchlist; a pick loads linked widgets", symbolic: false, source: "TradingView · Finnhub", w: 12, h: 16, minW: 6, minH: 10 },
     overview: { title: "Market overview", description: "Top stocks by sector over the past 12 months", symbolic: false, source: "TradingView", w: 4, h: 16, minW: 3, minH: 12 },
     indicators: { title: "Economic indicators", description: "Rates, inflation, jobs and growth, each with its period", symbolic: false, source: "FRED", w: 4, h: 14, minW: 3, minH: 8 },
 };

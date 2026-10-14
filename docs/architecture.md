@@ -6,9 +6,10 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 
 | Area | Files |
 |---|---|
-| Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data`, `market-overview`, `top-stories`, `economy`, `watchlist`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
+| Pages | `app/(root)/` (dashboard `page.tsx`, `workspace`, `heatmap`, `market-data` (Markets), `market-overview`, `top-stories`, `economy`, `watchlist`, `stocks/[symbol]`, `status`), `app/(auth)/` (sign in/up) |
 | Workspaces | `components/workspace/` (`WorkspaceApp` grid and toolbar, `WidgetFrame`, `widgets.tsx` contents, `SymbolField`), `lib/workspace.ts` (catalog, templates, layout moves, validation; pure), `lib/actions/workspace.actions.ts` + `database/models/workspace.model.ts` (one saved store per user) |
 | Watchlists | `components/watchlist/` (`WatchlistApp` page, `WatchlistGrid` quote grid also used by the workspace widget, `ListTabs`, `ColumnsMenu`, `InspectPanel`, `WatchCards` for phones, `useWatchRows`), `lib/watchlists.ts` (lists, columns, sorting, validation; pure), `lib/watchlist-format.ts` (cell text; pure), `lib/watchlist-store.ts` + `database/models/watchlist-lists.model.ts` (one document per user, migrated from the older `watchlists` collection, which is left as it was), `lib/watchlist-data.ts` (rows from the shared cache), `lib/actions/watchlist.actions.ts` |
+| Markets screener | `components/markets/` (`MarketsApp` page, `TvScreener` TradingView embed, `useScreenerTable` watchlist rows, `PresetsMenu`, `FiltersMenu`, `AddToList`, `ScreenerWidget` for workspaces), `lib/screener.ts` (universes, TradingView screens and views, figure ranges, presets, address; pure), `lib/actions/markets.actions.ts` + `database/models/markets-prefs.model.ts` (`markets_prefs`, one document per user). Reuses the watchlist grid, columns menu, details panel and `/api/watchlist/rows` |
 | Shared UI | `components/Panel.tsx` (titled frame), `components/PageHeader.tsx`, `components/ToolButton.tsx` (tool and full-screen buttons), `hooks/useFullscreen.ts` |
 | API routes | `app/api/market` (index and sector fund prices), `app/api/watchlist/rows` (watchlist grid figures; signed-in), `app/api/heatmap` (map data), `app/api/heatmap/stream` (live trades as server-sent events), `app/api/inngest` |
 | Request gate (every provider call) | `lib/providers/gate.ts` (budget, cache, merging, usage; pure), `lib/providers/registry.ts` (one gate per provider), `lib/providers/mongo-store.ts` (slow answers kept in MongoDB) |
@@ -57,6 +58,13 @@ action and undoes it if saving fails. Prices come with the page for the first 10
 `/api/watchlist/rows` in chunks of 40, each symbol once; Refresh and "Retry incomplete rows" are the only repeats (a row
 with its price but missing key figures asks for the figures only). Lists over 10 symbols load key figures behind
 prices.
+
+Markets: two universes kept apart. All US = TradingView's screener embed, driven only by its documented `defaultScreen`
+and `defaultColumn` (0 Finnhub calls). Watchlists = the user's lists with the Watchlist page's figures through
+`/api/watchlist/rows`; stocks answered "busy" are asked for again every 20 s (cache or the queued call answers) until in.
+Figure filters leave out and count rows missing the figure. The screen lives in the address (`replaceState`) and as
+`last` with the presets in MongoDB. (A native S&P 500 universe was removed on 2026-10-14: the free plan's 50 calls a
+minute couldn't price it fast enough. Old `u=sp500` screens open All US.)
 
 Economy: `getIndicators` asks FRED for 14 series through FRED's own gate (100/min budget; FRED allows 120). On a cold
 cache that is about 44 calls (observations, series details, release calendar); after that answers are reused for
