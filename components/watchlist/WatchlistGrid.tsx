@@ -8,10 +8,9 @@ import { cellFor } from "@/lib/watchlist-format";
 import { COLUMNS, type ColumnKey, type Density, type SortKey, type WatchRow, type WatchlistPrefs } from "@/lib/watchlists";
 import { cn, getChangeColorClass } from "@/lib/utils";
 
-// A symbol that's in the list but whose figures haven't arrived yet. idle: nothing has been asked for (the Markets
-// screener loads S&P 500 figures on request), so its cells say so instead of showing a loading bar. sector and
-// industry are known from the S&P 500 list before any figures load.
-export type GridRow = { symbol: string; company: string; data?: WatchRow; idle?: boolean; sector?: string; industry?: string };
+// A symbol that's in the list, with its figures once they arrive. sector (and industry, when given) are known from the
+// S&P 500 list before any figures load.
+export type GridRow = { symbol: string; company: string; data?: WatchRow; sector?: string; industry?: string };
 
 type GridProps = {
     rows: GridRow[];
@@ -70,13 +69,6 @@ const DataCell = ({ column, row }: { column: ColumnKey; row: GridRow }) => {
     if (!row.data) {
         if (column === "name") return <td className="max-w-56 truncate px-2 text-gray-400">{row.company}</td>;
         if ((column === "sector" || column === "industry") && row[column]) return <td title={row[column]} className="max-w-44 truncate px-2 text-gray-400">{row[column]}</td>;
-        if (row.idle) {
-            return (
-                <td title={`${def.label}: not loaded yet`} className={cn("px-2 text-gray-500", align)}>
-                    —
-                </td>
-            );
-        }
         return (
             <td className={cn("px-2", align)}>
                 <Skeleton align={def.align} />

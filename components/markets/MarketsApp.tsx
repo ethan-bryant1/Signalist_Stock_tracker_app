@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowDownUp, Download, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { ArrowDownUp, Loader2, RefreshCw, Search, X } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { OPEN_SEARCH_EVENT } from "@/components/SearchCommand";
 import { ToolButton } from "@/components/ToolButton";
@@ -17,31 +17,23 @@ import InspectPanel from "@/components/watchlist/InspectPanel";
 import WatchCards from "@/components/watchlist/WatchCards";
 import WatchlistGrid, { type GridRow } from "@/components/watchlist/WatchlistGrid";
 import { saveMarketsPrefs } from "@/lib/actions/markets.actions";
-import { MARKET_SECTORS, SP500_COMPANIES } from "@/lib/data/sp500";
 import {
     BUILT_IN_PRESETS,
     DEFAULT_SCREEN_COLUMNS,
-    FIGURE_LOAD_LIMIT,
     SCREENER_COLUMNS,
-    SECTOR_LABEL,
     TV_SCREENS,
     TV_VIEWS,
     UNIVERSES,
     activeRanges,
-    countBySector,
     createPreset,
     deletePreset,
     describeRange,
-    industriesIn,
-    loadMinutes,
     nextScreenSort,
     paramsFromState,
     renamePreset,
     sameScreen,
-    searchCompanies,
     stateFromParams,
     updatePreset,
-    CALLS_PER_STOCK,
     type MarketsPrefs,
     type Preset,
     type PresetResult,
@@ -67,21 +59,6 @@ const Chip = ({ label, onClear }: { label: string; onClear: () => void }) => (
     </span>
 );
 
-const SectorChip = ({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) => (
-    <button
-        type="button"
-        aria-pressed={active}
-        onClick={onClick}
-        className={cn(
-            "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-100",
-            active ? "border-gray-100 bg-gray-100 text-gray-900" : "border-gray-600 text-gray-400 hover:border-gray-400 hover:text-gray-100"
-        )}
-    >
-        {label}
-        <span className={cn("tabular-nums", active ? "opacity-70" : "text-gray-500")}>{count}</span>
-    </button>
-);
-
 type Props = {
     initialState: ScreenState;
     initialPrefs: MarketsPrefs;
@@ -90,7 +67,7 @@ type Props = {
 };
 
 // The Markets page: one toolbar over one screener. "All US" is TradingView's screener embed, driven only by the
-// settings it documents (screen and column view); "S&P 500" and "Watchlists" are our own table over a list we hold,
+// settings it documents (screen and column view); "Watchlists" is our own table over the user's lists,
 // where every filter shown filters the rows shown. The screen is kept in the address (so Back from a stock page
 // returns to it) and with the account, along with the user's presets.
 const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: Props) => {
@@ -106,7 +83,7 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
     const [findText, setFindText] = useState("");
 
     const native = state.universe !== "us";
-    const table = useScreenerTable(state, doc?.lists ?? null, doc?.activeId, "loops-watch:markets-figures");
+    const table = useScreenerTable(state, doc?.lists ?? null, doc?.activeId);
     const listName = (id?: string) => doc?.lists.find((list) => list.id === id)?.name;
     const update = (patch: Partial<ScreenState>) => setState((current) => ({ ...current, ...patch }));
 
@@ -156,40 +133,18 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
         return problem;
     };
 
-    // ---------- S&P 500 ----------
-
-    const searchMatches = useMemo(() => (state.universe === "sp500" ? searchCompanies(SP500_COMPANIES, state.query) : []), [state.universe, state.query]);
-    const sectorCounts = useMemo(() => countBySector(searchMatches), [searchMatches]);
-    const industries = useMemo(() => industriesIn(searchMatches, state.sector), [searchMatches, state.sector]);
-    // On a narrow screen the sector row scrolls sideways; keep the chosen sector in view
-    const sectorRow = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        const row = sectorRow.current;
-        const chip = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
-        if (row && chip && row.scrollWidth > row.clientWidth) row.scrollTo({ left: chip.offsetLeft - row.clientWidth / 2 + chip.offsetWidth / 2 });
-    }, [state.sector, state.universe]);
-
     // ---------- Selection ----------
 
     const selectedRow: GridRow | null = table.rows.find((row) => row.symbol === selected) ?? null;
-    const select = (symbol: string | null) => {
-        setSelected(symbol);
-        // A stock picked before its figures were asked for loads them on its own (one stock, a few calls at most)
-        const row = symbol ? table.rows.find((entry) => entry.symbol === symbol) : undefined;
-        if (row?.idle) table.request([row.symbol]);
-    };
+    const select = (symbol: string | null) => setSelected(symbol);
     const actionsFor = (row: GridRow) => (doc ? <AddToList symbol={row.symbol} company={row.data?.name ?? row.company} doc={doc} onSaved={setDoc} /> : null);
     const otherLists = (symbol: string) => (doc ? doc.lists.filter((list) => list.items.some((item) => item.symbol === symbol)).map((list) => list.name) : []);
 
     // ---------- Text ----------
 
-    const universeWord = state.universe === "sp500" ? "S&P 500 constituents" : `stocks in ${table.list?.name ?? "the list"}`;
+    const universeWord = `stocks in ${table.list?.name ?? "the list"}`;
     const ranges = activeRanges(state.filters);
-    const canLoad = state.universe === "sp500" && table.unrequested.length > 0 && table.total <= FIGURE_LOAD_LIMIT;
-    const figuresNote =
-        state.universe === "sp500"
-            ? "Figures are Finnhub's and load for S&P 500 stocks when you ask (Load figures). A stock whose figure hasn't loaded or doesn't exist isn't shown while a filter on that figure is on; the count below says how many."
-            : "Figures are Finnhub's, the same as the Watchlist page's. A stock without the figure isn't shown while a filter on that figure is on; the count below says how many.";
+    const figuresNote = "Figures are Finnhub's, the same as the Watchlist page's. A stock without the figure isn't shown while a filter on that figure is on; the count below says how many.";
     const sortSelect = ["symbol", "last", "changePercent", "marketCap", "peRatio", "dividendYield", "avgVolume"] as const;
 
     const findStock = () => window.dispatchEvent(new CustomEvent(OPEN_SEARCH_EVENT, { detail: findText.trim() }));
@@ -199,7 +154,7 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
             <PageHeader
                 back={false}
                 title="Markets"
-                description="Screen stocks and open their research. All US stocks screen in TradingView's screener; the S&P 500 and your watchlists in a Loops Watch table with Finnhub figures."
+                description="Screen stocks and open their research. All US stocks screen in TradingView's screener; your watchlists in a Loops Watch table with Finnhub figures."
             >
                 <p className="text-xs text-gray-500" aria-live="polite">
                     {native ? "Finnhub figures · each price shows its time (New York)" : "TradingView data · may be delayed · no Finnhub calls"}
@@ -320,7 +275,7 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
                                     value={state.query}
                                     onChange={(event) => update({ query: event.target.value })}
                                     onKeyDown={(event) => event.key === "Escape" && update({ query: "" })}
-                                    placeholder={state.universe === "sp500" ? "Company, ticker or industry" : "Filter this list"}
+                                    placeholder="Filter this list"
                                     autoComplete="off"
                                     className="h-8 w-full rounded-lg border border-gray-600 bg-gray-900 pr-2 pl-8 text-xs text-gray-100 outline-none placeholder:text-gray-500 focus:border-gray-400 sm:w-56"
                                 />
@@ -362,54 +317,19 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
                     )}
                 </div>
 
-                {state.universe === "sp500" && (
-                    <div className="flex flex-col gap-2 border-t border-gray-700 pt-2 lg:flex-row lg:items-center">
-                        <div ref={sectorRow} role="group" aria-label="S&P 500 sectors (constituent counts)" className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-hide lg:flex-wrap">
-                            <SectorChip label="All sectors" count={searchMatches.length} active={!state.sector} onClick={() => update({ sector: undefined, industry: undefined })} />
-                            {MARKET_SECTORS.map(({ value, label }) => (
-                                <SectorChip key={value} label={label} count={sectorCounts.get(value) ?? 0} active={state.sector === value} onClick={() => update({ sector: state.sector === value ? undefined : value, industry: undefined })} />
-                            ))}
-                        </div>
-                        <label htmlFor={`${ids}-industry`} className="sr-only">
-                            Industry
-                        </label>
-                        <select id={`${ids}-industry`} value={state.industry ?? ""} onChange={(event) => update({ industry: event.target.value || undefined })} className={cn(selectClass, "lg:max-w-64")}>
-                            <option value="">All industries{state.sector ? ` in ${SECTOR_LABEL.get(state.sector)}` : ""}</option>
-                            {industries.map(({ industry, count }) => (
-                                <option key={industry} value={industry}>
-                                    {industry} ({count})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
             </div>
 
             {/* What's applied and what the rows are */}
             {native && (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                    {state.sector && state.universe === "sp500" && <Chip label={`Sector: ${SECTOR_LABEL.get(state.sector)}`} onClear={() => update({ sector: undefined, industry: undefined })} />}
-                    {state.industry && state.universe === "sp500" && <Chip label={`Industry: ${state.industry}`} onClear={() => update({ industry: undefined })} />}
                     {state.query.trim() && <Chip label={`Search: ${state.query.trim()}`} onClear={() => update({ query: "" })} />}
                     {ranges.map((key) => (
                         <Chip key={key} label={describeRange(key, state.filters[key]!)} onClear={() => update({ filters: Object.fromEntries(Object.entries(state.filters).filter(([entry]) => entry !== key)) })} />
                     ))}
                     <p className="min-w-0 text-gray-500" aria-live="polite">
                         {table.rows.length === table.total ? `${table.total}` : `${table.rows.length} of ${table.total}`} {universeWord}
-                        {table.unchecked > 0 && ` · ${table.unchecked} not shown: missing a filtered figure${state.universe === "sp500" && table.loaded < table.total ? " (load figures)" : ""}`}
-                        {state.universe === "sp500" && ` · figures loaded for ${table.loaded}`}
+                        {table.unchecked > 0 && ` · ${table.unchecked} not shown: missing a filtered figure`}
                     </p>
-                    {canLoad && (
-                        <ToolButton
-                            onClick={() => table.request(table.unrequested)}
-                            title={`Up to ${table.unrequested.length * CALLS_PER_STOCK} Finnhub calls when nothing is cached, about ${loadMinutes(table.unrequested.length)} min within the free plan's budget. Loaded figures are kept, so loading again costs little.`}
-                            pressed
-                        >
-                            <Download aria-hidden className="h-3.5 w-3.5" />
-                            Load figures for {table.unrequested.length} {table.unrequested.length === 1 ? "stock" : "stocks"}
-                        </ToolButton>
-                    )}
-                    {state.universe === "sp500" && table.unrequested.length > 0 && !canLoad && <span className="text-gray-500">Pick a sector or industry, or search, to load figures (up to {FIGURE_LOAD_LIMIT} stocks at a time).</span>}
                     {(table.loading || table.waiting > 0) && (
                         <span className="inline-flex items-center gap-1 text-gray-500">
                             <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
@@ -448,16 +368,10 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
                         ) : table.rows.length === 0 ? (
                             <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
                                 <p className="max-w-md text-sm text-gray-400">
-                                    {table.unchecked > 0 && table.loaded === 0 ? "Figure filters need figures. Load them first, or clear the figure filters." : `No ${universeWord} match these filters.`}
+                                    {table.unchecked > 0 && table.loaded === 0 ? "Figure filters need figures, which haven't loaded yet. Clear the figure filters to see the list." : `No ${universeWord} match these filters.`}
                                 </p>
                                 <div className="flex flex-wrap justify-center gap-2">
-                                    {canLoad && (
-                                        <ToolButton onClick={() => table.request(table.unrequested)} title={`Up to ${table.unrequested.length * CALLS_PER_STOCK} Finnhub calls when nothing is cached`} pressed>
-                                            <Download aria-hidden className="h-3.5 w-3.5" />
-                                            Load figures for {table.unrequested.length} {table.unrequested.length === 1 ? "stock" : "stocks"}
-                                        </ToolButton>
-                                    )}
-                                    <ToolButton onClick={() => update({ sector: undefined, industry: undefined, query: "", filters: {} })} title="Clear every filter">
+                                    <ToolButton onClick={() => update({ query: "", filters: {} })} title="Clear every filter">
                                         <X aria-hidden className="h-3.5 w-3.5" />
                                         Clear filters
                                     </ToolButton>
@@ -474,13 +388,13 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
                                         density={prefs.density}
                                         selected={selected}
                                         onSelect={select}
-                                        label={state.universe === "sp500" ? "S&P 500 screener" : `${table.list?.name ?? "Watchlist"} screener`}
+                                        label={`${table.list?.name ?? "Watchlist"} screener`}
                                         maxHeightClass="max-h-[max(420px,calc(100dvh-19rem))] min-h-24"
                                     />
                                 </div>
                                 <div className="md:hidden">
-                                    <WatchCards rows={table.rows.slice(0, 200)} selected={selected} onSelect={select} listName={state.universe === "sp500" ? "S&P 500" : (table.list?.name ?? "Watchlist")} otherListsFor={otherLists} actionsFor={actionsFor} />
-                                    {table.rows.length > 200 && <p className="px-4 py-3 text-xs text-gray-500">Showing the first 200. Search or pick a sector to narrow the list.</p>}
+                                    <WatchCards rows={table.rows.slice(0, 200)} selected={selected} onSelect={select} listName={table.list?.name ?? "Watchlist"} otherListsFor={otherLists} actionsFor={actionsFor} />
+                                    {table.rows.length > 200 && <p className="px-4 py-3 text-xs text-gray-500">Showing the first 200. Filter the list to narrow it.</p>}
                                 </div>
                             </>
                         )}
@@ -506,7 +420,7 @@ const MarketsApp = ({ initialState, initialPrefs, prefsAvailable, watchlists }: 
                 <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
                     <p className="min-w-0 flex-1">
                         Finnhub figures through the app&apos;s shared cache; each price shows its time. A dash means no figure; n/a means it doesn&apos;t apply to a fund.
-                        {state.universe === "sp500" && " Sector and industry are GICS, from the S&P 500 list of 2026-10-09."} Volume is the 10-day average; Finnhub&apos;s free plan has no same-day volume.
+                        {" "}Volume is the 10-day average; Finnhub&apos;s free plan has no same-day volume.
                     </p>
                     <p className="hidden lg:block" aria-hidden>
                         ↑↓ select · Enter open

@@ -105,8 +105,8 @@ const SectorPerformance = ({ now, className, framed = true }: SectorPerformanceP
                     return (
                         <li key={symbol}>
                             <Link
-                                href={`/market-data?sector=${encodeURIComponent(sector)}`}
-                                title={`Quotes for every ${sector} company in the S&P 500`}
+                                href={`/stocks/${encodeURIComponent(symbol)}`}
+                                title={`${symbol}, the ${sector} sector fund`}
                                 className="grid w-full grid-cols-[minmax(0,1fr)_4.25rem] items-center gap-x-2 gap-y-1 px-4 py-1.5 transition-colors hover:bg-gray-700/50"
                             >
                                 <span className="min-w-0 truncate text-[13px] text-gray-100">

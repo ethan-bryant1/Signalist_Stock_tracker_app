@@ -38,8 +38,6 @@ const Card = memo(function Card({ row, open, index, count, onSelect, onRemove, o
                             <span className="block text-sm font-semibold text-gray-100">{data.price !== undefined ? formatCurrency(data.price, data.currency) : "—"}</span>
                             <span className={cn("block text-xs font-medium", getChangeColorClass(data.changePercent))}>{data.changePercent !== undefined ? formatChangePercent(data.changePercent) : "—"}</span>
                         </>
-                    ) : row.idle ? (
-                        <span title="Not loaded yet" className="block text-sm text-gray-500">—</span>
                     ) : (
                         <span aria-label="Loading" className="block h-8 w-16 animate-pulse rounded bg-gray-700" />
                     )}

@@ -2,13 +2,13 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Download } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import TvScreener from "@/components/markets/TvScreener";
 import { useScreenerTable } from "@/components/markets/useScreenerTable";
 import WatchlistGrid from "@/components/watchlist/WatchlistGrid";
 import { getMarketsPrefs } from "@/lib/actions/markets.actions";
 import { getWatchlists } from "@/lib/actions/watchlist.actions";
-import { BUILT_IN_PRESETS, CALLS_PER_STOCK, FIGURE_LOAD_LIMIT, paramsFromState, type Preset } from "@/lib/screener";
+import { BUILT_IN_PRESETS, paramsFromState, type Preset } from "@/lib/screener";
 import type { ColumnKey, WatchlistDoc } from "@/lib/watchlists";
 
 const COLUMNS: ColumnKey[] = ["last", "changePercent", "marketCap"];
@@ -44,7 +44,7 @@ const ScreenerWidget = ({ widgetId, symbol, onPickSymbol }: { widgetId: string; 
 
     const all = useMemo(() => [...BUILT_IN_PRESETS, ...presets], [presets]);
     const preset = all.find((entry) => entry.id === choice) ?? all[0];
-    // A watchlist preset needs the lists; until they're in, it waits on the S&P 500 view's empty state
+    // A watchlist preset needs the lists; until they're in, it shows a loading line
     const state = preset.state;
     const table = useScreenerTable(state, doc?.lists ?? null, doc?.activeId);
     const choose = (id: string) => {
@@ -55,7 +55,6 @@ const ScreenerWidget = ({ widgetId, symbol, onPickSymbol }: { widgetId: string; 
             // Not kept, still applied
         }
     };
-    const canLoad = state.universe === "sp500" && table.unrequested.length > 0 && table.total <= FIGURE_LOAD_LIMIT;
 
     return (
         <div className="flex h-full flex-col">
@@ -81,17 +80,6 @@ const ScreenerWidget = ({ widgetId, symbol, onPickSymbol }: { widgetId: string; 
                         </optgroup>
                     )}
                 </select>
-                {canLoad && (
-                    <button
-                        type="button"
-                        onClick={() => table.request(table.unrequested)}
-                        title={`Load Finnhub figures for ${table.unrequested.length} stocks (up to ${table.unrequested.length * CALLS_PER_STOCK} calls when nothing is cached)`}
-                        className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-md border border-gray-600 px-2 text-xs font-semibold text-gray-400 hover:text-gray-100"
-                    >
-                        <Download aria-hidden className="h-3.5 w-3.5" />
-                        Figures
-                    </button>
-                )}
                 <Link href={`/market-data?${paramsFromState(state).toString()}`} title="Open this screen on the Markets page" className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs font-semibold text-gray-400 hover:text-gray-100">
                     Markets
                     <ArrowUpRight aria-hidden className="h-3.5 w-3.5" />
@@ -109,11 +97,7 @@ const ScreenerWidget = ({ widgetId, symbol, onPickSymbol }: { widgetId: string; 
                         sort={state.sort}
                         density="compact"
                         selected={symbol}
-                        onSelect={(picked) => {
-                            const row = table.rows.find((entry) => entry.symbol === picked);
-                            if (row?.idle) table.request([picked]);
-                            onPickSymbol(picked);
-                        }}
+                        onSelect={onPickSymbol}
                         label={preset.name}
                         linkSymbols={false}
                         maxHeightClass="max-h-full h-full"

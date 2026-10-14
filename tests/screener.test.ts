@@ -1,28 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { SP500_COMPANIES } from "@/lib/data/sp500";
 import {
     BUILT_IN_PRESETS,
+    COMPANY_BY_SYMBOL,
     DEFAULT_PREFS,
     DEFAULT_STATE,
-    FIGURE_LOAD_LIMIT,
     MAX_PRESETS,
     TV_SCREENS,
     TV_VIEWS,
     applyRanges,
-    countBySector,
     createPreset,
     deletePreset,
     describeRange,
     describeState,
-    industriesIn,
-    loadMinutes,
     paramsFromState,
     parsePrefs,
     parseState,
     rangeValue,
     renamePreset,
     sameScreen,
-    sp500Matches,
     stateFromParams,
     updatePreset,
     type ScreenState,
@@ -32,40 +27,11 @@ import type { WatchRow } from "@/lib/watchlists";
 const row = (symbol: string, figures: Partial<WatchRow> = {}): WatchRow => ({ symbol, kind: "stock", currency: "USD", checkedAt: 0, ...figures });
 const fromParams = (state: ScreenState) => stateFromParams(Object.fromEntries(paramsFromState(state)));
 
-describe("S&P 500 list", () => {
-    it("holds 503 constituents in 11 sectors whose counts add up", () => {
-        expect(SP500_COMPANIES).toHaveLength(503);
-        const counts = countBySector(SP500_COMPANIES);
-        expect(counts.size).toBe(11);
-        expect([...counts.values()].reduce((a, b) => a + b, 0)).toBe(503);
-        expect(counts.get("Information Technology")).toBe(75);
-    });
-
-    it("filters by sector, industry and search together", () => {
-        const tech = sp500Matches({ sector: "Information Technology", query: "" });
-        expect(tech).toHaveLength(75);
-        expect(tech.every((company) => company.sector === "Information Technology")).toBe(true);
-        const semis = sp500Matches({ sector: "Information Technology", industry: "Semiconductors", query: "" });
-        expect(semis.length).toBeGreaterThan(5);
-        expect(semis.every((company) => company.industry === "Semiconductors")).toBe(true);
-        expect(sp500Matches({ query: "NVDA" })[0].symbol).toBe("NVDA");
-        expect(sp500Matches({ sector: "Energy", query: "NVDA" })).toHaveLength(0);
-    });
-
-    it("finds tickers with punctuation", () => {
-        expect(sp500Matches({ query: "BRK.B" })[0].symbol).toBe("BRK.B");
-    });
-
-    it("lists industries of a sector with counts that add up to the sector", () => {
-        const energy = industriesIn(SP500_COMPANIES, "Energy");
-        expect(energy.reduce((sum, { count }) => sum + count, 0)).toBe(21);
-        expect(energy.map(({ industry }) => industry)).toEqual([...energy.map(({ industry }) => industry)].sort((a, b) => a.localeCompare(b)));
-    });
-
-    it("estimates load time from the 50-a-minute budget", () => {
-        expect(loadMinutes(1)).toBe(1);
-        expect(loadMinutes(75)).toBe(5);
-        expect(FIGURE_LOAD_LIMIT).toBeLessThanOrEqual(100);
+describe("sectors", () => {
+    it("knows an S&P 500 stock's sector without any calls", () => {
+        expect(COMPANY_BY_SYMBOL.get("NVDA")?.sector).toBe("Information Technology");
+        expect(COMPANY_BY_SYMBOL.get("BRK.B")).toBeDefined();
+        expect(COMPANY_BY_SYMBOL.get("NOPE")).toBeUndefined();
     });
 });
 
@@ -122,10 +88,16 @@ describe("state", () => {
         expect(parsed).toEqual(DEFAULT_STATE);
     });
 
-    it("swaps a min above its max and drops an industry outside the sector", () => {
-        const parsed = parseState({ universe: "sp500", sector: "Energy", industry: "Semiconductors", filters: { price: { min: 10, max: 2 } } });
-        expect(parsed.industry).toBeUndefined();
+    it("swaps a min above its max", () => {
+        const parsed = parseState({ universe: "watchlist", filters: { price: { min: 10, max: 2 } } });
         expect(parsed.filters.price).toEqual({ min: 2, max: 10 });
+    });
+
+    it("opens saved S&P 500 screens on All US, now that universe is gone", () => {
+        const parsed = parseState({ universe: "sp500", sector: "Energy", industry: "Oil, Gas & Consumable Fuels", query: "oil" });
+        expect(parsed.universe).toBe("us");
+        expect(parsed).not.toHaveProperty("sector");
+        expect(parsed).not.toHaveProperty("industry");
     });
 
     it("accepts every TradingView screen and view we offer", () => {
@@ -134,8 +106,8 @@ describe("state", () => {
     });
 
     it("round-trips through the address", () => {
-        const sp: ScreenState = { ...DEFAULT_STATE, universe: "sp500", sector: "Information Technology", industry: "Semiconductors", query: "micro", filters: { peRatio: { min: 0, max: 30 }, marketCap: { min: 10 } }, sort: { key: "peRatio", dir: "asc" }, columns: ["name", "last", "peRatio"] };
-        expect(fromParams(sp)).toEqual(sp);
+        const wlFull: ScreenState = { ...DEFAULT_STATE, universe: "watchlist", listId: "x1", query: "micro", filters: { peRatio: { min: 0, max: 30 }, marketCap: { min: 10 } }, sort: { key: "peRatio", dir: "asc" }, columns: ["name", "last", "peRatio", "sector"] };
+        expect(fromParams(wlFull)).toEqual(wlFull);
         const us: ScreenState = { ...DEFAULT_STATE, universe: "us", screen: "top_gainers", view: "performance" };
         expect(fromParams(us)).toEqual(us);
         const wl: ScreenState = { ...DEFAULT_STATE, universe: "watchlist", listId: "abc123", filters: { dividendYield: { min: 2 } } };
@@ -143,19 +115,19 @@ describe("state", () => {
     });
 
     it("keeps the address short for TradingView screens", () => {
-        expect(paramsFromState({ ...DEFAULT_STATE, sector: "Energy" }).toString()).toBe("u=us&screen=most_capitalized&view=overview");
+        expect(paramsFromState({ ...DEFAULT_STATE, query: "x", filters: { price: { min: 1 } } }).toString()).toBe("u=us&screen=most_capitalized&view=overview");
     });
 
-    it("opens the dashboard's ?sector= links on that S&P 500 sector", () => {
-        const state = stateFromParams({ sector: "Energy" });
-        expect(state).toMatchObject({ universe: "sp500", sector: "Energy", query: "", filters: {} });
+    it("treats old S&P 500 addresses as All US", () => {
         expect(stateFromParams({})).toBeNull();
-        expect(stateFromParams({ sector: "Nope" })?.sector).toBeUndefined();
+        // The dashboard's former ?sector= links describe no screen, so the last one used opens
+        expect(stateFromParams({ sector: "Energy" })).toBeNull();
+        expect(stateFromParams({ u: "sp500", sector: "Energy" })?.universe).toBe("us");
     });
 
     it("describes a screen in one line", () => {
         expect(describeState({ ...DEFAULT_STATE, universe: "us", screen: "top_gainers", view: "performance" })).toBe("All US · Top gainers · Performance");
-        expect(describeState({ ...DEFAULT_STATE, universe: "sp500", sector: "Energy", query: "oil", filters: { price: { min: 1 } } })).toBe('S&P 500 · Energy · "oil" · 1 figure filter');
+        expect(describeState({ ...DEFAULT_STATE, universe: "watchlist", query: "oil", filters: { price: { min: 1 } } }, "Energy")).toBe('Watchlist: Energy · "oil" · 1 figure filter');
         expect(describeState({ ...DEFAULT_STATE, universe: "watchlist" }, "Tech")).toBe("Watchlist: Tech");
     });
 });
@@ -164,12 +136,11 @@ describe("presets", () => {
     it("ships real, distinct ready-made screens", () => {
         expect(new Set(BUILT_IN_PRESETS.map((preset) => preset.id)).size).toBe(BUILT_IN_PRESETS.length);
         for (const preset of BUILT_IN_PRESETS) expect(parseState(preset.state)).toEqual(preset.state);
-        const tech = BUILT_IN_PRESETS.find((preset) => preset.id === "builtin-technology")!;
-        expect(sp500Matches(tech.state)).toHaveLength(75);
+        expect(BUILT_IN_PRESETS.every((preset) => preset.state.universe === "us")).toBe(true);
     });
 
     it("creates, renames, updates and deletes", () => {
-        const sp: ScreenState = { ...DEFAULT_STATE, universe: "sp500", sector: "Energy" };
+        const sp: ScreenState = { ...DEFAULT_STATE, universe: "watchlist", listId: "energy" };
         let result = createPreset(DEFAULT_PREFS, "p1", "  Energy   names ", sp);
         expect(result.ok).toBe(true);
         let prefs = result.ok ? result.prefs : DEFAULT_PREFS;
@@ -201,7 +172,7 @@ describe("presets", () => {
     it("cleans saved preferences", () => {
         const prefs = parsePrefs({
             presets: [
-                { id: "p1", name: "One", state: { universe: "sp500" } },
+                { id: "p1", name: "One", state: { universe: "watchlist" } },
                 { id: "p1", name: "Duplicate id", state: {} },
                 { id: "builtin-x", name: "Pretend built-in", state: {} },
                 { id: "bad id!", name: "Bad", state: {} },
