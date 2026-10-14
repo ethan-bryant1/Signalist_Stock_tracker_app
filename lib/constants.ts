@@ -5,6 +5,7 @@ export const NAV_ITEMS: { href: string; label: string }[] = [
     { href: "/heatmap", label: "Heatmap" },
     { href: "/market-data", label: "Markets" },
     { href: "/top-stories", label: "News" },
+    { href: "/economy", label: "Economy" },
 ];
 
 // Sign-up form select options
