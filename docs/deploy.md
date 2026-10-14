@@ -78,7 +78,9 @@ Delete these if they came in with the paste:
 - `NEXT_PUBLIC_FINNHUB_API_KEY`: the old name of the Finnhub key. The `NEXT_PUBLIC_` prefix tells Next.js a value
   may be sent to browsers. Use `FINNHUB_API_KEY` instead.
 
-Leave each variable's environments at the default (Production, Preview and Development all ticked). If you want a
+Set each variable's environment to **Production** only (untick Preview and Development). Preview deployments are
+built from pull request branches before you've merged them, so they shouldn't get your real database and keys; they
+simply won't be able to sign you in, which is fine because you test pull requests on your computer. If you want a
 fresh secret instead of reusing yours, this PowerShell line prints one (copy it straight into Vercel; changing it
 only signs you out):
 
@@ -140,7 +142,8 @@ Open your live address in a normal browser window and go through this list:
 ## Good to know
 
 - **Updates:** every merge into `main` on GitHub deploys again automatically. Each pull request also gets its own
-  preview address; sign-in works there, but emails always link to the main address.
+  preview address. Previews don't have your keys (step 3), so they show the sign-in page and nothing more; test pull
+  requests on your computer with `npm run dev`.
 - **Undo a bad deploy:** **Deployments**, pick the last good one, **⋯ → Promote to Production** (or **Instant
   Rollback**).
 - **Live prices on two machines:** Finnhub allows one live trade stream per key. If the deployed site and
