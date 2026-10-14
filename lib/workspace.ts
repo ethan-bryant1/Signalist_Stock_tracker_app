@@ -11,6 +11,7 @@ const MAX_NAME = 40;
 
 export type WidgetType =
     | "chart"
+    | "dailyChart"
     | "quote"
     | "news"
     | "marketNews"
@@ -44,6 +45,7 @@ type CatalogEntry = {
 // TradingView widgets are embeds with TradingView's own (often delayed) data.
 export const WIDGETS: Record<WidgetType, CatalogEntry> = {
     chart: { title: "Chart", description: "TradingView's chart with indicators and drawing tools", symbolic: true, source: "TradingView", w: 8, h: 14, minW: 4, minH: 8 },
+    dailyChart: { title: "Daily chart", description: "Adjusted daily bars since 2016 with volume and 50/200-day averages", symbolic: true, source: "Alpaca", w: 8, h: 14, minW: 4, minH: 10 },
     quote: { title: "Quote", description: "Price, change and day range with its time", symbolic: true, source: "Finnhub", w: 4, h: 6, minW: 3, minH: 5 },
     news: { title: "Company news", description: "The past week's headlines for the symbol", symbolic: true, source: "Finnhub", w: 4, h: 12, minW: 3, minH: 6 },
     technicals: { title: "Technical rating", description: "TradingView's summary of moving averages and oscillators", symbolic: true, source: "TradingView", w: 4, h: 12, minW: 3, minH: 10 },

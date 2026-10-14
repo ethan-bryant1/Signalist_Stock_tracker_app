@@ -9,6 +9,8 @@ import { useLiveMarket } from "@/components/LiveMarket";
 import PriceStamp from "@/components/PriceStamp";
 import SectorPerformance from "@/components/SectorPerformance";
 import TradingViewWidget from "@/components/TradingViewWidget";
+import PriceChart from "@/components/chart/PriceChart";
+import { useChartSettings } from "@/hooks/useChartSettings";
 import { useNow } from "@/hooks/useHeatmapFeed";
 import { getCompanyNewsForWidget, getStockQuote, type StockQuote } from "@/lib/actions/finnhub.actions";
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
@@ -114,6 +116,14 @@ const ChartWidget = ({ symbol }: WidgetProps) => {
         [symbol]
     );
     return <TradingViewFill key={symbol} script="advanced-chart.js" config={config} />;
+};
+
+// The stock page's daily chart on Alpaca's adjusted daily bars. It shares the stock page's range, style and averages
+// (remembered in this browser) and its answers: one request per symbol per visit, which the server answers from its
+// daily copy (at most one Alpaca call per symbol a day). No polling.
+const DailyChartWidget = ({ symbol }: WidgetProps) => {
+    const [settings, updateSettings] = useChartSettings();
+    return <PriceChart symbol={symbol} settings={settings} onChange={updateSettings} />;
 };
 
 // Widgets that need the exchange (NASDAQ:AAPL) wait for the quote lookup, which has it
@@ -323,6 +333,7 @@ const IndicatorsWidget = () => {
 
 export const WIDGET_CONTENT: Record<WidgetType, { component: React.ComponentType<WidgetProps>; scroll: boolean }> = {
     chart: { component: ChartWidget, scroll: false },
+    dailyChart: { component: DailyChartWidget, scroll: false },
     quote: { component: QuoteWidget, scroll: true },
     news: { component: NewsWidget, scroll: true },
     marketNews: { component: MarketNewsWidget, scroll: true },

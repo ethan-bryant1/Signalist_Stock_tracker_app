@@ -78,6 +78,15 @@ describe("widget operations", () => {
         expect(overlapFree(next.layout)).toBe(true);
         expect(next.widgets.at(-1)).toEqual({ id: "new", type: "chart", linked: true });
     });
+    it("adds the daily chart linked to the workspace symbol, and keeps it through saving", () => {
+        const base = createWorkspace("technical", 1);
+        const next = addWidget(base, "dailyChart", "daily");
+        expect(next.widgets.at(-1)).toEqual({ id: "daily", type: "dailyChart", linked: true });
+        expect(widgetSymbol(next, next.widgets.at(-1)!)).toBe("AAPL");
+        const saved = parseStore(JSON.parse(JSON.stringify({ version: 1, activeId: next.id, workspaces: [next] })))!;
+        expect(saved.workspaces[0].widgets.at(-1)).toEqual({ id: "daily", type: "dailyChart", linked: true });
+        expect(saved.workspaces[0].layout.find((item) => item.i === "daily")).toMatchObject({ w: WIDGETS.dailyChart.w, h: WIDGETS.dailyChart.h });
+    });
     it("removes a widget and closes the gap", () => {
         const base = createWorkspace("market", 1);
         const first = readingOrder(base.layout)[0];
