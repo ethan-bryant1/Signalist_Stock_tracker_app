@@ -11,6 +11,7 @@
     "test": "vitest run",
     "check:market-data": "node scripts/check-market-data.mjs",
     "check:stream": "node scripts/check-stream.mjs",
+    "check:fred": "node scripts/check-fred.mjs",
     "check:portfolio": "node scripts/check-portfolio.mjs"
   },
   "dependencies": {
