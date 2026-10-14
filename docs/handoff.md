@@ -3,7 +3,7 @@
 The state of Loops Watch for whoever picks up the next task, human or Claude. Keep it short and current: update
 the "Status" and "Next" sections in the same pull request as any feature. Details live in the linked docs, not here.
 
-Last updated: 2026-10-14, after the daily chart (PR #30), with the daily chart workspace widget pull request.
+Last updated: 2026-10-14, after the indicators (PR #32), with the launch security review pull request.
 
 ## Read only what the task needs
 
@@ -19,16 +19,17 @@ Last updated: 2026-10-14, after the daily chart (PR #30), with the daily chart w
 
 ## Status
 
-- `main` = `c860e68` (PRs #25 to #30 merged). Live on Vercel at https://loops-watch.vercel.app; every merge to `main`
+- `main` = `17fa4f7` (PRs #25 to #32 merged). Live on Vercel at https://loops-watch.vercel.app; every merge to `main`
   deploys. Everything below "Done" is on `main`.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
-- In review: "Daily chart" workspace widget (branch `claude/project-thread-eila82`). Add widget → Daily chart puts the
-  stock page's daily chart (`components/chart/PriceChart.tsx`) in a workspace panel. It follows the linked symbol (or
-  its own when unlinked) and shares the stock page's range, style and averages (browser setting) and its loaded
-  answers. Same `/api/chart` cache: no call until the panel is on screen, one request per symbol per visit, at most one
-  Alpaca call per symbol a day; no polling. Templates are unchanged. Browser check on mock data:
-  `dev-harness/ws-daily-check.mjs` 20/20; `ws-check.mjs` 33/33.
+- In review: launch security review (branch `claude/project-thread-pahq1h`). Every API route and server action was
+  checked for a signed-in, allowed user, and a build with marker values showed no key in the browser bundle. Fixed: the
+  news email's per-email watchlist lookup was a callable server action with no sign-in check (now plain server code in
+  `lib/news-email-users.ts`); sign-in had no attempt limit (Better Auth's only covers its HTTP routes), now 10 wrong
+  tries per address or 30 per email in 15 minutes pause sign-in (`lib/sign-in-limit.ts`, MongoDB
+  `sign_in_failures`); sign-in/up no longer return the session token to the page or pass database error text on;
+  stock pages 404 on anything that can't be a ticker. No env change needed.
 
 ### Done
 
@@ -86,7 +87,7 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Tests
 
-- Unit: `npm test` (Vitest, `tests/`), 312 passing.
+- Unit: `npm test` (Vitest, `tests/`), 325 passing.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
   On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases, events 19/19, integration 21/21 plus
