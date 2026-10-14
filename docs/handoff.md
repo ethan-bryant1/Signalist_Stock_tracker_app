@@ -3,7 +3,7 @@
 The state of Loops Watch for whoever picks up the next task, human or Claude. Keep it short and current: update
 the "Status" and "Next" sections in the same pull request as any feature. Details live in the linked docs, not here.
 
-Last updated: 2026-10-14, after PRs #25 to #28, with the deploy prep pull request.
+Last updated: 2026-10-14, after the deploy (PR #29), with the daily chart pull request.
 
 ## Read only what the task needs
 
@@ -19,14 +19,17 @@ Last updated: 2026-10-14, after PRs #25 to #28, with the deploy prep pull reques
 
 ## Status
 
-- `main` = `74b7359` (PRs #25 News, #26 Markets, #27 Economy, #28 Portfolio merged). Everything below "Done" is on
-  `main`.
+- `main` = `4da0480` (PRs #25 to #29 merged). Live on Vercel at https://loops-watch.vercel.app; every merge to `main`
+  deploys. Everything below "Done" is on `main`.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
-- In review: deploy prep on `claude/vercel-deploy-prep-ub3dut`. Beginner deploy guide `docs/deploy.md` (Vercel,
-  Atlas network access, every env var, Inngest integration, checks after deploy). Email links and Better Auth use
-  `lib/app-url.ts` (`BETTER_AUTH_URL`, else Vercel's production address, else localhost); `package.json` asks for
-  Node 22+ so Vercel runs a Node with built-in WebSocket.
+- In review: daily chart on stock pages (branch `claude/project-thread-j8jqtv`). The stock page's Chart panel gets a
+  "TradingView | Daily" switch (TradingView stays the default; the choice, range, style and averages are remembered in
+  the browser). "Daily" draws Alpaca's adjusted daily bars since 2016 with Lightweight Charts 5.2.1 (Apache 2.0, keeps
+  its TradingView attribution logo): candles or close line, volume, 50/200-session simple moving averages, 3M to Max
+  ranges, keyboard reading (arrow keys, Home/End, Esc). Same cached history as the Portfolio page (`/api/chart`,
+  `getDailyHistory`): 1 Alpaca call per symbol a day at most, only when the daily chart is opened, no polling.
+  Browser check on mock data: `dev-harness/chart-check.mjs` 22/22.
 
 ### Done
 
@@ -42,6 +45,7 @@ Last updated: 2026-10-14, after PRs #25 to #28, with the deploy prep pull reques
 - Request gate: shared Finnhub budget (50/min), memory + MongoDB cache, freshness labels, Data status page.
 - Economy page: US indicators from FRED (PR #27; needs `FRED_API_KEY`, check with `npm run check:fred`).
 - News page, Dashboard Market news panel, upcoming events (PR #25, details below).
+- Deploy: Vercel production with Atlas and Inngest (PR #29, `docs/deploy.md`).
 - Portfolio page: target-weight backtests on Alpaca free daily bars (PR #28; `lib/backtest.ts`, `lib/portfolio.ts`,
   `lib/daily-bars.ts`, `lib/alpaca.ts`; Alpaca gate 180/min, 1 call per symbol per day; needs the Alpaca keys, check
   with `npm run check:portfolio`).
@@ -79,7 +83,7 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Tests
 
-- Unit: `npm test` (Vitest, `tests/`), 301 passing.
+- Unit: `npm test` (Vitest, `tests/`), 311 passing.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
   On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases, events 19/19, integration 21/21 plus
@@ -90,10 +94,12 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 ## Next (priority order)
 
 1. Owner checks in market hours: `npm run check:market-data`, `npm run check:stream`; Data status stays under
-   50 calls/min. Any time: `npm run check:events`, `npm run check:fred`, `npm run check:portfolio`.
-2. Owner merges the deploy prep pull request and deploys by following `docs/deploy.md`, then runs its checklist
-   (section 6) on the live site.
-3. Our own charts with Lightweight Charts on the Alpaca daily bars.
+   50 calls/min. Any time: `npm run check:events`, `npm run check:fred`, `npm run check:portfolio` (the last one also
+   covers the daily chart's data).
+2. Owner reviews and merges the daily chart pull request, then opens a stock page on the live site, picks "Daily" and
+   checks the chart against a known recent close (the bars are adjusted, so old prices differ from what traded then).
+3. Possible follow-ups, only if wanted: the daily chart as a workspace widget; more indicators (each as tested pure
+   code in `lib/price-chart.ts`).
 
 ## Working efficiently (for Claude threads)
 
