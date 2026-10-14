@@ -27,25 +27,29 @@ Last updated: 2026-10-13, after PR #24.
 
 - Auth (Better Auth), owner-only access via `ALLOWED_EMAILS`, welcome and daily news emails (Inngest, Gemini text).
 - Header: tabs, search (Ctrl+K), looping price ticker, session and New York clock.
-- Dashboard: index funds, 54-stock Market Snapshot (Finnhub, live trades in session), sector funds, TradingView panels.
+- Dashboard: index funds, 54-stock Market Snapshot (Finnhub, live trades in session), sector funds, Market news
+  (on the News branch), TradingView panels.
 - S&P 500 Heatmap page (TradingView map only), Markets page (TradingView screener + S&P 500 lists).
 - Stock and ETF pages: Finnhub quote, key figures, company news; TradingView chart, profile, financials.
 - Workspaces: drag/resize grid, templates, several saved layouts, linked symbol (`/workspace`).
 - Watchlists: several named lists, sortable/configurable grid, details panel, phone cards (`/watchlist`).
 - Request gate: shared Finnhub budget (50/min), memory + MongoDB cache, freshness labels, Data status page.
 
-### In review: News & Intelligence (`/top-stories`), branch `claude/project-thread-g500zn`
+### In review: News (`/top-stories`, Dashboard, stock pages), branch `claude/project-thread-g500zn`
 
-- Native Finnhub feed: tabs All, Markets, M&A, My watchlists, Earnings, Saved; search, order, row height, bookmarks
-  and settings saved per user (MongoDB `news_prefs`); 15-minute refresh only while visible.
-- Calls: 2 per 10 minutes for headlines, 1 per watchlist symbol per 30 minutes (only when that tab opens), 1 per
-  6 hours for earnings; a revisit makes 0 (measured on mock data).
-- Side panel: upcoming events (FOMC, Fed speeches and testimony, Beige Book, CPI, jobs, PPI, GDP, PCE) from the
-  free Federal Reserve, BLS and BEA schedules, filter All/Fed/Data, New York times, no forecasts. Replaced the
-  TradingView economic calendar at the owner's request. The workspace's "Economic calendar" widget is still TradingView.
+- One shared Finnhub news system (`lib/news-data.ts`): market + M&A headlines (2 calls, reused 10 minutes) feed the
+  News page, the Dashboard's Market news panel (8 newest, at most 2 M&A) and the workspace widget; company news
+  (1 call per symbol, past week, reused 30 minutes) feeds the watchlist tab, stock pages and the workspace widget.
+  Measured on mock data: Dashboard 2 calls, then News page 0, watchlist tab 1 per symbol, then that stock's page 0.
+- News page tabs: All, Markets, M&A, My watchlists, Earnings (calendar), Economic calendar (TradingView, full width,
+  importance and economies settings), Saved. Search, order, row height, bookmarks and settings saved per user
+  (MongoDB `news_prefs`); 15-minute refresh only while visible.
+- Side panel: upcoming events (FOMC, Fed governors' speeches and testimony, Beige Book, CPI, jobs, PPI, GDP, PCE) from
+  the free Federal Reserve, BLS and BEA schedules; New York times; no forecasts (the calendar tab has those).
   Real sources unverified until the owner runs `npm run check:events`.
-- `NewsRow` is shared by the News page, stock pages and the workspace's Company news and new Market news widgets.
-- Not built (no free source): Economy and Sectors news categories.
+- Status line never calls an old copy new: a copy past 10 minutes reads "refreshing" and the page picks up the new one;
+  older than 30 minutes reads "last updated".
+- Not built (no free tagged source): Economy and Sectors news categories, earnings headlines as a category.
 
 ## Decisions to keep
 
@@ -64,17 +68,17 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Tests
 
-- Unit: `npm test` (Vitest, `tests/`), 237 passing.
+- Unit: `npm test` (Vitest, `tests/`), 239 passing.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
-  On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases, events 19/19 plus
+  On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases, events 19/19, integration 21/21 plus
   2 failure cases.
 - Real provider: owner runs `npm run check:market-data` and `npm run check:stream` in market hours, and
   `npm run check:events` (any time). Still unverified.
 
 ## Next (priority order)
 
-1. Owner reviews and merges the News pull request.
+1. Owner reviews and merges the News pull request (run `npm run check:events` first).
 2. Owner checks: run the two `check:*` scripts in market hours; confirm Data status stays under 50 calls/min.
 3. Deploy prep: set `BETTER_AUTH_URL`, `ALLOWED_EMAILS`, keys on Vercel; owner deploys.
 4. Economic indicators from FRED (needs the owner's free FRED key).

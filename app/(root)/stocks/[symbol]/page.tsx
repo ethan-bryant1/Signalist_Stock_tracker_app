@@ -15,7 +15,8 @@ import {
   TRADINGVIEW_SCRIPT_URL,
 } from "@/lib/constants";
 import { isStockInWatchlist } from "@/lib/actions/watchlist.actions";
-import { getCompanyNews, getStockOverview } from "@/lib/stock-data";
+import { getStockOverview } from "@/lib/stock-data";
+import { getCompanyNewsItems } from "@/lib/news-data";
 import { getSession } from "@/lib/better-auth/auth";
 import { cn } from "@/lib/utils";
 
@@ -26,16 +27,17 @@ export async function generateMetadata({ params }: StockDetailsPageProps): Promi
 
 // Loads the company's news separately, so the rest of the page doesn't wait for it
 async function NewsList({ symbol, renderedAt }: { symbol: string; renderedAt: number }) {
-  const articles = await getCompanyNews(symbol);
+  // The same cached copy the News page's watchlist tab and the workspace widget use (lib/news-data.ts)
+  const news = await getCompanyNewsItems(symbol.toUpperCase());
 
-  if (articles === null) {
+  if (news.items.length === 0 && news.issue) {
     return <p className="px-4 py-3 text-sm text-gray-500">News couldn&apos;t load right now. Refresh the page to try again.</p>;
   }
-  if (articles.length === 0) {
+  if (news.items.length === 0) {
     return <p className="px-4 py-3 text-sm text-gray-500">No news about {symbol} in the past week.</p>;
   }
 
-  return <CompanyNews articles={articles} renderedAt={renderedAt} />;
+  return <CompanyNews news={news} renderedAt={renderedAt} />;
 }
 
 const NewsLoading = () => (

@@ -14,8 +14,8 @@ import { getCompanyNewsForWidget, getStockQuote, type StockQuote } from "@/lib/a
 import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
 import WatchlistGrid from "@/components/watchlist/WatchlistGrid";
 import NewsList from "@/components/news/NewsList";
-import { formatNewsTime, fromCompanyArticle } from "@/lib/news";
-import type { NewsResult } from "@/lib/news-data";
+import { headlineStatus, type CompanyNewsResult } from "@/lib/news";
+import { useMarketNews } from "@/hooks/useMarketNews";
 import { useWatchRows } from "@/components/watchlist/useWatchRows";
 import type { ColumnKey } from "@/lib/watchlists";
 import {
@@ -178,19 +178,19 @@ const QuoteWidget = ({ symbol }: WidgetProps) => {
 
 const NewsWidget = ({ symbol }: WidgetProps) => {
     const now = useNow(useLiveMarket().checkedAt);
-    const [result, setResult] = useState<{ symbol: string; articles: MarketNewsArticle[] | null } | null>(null);
+    const [result, setResult] = useState<{ symbol: string; news: CompanyNewsResult | null } | null>(null);
     useEffect(() => {
         let current = true;
         getCompanyNewsForWidget(symbol)
             .catch(() => null)
-            .then((articles) => current && setResult({ symbol, articles }));
+            .then((news) => current && setResult({ symbol, news }));
         return () => {
             current = false;
         };
     }, [symbol]);
-    const items = useMemo(() => result?.articles?.map(fromCompanyArticle) ?? [], [result]);
+    const items = result?.news?.items ?? [];
     if (result?.symbol !== symbol) return <Loading />;
-    if (result.articles === null) return <Message>News couldn&apos;t load right now.</Message>;
+    if (result.news === null || (items.length === 0 && result.news.issue)) return <Message>News couldn&apos;t load right now.</Message>;
     if (items.length === 0) return <Message>No news about {symbol} in the past week.</Message>;
     return <NewsList items={items} now={now} density="compact" grouped={false} label={`${symbol} news`} />;
 };
@@ -198,27 +198,14 @@ const NewsWidget = ({ symbol }: WidgetProps) => {
 // Finnhub's market and M&A headlines from the News page's shared feed (reused for 10 minutes on the server)
 const MarketNewsWidget = () => {
     const now = useNow(useLiveMarket().checkedAt);
-    const [result, setResult] = useState<NewsResult | "failed" | null>(null);
-    useEffect(() => {
-        let current = true;
-        fetch("/api/news?feed=market", { cache: "no-store" })
-            .then((response) => (response.ok ? (response.json() as Promise<NewsResult>) : Promise.reject(new Error("failed"))))
-            .catch(() => "failed" as const)
-            .then((next) => current && setResult(next));
-        return () => {
-            current = false;
-        };
-    }, []);
-    if (result === null) return <Loading />;
-    if (result === "failed" || (result.items.length === 0 && result.issue)) return <Message>Headlines couldn&apos;t load right now.</Message>;
+    const { result, failed } = useMarketNews(null);
+    if (result === null) return failed ? <Message>Headlines couldn&apos;t load right now.</Message> : <Loading />;
+    if (result.items.length === 0 && (result.issue || failed)) return <Message>Headlines couldn&apos;t load right now.</Message>;
     if (result.items.length === 0) return <Message>Finnhub sent no headlines.</Message>;
+    const status = headlineStatus(result, now, failed);
     return (
         <>
-            {(result.stale || result.issue) && (
-                <p className="border-b border-gray-600 px-4 py-1.5 text-[11px] font-medium text-gray-100">
-                    Couldn&apos;t refresh · headlines from {result.fetchedAt ? formatNewsTime(result.fetchedAt, now) : "earlier"}
-                </p>
-            )}
+            {status.warning && <p className="border-b border-gray-600 px-4 py-1.5 text-[11px] font-medium text-gray-100">{status.text}</p>}
             <NewsList items={result.items} now={now} density="compact" showFeed grouped={false} label="Market news" />
         </>
     );

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import NewsRow from "@/components/news/NewsRow";
 import { useNow } from "@/hooks/useHeatmapFeed";
-import { fromCompanyArticle } from "@/lib/news";
+import { formatNewsTime, type CompanyNewsResult } from "@/lib/news";
 import { cn } from "@/lib/utils";
 
 // On phones the first few articles show, with a button for the rest.
@@ -11,13 +11,16 @@ import { cn } from "@/lib/utils";
 // like the News page's (components/news/NewsRow.tsx).
 const INITIAL_COUNT = 5;
 
-const CompanyNews = ({ articles, renderedAt }: { articles: MarketNewsArticle[]; renderedAt: number }) => {
+const CompanyNews = ({ news, renderedAt }: { news: CompanyNewsResult; renderedAt: number }) => {
     const [showAll, setShowAll] = useState(false);
     const now = useNow(renderedAt);
-    const items = useMemo(() => articles.map(fromCompanyArticle), [articles]);
+    const items = news.items;
 
     return (
         <div className="flex flex-col">
+            {news.stale && news.fetchedAt && (
+                <p className="border-b border-gray-600 px-4 py-1.5 text-[11px] font-medium text-gray-400">Finnhub · as of {formatNewsTime(news.fetchedAt, now)}</p>
+            )}
             <ul className="divide-y divide-gray-600 scrollbar-hide-default lg:max-h-[592px] lg:overflow-y-auto">
                 {items.map((item, index) => (
                     <li key={item.id + item.url} className={cn(!showAll && index >= INITIAL_COUNT && "hidden lg:block")}>

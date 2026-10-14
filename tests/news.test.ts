@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+    HEADLINES_OLD_MS,
+    headlineStatus,
+    pickHeadlines,
     DEFAULT_NEWS_PREFS,
     MAX_SAVED,
     canonicalUrl,
     countByTicker,
     formatEps,
-    fromCompanyArticle,
     formatNewsAge,
     formatNewsTime,
     formatRevenue,
@@ -160,11 +162,12 @@ describe("times", () => {
 describe("settings and bookmarks", () => {
     it("falls back to defaults for anything unknown", () => {
         expect(parseNewsPrefs(null)).toEqual(DEFAULT_NEWS_PREFS);
-        expect(parseNewsPrefs({ tab: "earnings", sort: "sideways", density: "compact", events: "fed", importance: "high" })).toEqual({
+        expect(parseNewsPrefs({ tab: "earnings", sort: "sideways", density: "compact", events: "fed", importance: "high", region: "mars" })).toEqual({
             ...DEFAULT_NEWS_PREFS,
             tab: "earnings",
             density: "compact",
             events: "fed",
+            importance: "high",
         });
         expect(parseNewsPrefs({ events: "parties" }).events).toBe("all");
     });
@@ -232,9 +235,36 @@ describe("earnings", () => {
     });
 });
 
-describe("fromCompanyArticle", () => {
-    it("turns the stock page's article shape into a row", () => {
-        const row = fromCompanyArticle({ id: 3, headline: "H", summary: "S", source: "X", url: "https://x.com", datetime: 1_700_000_000, category: "company", related: "AAPL", image: "" });
-        expect(row).toMatchObject({ id: "c3", datetime: 1_700_000_000_000, feed: "company", tickers: ["AAPL"] });
+
+describe("Dashboard headlines", () => {
+    it("takes the newest, with at most a third from M&A", () => {
+        const items = [
+            ...Array.from({ length: 6 }, (_, i) => item({ id: `d${i}`, url: `https://d.com/${i}`, feed: "deals", datetime: NOW - i * 60_000 })),
+            ...Array.from({ length: 10 }, (_, i) => item({ id: `m${i}`, url: `https://m.com/${i}`, feed: "markets", datetime: NOW - (i + 10) * 60_000 })),
+        ];
+        const picked = pickHeadlines(items, 8);
+        expect(picked).toHaveLength(8);
+        expect(picked.filter((i) => i.feed === "deals")).toHaveLength(2);
+        expect(picked.every((p, i) => i === 0 || picked[i - 1].datetime >= p.datetime)).toBe(true);
+        expect(pickHeadlines([], 8)).toEqual([]);
+    });
+});
+
+describe("headline status", () => {
+    const base = { items: [item()], fetchedAt: NOW - 5 * 60_000, stale: false };
+    it("says when the copy is from, without calling an old copy new", () => {
+        expect(headlineStatus(base, NOW)).toMatchObject({ warning: false, refreshing: false });
+        expect(headlineStatus(base, NOW).text).toMatch(/^Finnhub · updated /);
+        // Past its 10 minutes and being refreshed in the background: not an error
+        expect(headlineStatus({ ...base, fetchedAt: NOW - 12 * 60_000, stale: true }, NOW)).toMatchObject({ warning: false, refreshing: true });
+        // Much older: says "last updated" and flags it
+        const old = headlineStatus({ ...base, fetchedAt: NOW - HEADLINES_OLD_MS - 60_000, stale: true }, NOW);
+        expect(old).toMatchObject({ warning: true });
+        expect(old.text).toMatch(/last updated/);
+    });
+    it("reports failures", () => {
+        expect(headlineStatus({ ...base, issue: "network" }, NOW).text).toMatch(/^Couldn't refresh/);
+        expect(headlineStatus(base, NOW, true).warning).toBe(true);
+        expect(headlineStatus({ items: [], stale: false, issue: "auth" }, NOW).text).toBe("Headlines couldn't load");
     });
 });

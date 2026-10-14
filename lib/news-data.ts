@@ -10,6 +10,7 @@ import {
   normalizeArticle,
   normalizeEarnings,
   selectEarnings,
+  type CompanyNewsResult,
   type EarningsEvent,
   type NewsFeed,
   type NewsItem,
@@ -19,7 +20,8 @@ import {
 
 // The News page's data, all from Finnhub's free plan through the shared cache and call budget (lib/finnhub.ts):
 // - market news (/news, general and merger): 2 requests, reused for 10 minutes by every page and widget;
-// - company news (/company-news) for watchlist symbols: 1 request per symbol, reused for 30 minutes;
+// - company news (/company-news): 1 request per symbol, reused for 30 minutes by the watchlist tab, the stock page
+//   and the workspace's company-news widget alike (same range and cache, so opening one after another costs nothing);
 // - the earnings calendar (/calendar/earnings): 1 request, reused for 6 hours.
 // Copies are also kept in MongoDB, so a restart or deploy doesn't fetch them again, and a failing Finnhub leaves the
 // last copy showing (labeled with its age) instead of an empty page. Finnhub's economic calendar is a paid
@@ -36,10 +38,34 @@ export const NEWS_CACHE = {
 // Symbols per watchlist-news request: the page asks for a long list in several requests, one after another, so
 // the first headlines appear quickly and the free plan's per-minute budget is never spent in one burst
 export const WATCHLIST_NEWS_CHUNK = 12;
-// Company news covers the last few days; older stories are a click away on each stock's page
-const COMPANY_NEWS_DAYS = 3;
-// The newest few articles per company, so one busy name doesn't crowd out the rest
+// Company news covers the past week (New York days); every page asks for the same range so they share one copy
+const COMPANY_NEWS_DAYS = 7;
+// The newest few articles per company in the watchlist tab, so one busy name doesn't crowd out the rest
 const PER_COMPANY = 15;
+// On a stock page or widget
+const PER_STOCK_PAGE = 20;
+
+// One company's news for the past week, newest first, from the shared cache
+const fetchCompanyNews = async (symbol: string, now: number) => {
+  const today = newYorkClock(now).day;
+  const served = await finnhubGet<ProviderArticle[]>('/company-news', { symbol, from: addDays(today, -COMPANY_NEWS_DAYS), to: today }, { ...NEWS_CACHE.company, waitMs: PAGE_WAIT_MS });
+  const items = (Array.isArray(served.data) ? served.data : [])
+    .map((raw) => normalizeArticle(raw, 'company', now, symbol))
+    .filter((item): item is NewsItem => item !== null);
+  return { items: mergeNews([items]).sort((a, b) => b.datetime - a.datetime), fetchedAt: served.fetchedAt, stale: served.stale };
+};
+
+// The past week's news about one company, for its stock page and the workspace's company-news widget
+export async function getCompanyNewsItems(symbol: string): Promise<CompanyNewsResult> {
+  try {
+    const news = await fetchCompanyNews(symbol, Date.now());
+    return { ...news, items: news.items.slice(0, PER_STOCK_PAGE) };
+  } catch (e) {
+    const issue = issueOf(e);
+    if (issue !== 'busy') console.error('Error fetching company news for', symbol, issue);
+    return { items: [], stale: false, issue };
+  }
+}
 
 export type NewsResult = {
   items: NewsItem[];
@@ -95,8 +121,6 @@ export type WatchlistNewsResult = {
 // The last few days' news for each symbol (at most WATCHLIST_NEWS_CHUNK per call), as one list without repeats
 export async function getWatchlistNews(symbols: readonly string[]): Promise<WatchlistNewsResult> {
   const now = Date.now();
-  const today = newYorkClock(now).day;
-  const range = { from: addDays(today, -COMPANY_NEWS_DAYS), to: today };
   const status: Record<string, SymbolNewsStatus> = {};
   const issues: FeedIssue[] = [];
   let stale = false;
@@ -104,15 +128,11 @@ export async function getWatchlistNews(symbols: readonly string[]): Promise<Watc
 
   const lists = await mapWithLimit(symbols.slice(0, WATCHLIST_NEWS_CHUNK), 4, async (symbol) => {
     try {
-      const served = await finnhubGet<ProviderArticle[]>('/company-news', { symbol, ...range }, { ...NEWS_CACHE.company, waitMs: PAGE_WAIT_MS });
-      stale ||= served.stale;
-      fetchedAt = fetchedAt === undefined ? served.fetchedAt : Math.min(fetchedAt, served.fetchedAt);
+      const news = await fetchCompanyNews(symbol, now);
+      stale ||= news.stale;
+      fetchedAt = fetchedAt === undefined ? news.fetchedAt : Math.min(fetchedAt, news.fetchedAt ?? fetchedAt);
       status[symbol] = 'ok';
-      return (Array.isArray(served.data) ? served.data : [])
-        .map((raw) => normalizeArticle(raw, 'company', now, symbol))
-        .filter((item): item is NewsItem => item !== null)
-        .sort((a, b) => b.datetime - a.datetime)
-        .slice(0, PER_COMPANY);
+      return news.items.slice(0, PER_COMPANY);
     } catch (e) {
       const issue = issueOf(e);
       status[symbol] = issue === 'busy' ? 'waiting' : 'failed';

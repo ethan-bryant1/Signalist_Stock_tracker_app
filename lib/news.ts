@@ -2,7 +2,7 @@
 // and bookmarks, and the earnings calendar's rows. No server or browser APIs, so it's unit tested directly
 // (tests/news.test.ts). Nothing here writes a headline, summary, ticker or figure the provider didn't send.
 
-import { formatNewYorkDay, formatNewYorkTime, newYorkClock } from "@/lib/market-data";
+import { formatNewYorkDay, formatNewYorkTime, newYorkClock, type FeedIssue } from "@/lib/market-data";
 
 // ---------- Articles ----------
 
@@ -63,17 +63,9 @@ export function normalizeArticle(raw: ProviderArticle, feed: NewsFeed, now: numb
     return { id, headline, summary, source, url, datetime, feed, tickers };
 }
 
-// An article from the older company-news shape (seconds, one related symbol) as a page row
-export const fromCompanyArticle = (article: MarketNewsArticle): NewsItem => ({
-    id: `c${article.id}`,
-    headline: article.headline,
-    summary: article.summary,
-    source: article.source,
-    url: article.url,
-    datetime: article.datetime * 1000,
-    feed: "company",
-    tickers: parseTickers(article.related),
-});
+// One company's recent news as a stock page or widget gets it: a cached copy (`stale` when it couldn't be refreshed)
+// or the reason it failed
+export type CompanyNewsResult = { items: NewsItem[]; fetchedAt?: number; stale: boolean; issue?: FeedIssue };
 
 // The link without tracking parameters, fragment, "www." or a trailing slash, so the same story from two feeds matches
 export const canonicalUrl = (url: string) => {
@@ -181,23 +173,65 @@ export function groupByDay(items: readonly NewsItem[], now: number): { day: stri
     return groups;
 }
 
+// The Dashboard's short list: the newest headlines, with at most `maxDeals` M&A stories so deal news (Finnhub's
+// busiest feed) doesn't push out general market news. Newest first; deterministic, no ranking guesswork.
+export function pickHeadlines(items: readonly NewsItem[], count: number, maxDeals = Math.floor(count / 3)): NewsItem[] {
+    const picked: NewsItem[] = [];
+    let deals = 0;
+    for (const item of [...items].sort((a, b) => b.datetime - a.datetime)) {
+        if (picked.length >= count) break;
+        if (item.feed === "deals") {
+            if (deals >= maxDeals) continue;
+            deals++;
+        }
+        picked.push(item);
+    }
+    return picked;
+}
+
+// ---------- Freshness of a headline list ----------
+
+// Headlines are reused for 10 minutes; a copy older than this is either being refreshed right now or the provider is
+// failing, so the page says how old it is instead of "updated"
+export const HEADLINES_OLD_MS = 30 * 60_000;
+
+export type HeadlineStatus = { text: string; warning: boolean; refreshing: boolean };
+
+// What the status line says about a headline list: its source and time, a refresh in progress (a cached copy past
+// its 10 minutes is shown while a new one loads), or that it couldn't be refreshed. Never calls an old copy new.
+export function headlineStatus(result: { items: readonly unknown[]; fetchedAt?: number; stale: boolean; issue?: FeedIssue }, now: number, failed = false): HeadlineStatus {
+    const time = result.fetchedAt ? formatNewsTime(result.fetchedAt, now) : "earlier";
+    if (result.items.length === 0 && result.issue) return { text: "Headlines couldn't load", warning: true, refreshing: false };
+    if (failed || (result.issue && result.items.length > 0)) return { text: `Couldn't refresh · headlines from ${time}`, warning: true, refreshing: false };
+    const old = result.fetchedAt !== undefined && now - result.fetchedAt > HEADLINES_OLD_MS;
+    if (result.stale && old) return { text: `Finnhub · last updated ${time}`, warning: true, refreshing: true };
+    if (result.stale) return { text: `Finnhub · updated ${time} · refreshing`, warning: false, refreshing: true };
+    return { text: `Finnhub · updated ${result.fetchedAt ? formatNewsTime(result.fetchedAt, now) : "—"}`, warning: false, refreshing: false };
+}
+
 // ---------- Saved settings and bookmarks ----------
 
-export const NEWS_TABS = ["all", "markets", "deals", "watchlist", "earnings", "saved"] as const;
+export const NEWS_TABS = ["all", "markets", "deals", "watchlist", "earnings", "calendar", "saved"] as const;
 export type NewsTab = (typeof NEWS_TABS)[number];
 export type NewsDensity = "compact" | "comfortable";
 // Which upcoming events the side panel lists (lib/events.ts): everything, the Federal Reserve's, or data releases
 export const EVENT_FILTERS = ["all", "fed", "data"] as const;
 export type EventFilter = (typeof EVENT_FILTERS)[number];
+// TradingView's calendar importance filter: high only, medium and high, or everything
+export type CalendarImportance = "high" | "medium" | "all";
+// US only, or the US with the other large economies
+export type CalendarRegion = "us" | "major";
 
 export type NewsPrefs = {
     tab: NewsTab;
     sort: NewsSort;
     density: NewsDensity;
     events: EventFilter;
+    importance: CalendarImportance;
+    region: CalendarRegion;
 };
 
-export const DEFAULT_NEWS_PREFS: NewsPrefs = { tab: "all", sort: "newest", density: "comfortable", events: "all" };
+export const DEFAULT_NEWS_PREFS: NewsPrefs = { tab: "all", sort: "newest", density: "comfortable", events: "all", importance: "medium", region: "us" };
 
 const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
 
@@ -209,8 +243,14 @@ export const parseNewsPrefs = (value: unknown): NewsPrefs => {
         sort: pick(raw.sort, ["newest", "oldest"] as const, DEFAULT_NEWS_PREFS.sort),
         density: pick(raw.density, ["compact", "comfortable"] as const, DEFAULT_NEWS_PREFS.density),
         events: pick(raw.events, EVENT_FILTERS, DEFAULT_NEWS_PREFS.events),
+        importance: pick(raw.importance, ["high", "medium", "all"] as const, DEFAULT_NEWS_PREFS.importance),
+        region: pick(raw.region, ["us", "major"] as const, DEFAULT_NEWS_PREFS.region),
     };
 };
+
+// TradingView's documented events.js options for the calendar settings
+export const CALENDAR_IMPORTANCE_FILTER: Record<CalendarImportance, string> = { high: "1", medium: "0,1", all: "-1,0,1" };
+export const CALENDAR_COUNTRIES: Record<CalendarRegion, string> = { us: "us", major: "us,eu,gb,de,fr,jp,cn,ca" };
 
 export const MAX_SAVED = 100;
 export type SavedArticle = Pick<NewsItem, "id" | "headline" | "source" | "url" | "datetime" | "tickers"> & { savedAt: number };
