@@ -8,8 +8,9 @@ import { cellFor } from "@/lib/watchlist-format";
 import { COLUMNS, type ColumnKey, type Density, type SortKey, type WatchRow, type WatchlistPrefs } from "@/lib/watchlists";
 import { cn, getChangeColorClass } from "@/lib/utils";
 
-// A symbol that's in the list but whose figures haven't arrived yet
-export type GridRow = { symbol: string; company: string; data?: WatchRow };
+// A symbol that's in the list, with its figures once they arrive. sector (and industry, when given) are known from the
+// S&P 500 list before any figures load.
+export type GridRow = { symbol: string; company: string; data?: WatchRow; sector?: string; industry?: string };
 
 type GridProps = {
     rows: GridRow[];
@@ -67,6 +68,7 @@ const DataCell = ({ column, row }: { column: ColumnKey; row: GridRow }) => {
     const align = def.align === "right" ? "text-right" : "text-left";
     if (!row.data) {
         if (column === "name") return <td className="max-w-56 truncate px-2 text-gray-400">{row.company}</td>;
+        if ((column === "sector" || column === "industry") && row[column]) return <td title={row[column]} className="max-w-44 truncate px-2 text-gray-400">{row[column]}</td>;
         return (
             <td className={cn("px-2", align)}>
                 <Skeleton align={def.align} />
@@ -83,13 +85,13 @@ const DataCell = ({ column, row }: { column: ColumnKey; row: GridRow }) => {
     const cell = cellFor(column, row.data);
     return (
         <td
-            title={cell.state === "na" ? `${def.label} doesn't apply to funds` : cell.state === "unloaded" ? `${def.label} didn't load (Finnhub was busy or failed); use Retry below` : cell.state === "missing" ? `${def.label} isn't available from Finnhub` : column === "name" || column === "industry" ? cell.text : undefined}
+            title={cell.state === "na" ? `${def.label} doesn't apply to funds` : cell.state === "unloaded" ? `${def.label} didn't load (Finnhub was busy or failed); use Retry below` : cell.state === "missing" ? (column === "sector" ? "Not an S&P 500 constituent" : `${def.label} isn't available from Finnhub`) : column === "name" || column === "industry" || column === "sector" ? cell.text : undefined}
             className={cn(
                 "px-2 whitespace-nowrap",
                 align,
                 column === "name" ? "max-w-56 truncate text-gray-400" : "tabular-nums",
-                column === "industry" && "max-w-44 truncate text-gray-400",
-                cell.state ? "text-gray-500" : cell.signed ? cn("font-medium", getChangeColorClass(row.data.changePercent)) : column !== "name" && column !== "industry" && "text-gray-100"
+                (column === "industry" || column === "sector") && "max-w-44 truncate text-gray-400",
+                cell.state ? "text-gray-500" : cell.signed ? cn("font-medium", getChangeColorClass(row.data.changePercent)) : column !== "name" && column !== "industry" && column !== "sector" && "text-gray-100"
             )}
         >
             {cell.text}

@@ -3,7 +3,7 @@
 The state of Loops Watch for whoever picks up the next task, human or Claude. Keep it short and current: update
 the "Status" and "Next" sections in the same pull request as any feature. Details live in the linked docs, not here.
 
-Last updated: 2026-10-14, after PR #27.
+Last updated: 2026-10-14, after PRs #26 and #27.
 
 ## Read only what the task needs
 
@@ -18,7 +18,7 @@ Last updated: 2026-10-14, after PR #27.
 
 ## Status
 
-- `main` = `a40dce4` (PR #27 merged). Everything below "Done" is on `main`.
+- `main` = `1666f77` (PR #26 merged). Everything below "Done" is on `main`.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
 - In review: News page redesign on `claude/project-thread-g500zn` (pull request open, see below).
@@ -29,7 +29,8 @@ Last updated: 2026-10-14, after PR #27.
 - Header: tabs, search (Ctrl+K), looping price ticker, session and New York clock.
 - Dashboard: index funds, 54-stock Market Snapshot (Finnhub, live trades in session), sector funds,
   TradingView panels (the Market news panel is in review, below).
-- S&P 500 Heatmap page (TradingView map only), Markets page (TradingView screener + S&P 500 lists).
+- S&P 500 Heatmap page (TradingView map only), Markets page (TradingView screener for all US
+  stocks, native screener for your watchlists, saved presets; PR #26).
 - Stock and ETF pages: Finnhub quote, key figures, company news; TradingView chart, profile, financials.
 - Workspaces: drag/resize grid, templates, several saved layouts, linked symbol (`/workspace`).
 - Watchlists: several named lists, sortable/configurable grid, details panel, phone cards (`/watchlist`).
@@ -69,7 +70,7 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 
 ## Tests
 
-- Unit: `npm test` (Vitest, `tests/`), 239 passing.
+- Unit: `npm test` (Vitest, `tests/`), 273 passing.
 - Static: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 - Browser (mock data, cloud only): preview harness in the shared project folder `dev-harness/` (see its README).
   On the News branch: pages 38/38, watchlist 48/48, workspace 33/33, ticker all pass, news 32/32 plus 5 failure cases, events 19/19, integration 21/21 plus

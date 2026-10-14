@@ -2,16 +2,30 @@
 
 import { ArrowDown, ArrowUp, Columns3 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { COLUMN_KEYS, COLUMNS, DEFAULT_PREFS, moveColumn, toggleColumn, type Density, type WatchlistPrefs } from "@/lib/watchlists";
+import { COLUMN_KEYS, COLUMNS, DEFAULT_PREFS, moveColumn, toggleColumn, type ColumnKey, type Density, type WatchlistPrefs } from "@/lib/watchlists";
 import { cn } from "@/lib/utils";
 
 const smallButton =
     "inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-gray-500 hover:bg-gray-700 hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-gray-100 disabled:cursor-not-allowed disabled:opacity-30";
 
 // Which columns the grid shows and in what order, row height and the details panel. Saved with the account.
-const ColumnsMenu = ({ prefs, onChange, showPanelToggle = true }: { prefs: WatchlistPrefs; onChange: (prefs: WatchlistPrefs) => void; showPanelToggle?: boolean }) => {
+// available and defaultColumns let the Markets screener offer its own set (it adds the S&P 500 sector)
+const ColumnsMenu = ({
+    prefs,
+    onChange,
+    showPanelToggle = true,
+    available = COLUMN_KEYS,
+    defaultColumns = DEFAULT_PREFS.columns,
+}: {
+    prefs: WatchlistPrefs;
+    onChange: (prefs: WatchlistPrefs) => void;
+    showPanelToggle?: boolean;
+    available?: readonly ColumnKey[];
+    defaultColumns?: ColumnKey[];
+}) => {
     const shown = prefs.columns;
-    const hidden = COLUMN_KEYS.filter((key) => !shown.includes(key));
+    const hidden = available.filter((key) => !shown.includes(key));
+    const toggle = (key: ColumnKey) => toggleColumn(shown, key, available);
     const set = (patch: Partial<WatchlistPrefs>) => onChange({ ...prefs, ...patch });
 
     return (
@@ -30,7 +44,7 @@ const ColumnsMenu = ({ prefs, onChange, showPanelToggle = true }: { prefs: Watch
                         {shown.map((key, index) => (
                             <li key={key} className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-gray-700/40">
                                 <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm">
-                                    <input type="checkbox" checked onChange={() => set({ columns: toggleColumn(shown, key) })} className="h-3.5 w-3.5 accent-gray-100" />
+                                    <input type="checkbox" checked onChange={() => set({ columns: toggle(key) })} className="h-3.5 w-3.5 accent-gray-100" />
                                     <span className="truncate">{COLUMNS[key].label}</span>
                                     {COLUMNS[key].stockOnly && <span className="text-[10px] text-gray-500">stocks</span>}
                                 </label>
@@ -51,7 +65,7 @@ const ColumnsMenu = ({ prefs, onChange, showPanelToggle = true }: { prefs: Watch
                             {hidden.map((key) => (
                                 <li key={key} className="rounded px-1 py-0.5 hover:bg-gray-700/40">
                                     <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-400">
-                                        <input type="checkbox" checked={false} onChange={() => set({ columns: toggleColumn(shown, key) })} className="h-3.5 w-3.5 accent-gray-100" />
+                                        <input type="checkbox" checked={false} onChange={() => set({ columns: toggle(key) })} className="h-3.5 w-3.5 accent-gray-100" />
                                         <span className="truncate">{COLUMNS[key].label}</span>
                                         {COLUMNS[key].stockOnly && <span className="text-[10px] text-gray-500">stocks</span>}
                                     </label>
@@ -88,7 +102,7 @@ const ColumnsMenu = ({ prefs, onChange, showPanelToggle = true }: { prefs: Watch
                 )}
                 <button
                     type="button"
-                    onClick={() => onChange({ ...DEFAULT_PREFS, sort: prefs.sort })}
+                    onClick={() => onChange({ ...DEFAULT_PREFS, columns: defaultColumns, sort: prefs.sort })}
                     className="mt-3 h-7 w-full cursor-pointer rounded-md border border-gray-600 text-xs font-semibold text-gray-400 hover:text-gray-100"
                 >
                     Reset columns and rows

@@ -11,11 +11,8 @@ import { HEATMAP_SYMBOLS, HEATMAP_UNIVERSE } from "@/lib/data/heatmap";
 import { assessStocks, periodPhrase, type HeatmapPayload } from "@/lib/market-data";
 import { cn } from "@/lib/utils";
 
-// A sector heading opens the quotes for every S&P 500 company in that sector
-const sectorHref = (sector: string) => `/market-data?sector=${encodeURIComponent(sector)}`;
-
-// The dashboard's Market Snapshot: a quick read of the market. Hovering shows a stock's quote, clicking opens its page,
-// and a sector heading opens that sector's stocks on the Markets page. The S&P 500 Heatmap page has TradingView's map
+// The dashboard's Market Snapshot: a quick read of the market. Hovering shows a stock's quote and clicking opens its
+// page. The S&P 500 Heatmap page has TradingView's map
 // of the whole index.
 // In a workspace, onSelect makes a click load the stock into the linked widgets instead of opening its page.
 const DashboardHeatmap = ({
@@ -55,7 +52,6 @@ const DashboardHeatmap = ({
                     showLogos={settings.logos}
                     periodText={periodPhrase(assessment.period)}
                     label={`Heatmap of ${HEATMAP_SYMBOLS.length} ${HEATMAP_UNIVERSE.description}`}
-                    sectorHref={sectorHref}
                     emptyMessage={feed.issue === "not-configured" ? "Prices are unavailable: the server has no Finnhub API key." : undefined}
                     className="h-full"
                 />

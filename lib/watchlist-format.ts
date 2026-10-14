@@ -31,6 +31,7 @@ export const cellFor = (key: ColumnKey, row: WatchRow): Cell => {
     switch (key) {
         case "name":
         case "industry":
+        case "sector":
         case "exchange":
             return { text: String(value) };
         case "change":
