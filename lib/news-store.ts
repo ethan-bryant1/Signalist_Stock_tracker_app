@@ -19,21 +19,24 @@ export const saveNewsPrefs = async (userId: string, prefs: Prefs) => {
 
 // Removes the article when it's saved, otherwise saves it first in the list (the oldest drop off past MAX_SAVED).
 // Both steps are conditional single-document updates: the add only matches a list without this link, so two tabs
-// saving the same article at once can't store it twice (the second one finds it there, or, for a user with no
-// document yet, loses the insert race on the unique userId and does nothing).
+// saving the same article at once can't store it twice. For a user with no document yet, two saves at once both try
+// to create it; the loser hits the unique userId and adds again to the document the winner made (still only when the
+// link isn't there).
 export const toggleSavedArticle = async (userId: string, article: SavedArticle): Promise<SavedArticle[]> => {
   await connectToDatabase();
   const removed = await NewsPrefs.updateOne({ userId, 'saved.url': article.url }, { $pull: { saved: { url: article.url } }, $set: { updatedAt: new Date() } });
   if (removed.matchedCount === 0) {
-    try {
-      await NewsPrefs.updateOne(
+    const add = (upsert: boolean) =>
+      NewsPrefs.updateOne(
         { userId, 'saved.url': { $ne: article.url } },
         { $push: { saved: { $each: [article], $position: 0, $slice: MAX_SAVED } }, $set: { updatedAt: new Date() } },
-        { upsert: true }
+        { upsert }
       );
+    try {
+      await add(true);
     } catch (e) {
-      // The list already has it (saved from another tab a moment ago), so the upsert tried a second document
       if ((e as { code?: number })?.code !== 11000) throw e;
+      await add(false);
     }
   }
   return (await loadNewsPrefs(userId)).saved;
