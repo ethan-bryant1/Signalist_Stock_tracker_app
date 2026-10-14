@@ -22,6 +22,13 @@ Last updated: 2026-10-14, after PRs #26 and #27.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
 - In review: News page redesign on `claude/project-thread-g500zn` (pull request open, see below).
+- In review: Portfolio page (backtesting) on `claude/portfolio-backtesting-dyqocn`, PR #28. A portfolio = symbols with
+  target weights (saved per user, MongoDB `portfolios`), backtested against a benchmark on Alpaca free daily bars (SIP,
+  adjusted, since 2016): rebalancing, costs, optional moving-average trend filter, in/out-of-sample split, next-open
+  fills, assumptions listed on the page. `lib/backtest.ts`, `lib/portfolio.ts`, `lib/daily-bars.ts`, `lib/alpaca.ts`,
+  `/api/portfolio/bars`, `components/portfolio/`. Alpaca gate 180/min, 1 call per symbol per day (memory + MongoDB),
+  0 Finnhub calls; no keys = setup notice. Owner adds `ALPACA_API_KEY_ID`/`ALPACA_API_SECRET_KEY`, runs
+  `npm run check:portfolio` (real Alpaca unverified). Browser check: `dev-harness/portfolio-check.mjs` + `mock_alpaca.py`.
 
 ### Done
 
@@ -83,7 +90,7 @@ company news US only, earnings calendar about a month. TradingView: delayed, unr
 1. Owner reviews and merges the News pull request (run `npm run check:events` first).
 2. Owner checks: run the two `check:*` scripts in market hours; confirm Data status stays under 50 calls/min.
 3. Deploy prep: set `BETTER_AUTH_URL`, `ALLOWED_EMAILS`, keys on Vercel; owner deploys.
-4. Portfolio analytics and backtesting (needs a free daily-price source; decide provider first).
+4. Portfolio and backtesting: PR #28; owner adds free Alpaca keys, runs `npm run check:portfolio`, merges.
 5. Our own charts with Lightweight Charts once daily bars exist.
 
 ## Working efficiently (for Claude threads)

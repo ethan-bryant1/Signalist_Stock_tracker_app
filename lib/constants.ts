@@ -2,6 +2,7 @@ export const NAV_ITEMS: { href: string; label: string }[] = [
     { href: "/", label: "Dashboard" },
     { href: "/workspace", label: "Workspace" },
     { href: "/watchlist", label: "Watchlist" },
+    { href: "/portfolio", label: "Portfolio" },
     { href: "/heatmap", label: "Heatmap" },
     { href: "/market-data", label: "Markets" },
     { href: "/top-stories", label: "News" },
