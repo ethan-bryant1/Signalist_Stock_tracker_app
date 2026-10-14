@@ -18,11 +18,18 @@ import useTheme from "@/hooks/useTheme";
 import { formatNewYorkDay, formatNewYorkTime } from "@/lib/market-data";
 import { ISSUE_WORDS } from "@/lib/price-stamp";
 import {
+    BOLLINGER,
+    bollingerBands,
     CHART_RANGES,
     dayChangePercent,
     MOVING_AVERAGES,
     rangeStartIndex,
+    relativeStrengthIndex,
+    RSI_LENGTH,
+    RSI_LEVELS,
     simpleMovingAverage,
+    type Bands,
+    type ChartIndicator,
     type ChartPayload,
     type ChartSettings,
 } from "@/lib/price-chart";
@@ -31,7 +38,7 @@ import { formatChangePercent, getChangeColorClass } from "@/lib/utils";
 
 // The stock page's own daily chart: Alpaca's adjusted daily bars (the Portfolio page's cached copy) drawn with
 // TradingView's open-source Lightweight Charts library. Candles or a close line, volume, 50- and 200-session simple
-// moving averages and ranges from 3 months to the whole history since 2016. Loads once per symbol when opened (the
+// moving averages, optional Bollinger Bands (20, 2) and a 14-session RSI pane, and ranges from 3 months to the whole history since 2016. Loads once per symbol when opened (the
 // server asks Alpaca at most once a day per symbol); no polling, since a daily bar only changes after the session.
 
 type Props = {
@@ -84,6 +91,13 @@ const readColors = (theme: Theme) => {
 // The 50-session average is a solid gray line, the 200-session one dashed, so they differ without color
 const averageStyle = (length: number) => (length === 50 ? { dashed: false } : { dashed: true });
 
+const INDICATOR_BUTTONS: { id: ChartIndicator; label: string; title: string }[] = [
+    { id: "bollinger", label: "BB", title: `Bollinger Bands: ${BOLLINGER.length}-session average of the close ± ${BOLLINGER.width} standard deviations` },
+    { id: "rsi", label: "RSI", title: `${RSI_LENGTH}-session Relative Strength Index (Wilder), in its own pane` },
+];
+
+const oneDecimal = (value: number | undefined) => (value === undefined ? "—" : value.toFixed(1));
+
 export default function PriceChart({ symbol, settings, onChange }: Props) {
     const theme = useTheme();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -96,8 +110,10 @@ export default function PriceChart({ symbol, settings, onChange }: Props) {
     const current = loaded?.symbol === symbol && loaded.attempt === attempt ? loaded : undefined;
     const payload = cachedAnswer ?? current?.payload;
     const bars = payload?.status === "ok" ? payload.bars : undefined;
-    const { range, style, averages } = settings;
+    const { range, style, averages, indicators } = settings;
     const averagesKey = averages.join(",");
+    const showBands = indicators.includes("bollinger");
+    const showRsi = indicators.includes("rsi");
 
     useEffect(() => {
         if (answers.has(symbol)) return;
@@ -120,6 +136,9 @@ export default function PriceChart({ symbol, settings, onChange }: Props) {
         () => (bars ? MOVING_AVERAGES.map((length) => ({ length, values: simpleMovingAverage(bars.close, length) })) : []),
         [bars]
     );
+    // Computed from the loaded closes only when shown; no extra requests
+    const bands = useMemo(() => (bars && showBands ? bollingerBands(bars.close) : undefined), [bars, showBands]);
+    const rsi = useMemo(() => (bars && showRsi ? relativeStrengthIndex(bars.close) : undefined), [bars, showRsi]);
 
     // Draws the chart; rebuilt when the bars, style, averages or theme change (cheap for a few thousand bars)
     useEffect(() => {
@@ -179,15 +198,52 @@ export default function PriceChart({ symbol, settings, onChange }: Props) {
             series.setData(bars.days.map((time, i) => (line.values[i] === undefined ? { time } : { time, value: line.values[i]! })));
         }
 
+        if (bands) {
+            // Dotted gray bands with a sparser dotted middle, distinct from the solid and dashed moving averages
+            const band = (pick: (b: Bands) => number, lineStyle: LineStyle) => {
+                const series = chart.addSeries(LineSeries, {
+                    color: colors.muted,
+                    lineWidth: 1,
+                    lineStyle,
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                    crosshairMarkerVisible: false,
+                });
+                series.setData(bars.days.map((time, i) => (bands[i] === undefined ? { time } : { time, value: pick(bands[i]!) })));
+            };
+            band((b) => b.upper, LineStyle.Dotted);
+            band((b) => b.middle, LineStyle.SparseDotted);
+            band((b) => b.lower, LineStyle.Dotted);
+        }
+
         const volume = chart.addSeries(
             HistogramSeries,
             { color: colors.volume, priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false },
             1
         );
         volume.setData(bars.days.map((time, i) => ({ time, value: bars.volume[i] })));
+        if (rsi) {
+            const series = chart.addSeries(
+                LineSeries,
+                {
+                    color: colors.strong,
+                    lineWidth: 1,
+                    priceLineVisible: false,
+                    crosshairMarkerVisible: false,
+                    // The scale always spans 0 to 100, so the dashed 70 and 30 lines stay put
+                    autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+                },
+                2
+            );
+            series.setData(bars.days.map((time, i) => (rsi[i] === undefined ? { time } : { time, value: rsi[i]! })));
+            for (const level of RSI_LEVELS) {
+                series.createPriceLine({ price: level, color: colors.muted, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+            }
+        }
         const panes = chart.panes();
-        panes[0]?.setStretchFactor(3);
+        panes[0]?.setStretchFactor(rsi ? 4 : 3);
         panes[1]?.setStretchFactor(1);
+        panes[2]?.setStretchFactor(1.25);
 
         const last = bars.days.length - 1;
         // Every series starts on the first bar, so the crosshair's logical position is the bar's index
@@ -199,7 +255,7 @@ export default function PriceChart({ symbol, settings, onChange }: Props) {
             chartRef.current = undefined;
             chart.remove();
         };
-    }, [bars, lines, style, averagesKey, theme]);
+    }, [bars, lines, bands, rsi, style, averagesKey, theme]);
 
     // Shows the chosen range, ending on the newest bar; runs after every rebuild too
     useEffect(() => {
@@ -207,7 +263,7 @@ export default function PriceChart({ symbol, settings, onChange }: Props) {
         if (!chart || !bars) return;
         const last = bars.days.length - 1;
         chart.timeScale().setVisibleLogicalRange({ from: rangeStartIndex(bars.days, range) - 0.5, to: last + 3 });
-    }, [bars, range, style, averagesKey, theme]);
+    }, [bars, range, style, averagesKey, bands, rsi, theme]);
 
     if (!payload && !current?.signedOut) {
         return (
@@ -291,6 +347,19 @@ export default function PriceChart({ symbol, settings, onChange }: Props) {
                         </ToolButton>
                     ))}
                 </div>
+                <div role="group" aria-label="Indicators" className="flex gap-1">
+                    {INDICATOR_BUTTONS.map((item) => (
+                        <ToolButton
+                            key={item.id}
+                            title={item.title}
+                            pressed={indicators.includes(item.id)}
+                            onClick={() => onChange({ indicators: indicators.includes(item.id) ? indicators.filter((id) => id !== item.id) : [...indicators, item.id] })}
+                            className="h-7 px-2"
+                        >
+                            {item.label}
+                        </ToolButton>
+                    ))}
+                </div>
             </div>
 
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3 pt-2 text-xs tabular-nums text-gray-500" aria-live="off">
@@ -309,6 +378,18 @@ export default function PriceChart({ symbol, settings, onChange }: Props) {
                         MA {line.length} <span className="text-gray-100">{price(line.values[index])}</span>
                     </span>
                 ))}
+                {bands && (
+                    <span>
+                        BB {BOLLINGER.length}, {BOLLINGER.width} <span className="text-gray-100">{price(bands[index]?.upper)}</span> /{" "}
+                        <span className="text-gray-100">{price(bands[index]?.middle)}</span> /{" "}
+                        <span className="text-gray-100">{price(bands[index]?.lower)}</span>
+                    </span>
+                )}
+                {rsi && (
+                    <span>
+                        RSI {RSI_LENGTH} <span className="text-gray-100">{oneDecimal(rsi[index])}</span>
+                    </span>
+                )}
             </div>
 
             <div

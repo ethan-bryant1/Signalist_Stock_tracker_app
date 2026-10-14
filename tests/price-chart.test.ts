@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CHART_SETTINGS, dayChangePercent, isChartRange, monthsBefore, parseChartSettings, rangeStartIndex, simpleMovingAverage } from '@/lib/price-chart';
+import { bollingerBands, DEFAULT_CHART_SETTINGS, dayChangePercent, relativeStrengthIndex, isChartRange, monthsBefore, parseChartSettings, rangeStartIndex, simpleMovingAverage } from '@/lib/price-chart';
 
 describe('chart ranges', () => {
   it('steps back whole calendar months, clamping to the shorter month', () => {
@@ -66,7 +66,53 @@ describe('saved chart settings', () => {
   });
 
   it('reads saved choices', () => {
-    expect(parseChartSettings({ source: 'daily', range: '5y', style: 'line', averages: [200, 13] })).toEqual({ source: 'daily', range: '5y', style: 'line', averages: [200] });
+    expect(parseChartSettings({ source: 'daily', range: '5y', style: 'line', averages: [200, 13] })).toEqual({ source: 'daily', range: '5y', style: 'line', averages: [200], indicators: [] });
     expect(parseChartSettings({ averages: [] }).averages).toEqual([]);
+    expect(parseChartSettings({ indicators: ['rsi', 'macd', 'bollinger'] }).indicators).toEqual(['bollinger', 'rsi']);
+    expect(parseChartSettings({ indicators: 'rsi' }).indicators).toEqual([]);
+  });
+});
+
+// StockCharts' worked RSI example (ChartSchool, "Relative Strength Index"): 14-session Wilder RSI on these closes
+const RSI_CLOSES = [44.3389, 44.0902, 44.1497, 43.6124, 44.2779, 44.8264, 45.0955, 45.4245, 45.8433, 46.0826, 45.8931, 46.0328, 45.614, 46.282, 46.282, 46.0028, 46.0328, 46.4116, 46.2222, 45.6439];
+const RSI_EXPECTED = [70.53, 66.32, 66.55, 69.41, 66.36, 57.97];
+
+describe('relative strength index', () => {
+  it("matches StockCharts' published 14-session values", () => {
+    const rsi = relativeStrengthIndex(RSI_CLOSES, 14);
+    expect(rsi.slice(0, 14).every((v) => v === undefined)).toBe(true);
+    rsi.slice(14).forEach((value, i) => expect(value).toBeCloseTo(RSI_EXPECTED[i], 2));
+  });
+
+  it('is 100 with only gains, 0 with only losses, and empty without enough sessions', () => {
+    expect(relativeStrengthIndex([1, 2, 3, 4], 3)).toEqual([undefined, undefined, undefined, 100]);
+    expect(relativeStrengthIndex([4, 3, 2, 1], 3)).toEqual([undefined, undefined, undefined, 0]);
+    expect(relativeStrengthIndex([1, 2, 3], 3)).toEqual([undefined, undefined, undefined]);
+    expect(relativeStrengthIndex([], 14)).toEqual([]);
+  });
+
+  it('smooths with Wilder\'s method after the first average', () => {
+    // Changes +2, −1, then +3: first averages 1 and 0.5, then gain (1·1 + 3)/2 = 2, loss (0.5·1 + 0)/2 = 0.25
+    const rsi = relativeStrengthIndex([10, 12, 11, 14], 2);
+    expect(rsi[2]).toBeCloseTo(100 - 100 / (1 + 1 / 0.5), 10);
+    expect(rsi[3]).toBeCloseTo(100 - 100 / (1 + 2 / 0.25), 10);
+  });
+});
+
+describe('Bollinger Bands', () => {
+  it('are the average plus and minus two population standard deviations', () => {
+    // Closes 2, 4, 4, 4, 5, 5, 7, 9: mean 5, population standard deviation 2
+    const bands = bollingerBands([2, 4, 4, 4, 5, 5, 7, 9], 8, 2);
+    expect(bands.slice(0, 7).every((b) => b === undefined)).toBe(true);
+    expect(bands[7]).toEqual({ upper: 9, middle: 5, lower: 1 });
+  });
+
+  it('roll with the window and collapse on flat closes', () => {
+    const bands = bollingerBands([1, 2, 3, 4], 3, 2);
+    const sd = Math.sqrt(2 / 3);
+    expect(bands[2]!.middle).toBeCloseTo(2, 10);
+    expect(bands[3]!.upper).toBeCloseTo(3 + 2 * sd, 10);
+    expect(bands[3]!.lower).toBeCloseTo(3 - 2 * sd, 10);
+    expect(bollingerBands([5, 5, 5], 3, 2)[2]).toEqual({ upper: 5, middle: 5, lower: 5 });
   });
 });
