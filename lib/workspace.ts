@@ -57,7 +57,8 @@ export const WIDGETS: Record<WidgetType, CatalogEntry> = {
     indexes: { title: "Indexes", description: "S&P 500, Nasdaq 100, Dow 30 and Russell 2000 funds", symbolic: false, source: "Finnhub", w: 12, h: 7, minW: 6, minH: 7 },
     marketNews: { title: "Market news", description: "Market and M&A headlines with their tickers", symbolic: false, source: "Finnhub", w: 4, h: 14, minW: 3, minH: 6 },
     headlines: { title: "Top stories", description: "Market headlines", symbolic: false, source: "TradingView", w: 4, h: 14, minW: 3, minH: 8 },
-    calendar: { title: "Economic calendar", description: "US releases of medium and high importance", symbolic: false, source: "TradingView", w: 4, h: 14, minW: 3, minH: 8 },
+    // Keeps the id "calendar" (it was TradingView's economic calendar) so saved workspaces show it without a migration
+    calendar: { title: "Upcoming events", description: "FOMC meetings, Fed speakers and the major jobs, inflation and GDP releases", symbolic: false, source: "Fed · BLS · BEA", w: 4, h: 14, minW: 3, minH: 8 },
     screener: { title: "Screener", description: "Markets presets: TradingView's US screener, or a watchlist; a pick loads linked widgets", symbolic: false, source: "TradingView · Finnhub", w: 12, h: 16, minW: 6, minH: 10 },
     overview: { title: "Market overview", description: "Top stocks by sector over the past 12 months", symbolic: false, source: "TradingView", w: 4, h: 16, minW: 3, minH: 12 },
     indicators: { title: "Economic indicators", description: "Rates, inflation, jobs and growth, each with its period", symbolic: false, source: "FRED", w: 4, h: 14, minW: 3, minH: 8 },
@@ -192,7 +193,7 @@ type TemplateItem = [WidgetType, number, number, number, number];
 export const TEMPLATES: Record<TemplateId, { name: string; description: string; symbol: string; items: TemplateItem[] }> = {
     market: {
         name: "Market Overview",
-        description: "Indexes, the Market Snapshot, sectors, watchlist, headlines and the economic calendar",
+        description: "Indexes, the Market Snapshot, sectors, watchlist, headlines and upcoming events",
         symbol: "SPY",
         items: [
             ["indexes", 0, 0, 12, 7],

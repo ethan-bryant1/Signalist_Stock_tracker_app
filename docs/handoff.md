@@ -3,7 +3,7 @@
 The state of Loops Watch for whoever picks up the next task, human or Claude. Keep it short and current: update
 the "Status" and "Next" sections in the same pull request as any feature. Details live in the linked docs, not here.
 
-Last updated: 2026-10-14, after the indicators (PR #32), with the launch security review pull request.
+Last updated: 2026-10-15, after the launch security review (PR #33), with the workspace Upcoming events pull request.
 
 ## Read only what the task needs
 
@@ -19,17 +19,16 @@ Last updated: 2026-10-14, after the indicators (PR #32), with the launch securit
 
 ## Status
 
-- `main` = `17fa4f7` (PRs #25 to #32 merged). Live on Vercel at https://loops-watch.vercel.app; every merge to `main`
+- `main` = `448db08` (PRs #25 to #33 merged). Live on Vercel at https://loops-watch.vercel.app; every merge to `main`
   deploys. Everything below "Done" is on `main`.
 - Recovery checkpoint: branch `loops-watch-pre-final-autopilot-backup` (old `main`, `f77bcc9`); restore steps in
   `docs/final-polish.md`. Never delete it.
-- In review: launch security review (branch `claude/project-thread-pahq1h`). Every API route and server action was
-  checked for a signed-in, allowed user, and a build with marker values showed no key in the browser bundle. Fixed: the
-  news email's per-email watchlist lookup was a callable server action with no sign-in check (now plain server code in
-  `lib/news-email-users.ts`); sign-in had no attempt limit (Better Auth's only covers its HTTP routes), now 10 wrong
-  tries per address or 30 per email in 15 minutes pause sign-in (`lib/sign-in-limit.ts`, MongoDB
-  `sign_in_failures`); sign-in/up no longer return the session token to the page or pass database error text on;
-  stock pages 404 on anything that can't be a ticker. No env change needed.
+- In review: workspace Upcoming events (branch `claude/project-thread-gr7381`). The workspace widget that embedded
+  TradingView's economic calendar now shows the News page's Upcoming events (Fed, BLS and BEA schedules; the same
+  server copy, so no Finnhub calls and no new outside calls). It keeps the widget id `calendar`, so saved workspaces
+  and the Market Overview template show it with no migration. The News page's Economic calendar tab is unchanged.
+- Launch security review (PR #33) is merged: sign-in pauses after 10 wrong tries per address or 30 per email in 15
+  minutes (`lib/sign-in-limit.ts`, MongoDB `sign_in_failures`); first real test is on the live site.
 
 ### Done
 

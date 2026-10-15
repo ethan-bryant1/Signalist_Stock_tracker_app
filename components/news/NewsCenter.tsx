@@ -7,7 +7,7 @@ import { AlertTriangle, RefreshCw, Search } from "lucide-react";
 import EarningsTable from "@/components/news/EarningsTable";
 import UpcomingEvents from "@/components/news/UpcomingEvents";
 import EconomicCalendar from "@/components/news/EconomicCalendar";
-import { upcomingEvents, type EventsResult } from "@/lib/events";
+import { keepFailedSources, type EventsResult } from "@/lib/events";
 import NewsList from "@/components/news/NewsList";
 import { useNow } from "@/hooks/useHeatmapFeed";
 import { saveNewsSettings, toggleBookmark } from "@/lib/actions/news.actions";
@@ -161,12 +161,7 @@ const NewsCenter = ({ initialMarket, events: initialEvents, watchlistSymbols, in
         try {
             const next = await getJson<EventsResult>("/api/news?feed=events");
             // Keep a source's events on screen when this answer couldn't load them
-            setEvents((previous) => {
-                const kept = next.sources.filter((s) => s.issue).map((s) => s.source);
-                if (kept.length === 0) return next;
-                const keep = previous.events.filter((event) => kept.includes(event.source));
-                return keep.length === 0 ? next : { ...next, events: upcomingEvents([...next.events, ...keep], next.checkedAt) };
-            });
+            setEvents((previous) => keepFailedSources(previous, next));
         } catch {
             // The panel keeps what it has
         } finally {
