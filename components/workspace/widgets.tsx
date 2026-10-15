@@ -21,6 +21,9 @@ import { ChangeText } from "@/components/economy/IndicatorsBoard";
 import { FRED_NOTICE, INDICATORS, formatIndicatorValue, formatPeriod, type IndicatorsPayload } from "@/lib/indicators";
 import WatchlistGrid from "@/components/watchlist/WatchlistGrid";
 import NewsList from "@/components/news/NewsList";
+import { UpcomingEventsBody } from "@/components/news/UpcomingEvents";
+import { useUpcomingEvents } from "@/hooks/useUpcomingEvents";
+import type { EventFilter } from "@/lib/news";
 import { headlineStatus, type CompanyNewsResult } from "@/lib/news";
 import { useMarketNews } from "@/hooks/useMarketNews";
 import { useWatchRows } from "@/components/watchlist/useWatchRows";
@@ -28,7 +31,6 @@ import type { ColumnKey } from "@/lib/watchlists";
 import {
     COMPANY_FINANCIALS_WIDGET_CONFIG,
     COMPANY_PROFILE_WIDGET_CONFIG,
-    ECONOMIC_CALENDAR_WIDGET_CONFIG,
     MARKET_OVERVIEW_WIDGET_CONFIG,
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
     TOP_STORIES_WIDGET_CONFIG,
@@ -227,6 +229,20 @@ const MarketNewsWidget = () => {
     );
 };
 
+// The News page's Upcoming events: FOMC meetings, Fed speakers and testimony, the Beige Book and the major jobs,
+// inflation and GDP releases, from the agencies' own schedules through the server's shared copy (no Finnhub calls)
+const EventsWidget = () => {
+    const now = useNow(useLiveMarket().checkedAt);
+    const { result, failed, loading, reload } = useUpcomingEvents();
+    const [filter, setFilter] = useState<EventFilter>("all");
+    if (result === null) return failed ? <Message>The event schedules couldn&apos;t load right now.</Message> : <Loading />;
+    return (
+        <div className="flex h-full flex-col">
+            <UpcomingEventsBody result={result} filter={filter} onFilterChange={setFilter} now={now} onRetry={reload} loading={loading} />
+        </div>
+    );
+};
+
 const WIDGET_COLUMNS: ColumnKey[] = ["last", "changePercent"];
 const LIST_ORDER = { key: "manual", dir: "asc" } as const;
 
@@ -345,7 +361,7 @@ export const WIDGET_CONTENT: Record<WidgetType, { component: React.ComponentType
     sectors: { component: SectorsWidget, scroll: true },
     indexes: { component: IndexesWidget, scroll: true },
     headlines: { component: () => <TradingViewFill script="timeline.js" config={{ ...TOP_STORIES_WIDGET_CONFIG, ...fill }} />, scroll: false },
-    calendar: { component: () => <TradingViewFill script="events.js" config={{ ...ECONOMIC_CALENDAR_WIDGET_CONFIG, ...fill }} />, scroll: false },
+    calendar: { component: EventsWidget, scroll: false },
     screener: { component: ScreenerWidget, scroll: false },
     overview: { component: () => <TradingViewFill script="market-overview.js" config={{ ...MARKET_OVERVIEW_WIDGET_CONFIG, ...fill }} />, scroll: false },
     indicators: { component: IndicatorsWidget, scroll: true },

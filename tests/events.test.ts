@@ -3,6 +3,7 @@ import {
     filterEvents,
     formatEventTime,
     groupEventsByDay,
+    keepFailedSources,
     parseClock,
     parseFedCalendar,
     parseIcs,
@@ -179,5 +180,20 @@ describe("selecting and grouping", () => {
         expect(groups.slice(0, 2).map((g) => g.label)).toEqual(["Tomorrow", "Thu, Oct 15"]);
         expect(groupEventsByDay(upcoming, Date.UTC(2026, 9, 14, 3, 0))[0].label).toBe("Tomorrow"); // 11 PM in New York
         expect(groupEventsByDay(upcoming, Date.UTC(2026, 9, 14, 13, 0))[0].label).toBe("Today");
+    });
+
+    it("keeps a failed source's events from the last answer, and nothing else from it", () => {
+        const upcoming = upcomingEvents(all, NOW);
+        const previous = { events: upcoming, sources: [], checkedAt: NOW };
+        const ok = { source: "BLS" as const, stale: false, fetchedAt: NOW };
+        const withoutBls = upcoming.filter((e) => e.source !== "BLS");
+        // Every source answered: the new answer as is, even when it drops events
+        const fresh = { events: withoutBls, sources: [ok], checkedAt: NOW };
+        expect(keepFailedSources(previous, fresh)).toBe(fresh);
+        // BLS failed: its earlier events stay, in time order, with the new answer's sources
+        const failed = { events: withoutBls, sources: [{ ...ok, issue: "network" as const }], checkedAt: NOW };
+        const merged = keepFailedSources(previous, failed);
+        expect(merged.events.map((e) => e.id)).toEqual(upcoming.map((e) => e.id));
+        expect(merged.sources).toBe(failed.sources);
     });
 });

@@ -25,13 +25,20 @@ type Props = {
 // Upcoming market-moving events from the agencies' own public schedules (lib/events.ts): FOMC decisions and press
 // conferences, speeches and testimony by Fed governors, the Beige Book, and the major jobs, inflation and GDP
 // releases. Only when things happen; no forecasts or results. Times are New York time.
-const UpcomingEvents = ({ result, filter, onFilterChange, now, onRetry, loading, className }: Props) => {
+const UpcomingEvents = ({ className, ...body }: Props) => (
+    <Panel title="Upcoming events" description="Fed and economic data schedules · New York time" className={className} bodyClassName="flex min-h-0 flex-col">
+        <UpcomingEventsBody {...body} />
+    </Panel>
+);
+
+// The panel's contents without its frame, for the workspace widget (which has its own title bar)
+export const UpcomingEventsBody = ({ result, filter, onFilterChange, now, onRetry, loading }: Omit<Props, "className">) => {
     const groups = useMemo(() => groupEventsByDay(filterEvents(result.events, filter), now), [result.events, filter, now]);
     const failed = result.sources.filter((s) => s.issue);
     const stale = result.sources.filter((s) => !s.issue && s.stale && s.fetchedAt);
 
     return (
-        <Panel title="Upcoming events" description="Fed and economic data schedules · New York time" className={className} bodyClassName="flex min-h-0 flex-col">
+        <>
             <div className="flex items-center justify-between gap-2 border-b border-gray-600 px-4 py-2">
                 <div role="radiogroup" aria-label="Show events" className="flex rounded-lg border border-gray-600 p-0.5">
                     {EVENT_FILTERS.map((option) => (
@@ -96,7 +103,7 @@ const UpcomingEvents = ({ result, filter, onFilterChange, now, onRetry, loading,
                 ))}
                 <p>Sources: Federal Reserve Board, BLS, BEA. Schedules can change; forecasts aren&apos;t listed.</p>
             </footer>
-        </Panel>
+        </>
     );
 };
 

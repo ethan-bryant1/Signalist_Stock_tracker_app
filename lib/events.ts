@@ -200,6 +200,13 @@ export function upcomingEvents(events: readonly MarketEvent[], now: number, days
         .sort((a, b) => a.start - b.start || a.title.localeCompare(b.title));
 }
 
+// A fresh answer, keeping the events already shown for any source this answer couldn't load
+export function keepFailedSources(previous: EventsResult, next: EventsResult): EventsResult {
+    const failed = next.sources.filter((s) => s.issue).map((s) => s.source);
+    const keep = previous.events.filter((event) => failed.includes(event.source));
+    return keep.length === 0 ? next : { ...next, events: upcomingEvents([...next.events, ...keep], next.checkedAt) };
+}
+
 export const filterEvents = (events: readonly MarketEvent[], filter: EventFilter): MarketEvent[] =>
     filter === "all" ? [...events] : events.filter((event) => (filter === "fed" ? event.source === "Federal Reserve" : event.source !== "Federal Reserve"));
 
