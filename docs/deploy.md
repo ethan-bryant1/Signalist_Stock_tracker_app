@@ -41,7 +41,7 @@ computer share one account, the same watchlists, workspaces and portfolios, and 
 
 1. Go to https://vercel.com and **Sign up / Log in with GitHub**. Choose the free
    **Hobby** plan.
-2. Click **Add New… → Project**. Find `Signalist_Stock_tracker_app` in the list and click **Import**. If it isn't
+2. Click **Add New… → Project**. Find `loops-watch` in the list and click **Import**. If it isn't
    listed, click **Adjust GitHub App Permissions** and give Vercel access to that repository.
 3. On the setup screen:
    - **Project Name:** `loops-watch` (your address becomes `https://loops-watch.vercel.app`; if that name is taken,
