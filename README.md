@@ -4,8 +4,8 @@ A personal stock research workstation: live market dashboard, customizable widge
 screener, US economic indicators, a portfolio backtester and daily charts with technical indicators. It runs entirely
 on free data plans, with every provider request budgeted and cached so the app stays inside each free rate limit.
 
-**Live:** [loops-watch.vercel.app](https://loops-watch.vercel.app) (sign-in is limited to approved emails; see
-[Access](#access))
+**Live:** [loops-watch.vercel.app](https://loops-watch.vercel.app) (sign-in is limited to approved emails; a demo
+login is available on request, see [Access](#access))
 
 ![Dashboard with live index prices and the Market Snapshot heatmap](docs/screenshots/dashboard.png)
 
@@ -74,7 +74,9 @@ More detail: [architecture](docs/architecture.md), [data providers and limits](d
 ## Access
 
 Finnhub's free plan is licensed for personal use, so the deployed site only lets emails listed in `ALLOWED_EMAILS`
-sign up or sign in. Everyone else sees the sign-in page with a note that the site is private. To try it yourself, run
+sign up or sign in. Everyone else sees the sign-in page with a note that the site is private.
+
+A demo login is available on request: reach out through my GitHub profile. To try it on your own machine instead, run
 it locally with your own free keys.
 
 ## Run it locally
