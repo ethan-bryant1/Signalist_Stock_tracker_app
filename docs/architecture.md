@@ -1,6 +1,6 @@
 # Architecture notes
 
-A short map for whoever works on Loops Watch next. Keep it current when the structure changes.
+A map of the codebase: where each feature lives, how provider data flows, and why each library was chosen.
 
 ## Where things live
 
@@ -24,7 +24,7 @@ A short map for whoever works on Loops Watch next. Keep it current when the stru
 | Static data | `lib/data/sp500.ts` (GICS list), `lib/data/heatmap.ts` (map universe), `lib/data/markets.ts` (ETFs) |
 | Auth | `lib/better-auth/auth.ts`, `lib/owner-access.ts` (`ALLOWED_EMAILS`), `lib/sign-in-limit.ts` + `lib/sign-in-attempts.ts` (wrong-password pause, MongoDB `sign_in_failures`), `lib/app-url.ts` (live address for auth and email links), `proxy.ts` (Next 16 middleware) |
 | Email jobs | `lib/inngest/` (welcome and daily news emails; Gemini writes the text only) |
-| Checks | `tests/` (Vitest), `scripts/check-*.mjs` (real-provider checks with the owner's keys) |
+| Checks | `tests/` (Vitest), `scripts/check-*.mjs` (real-provider checks with your own keys) |
 
 ## Data flow
 
@@ -102,15 +102,15 @@ Evaluated 2026-10-13. Add one only when a feature needs it.
 
 | Library | Decision |
 |---|---|
-| Playwright | Use for browser checks. It is preinstalled in Claude's cloud environment; add `@playwright/test` as a dev dependency when browser tests move into the repo. |
+| Playwright | Use for browser checks. Browser checks run against mock providers; add `@playwright/test` as a dev dependency when they move into the repo. |
 | TradingView Lightweight Charts 5.2.1 | Added for the stock page daily chart on Alpaca bars. Free, Apache-2.0 (keep its attribution logo), ~45 kB, loaded only on stock pages. |
 | SQLite | Not used: Vercel's disk doesn't persist between requests. MongoDB (Atlas free, 512 MB) keeps slow provider answers (`provider_cache`), daily bars included (about 200 kB per symbol). |
 | Indicator library | Small set: the daily chart's simple moving averages, Bollinger Bands (20, 2) and RSI (14) in `lib/price-chart.ts`, tested. Write simple ones in `lib/` with tests; revisit for a full set. |
 | React Grid Layout | Used by the Workspace page (2.2.4, pinned): drag and resize only. Layout rules (compaction, moves, validation) are our own in `lib/workspace.ts` so they're tested without the library. Its stylesheet isn't imported; `globals.css` styles the grid in the app's grays. |
 | NumPy, pandas, SciPy, statsmodels, Backtrader | Not in the app: it runs as Next.js on Vercel. Revisit only for an offline research or backtesting tool kept apart from the app. |
 
-## Development and cost
+## Cost
 
-- Claude's development usage (this repo's work) is separate from the app's API usage (the owner's Finnhub key
-  at runtime). The app makes no AI calls for market data; Gemini only writes email text.
-- Deterministic checks (`npm test`, `npm run check:*`) verify figures; don't ask a model to recompute them.
+- Every provider is on a free plan. The app makes no AI calls for market data; Gemini only writes email text.
+- Figures are computed by deterministic, unit-tested code (`npm test`) and checked against the real providers with
+  `npm run check:*`.

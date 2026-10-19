@@ -6,7 +6,7 @@ import { mongoSlowStore } from '@/lib/providers/mongo-store';
 // One gate per provider for the whole server process, shared by every page, route and tab. Kept on globalThis so
 // a code reload in development doesn't start a second gate with a fresh budget.
 //
-// Budgets sit a little under each free plan's limit (see .claude/skills/market-data-engineer/providers.md):
+// Budgets sit a little under each free plan's limit (see docs/providers.md):
 //   Finnhub: about 60 calls a minute (widely cited; its pricing page couldn't be read), 30 a second documented.
 //            50 leaves room for the check scripts and anything else using the same key.
 //   FRED:    120 calls a minute documented (fred.stlouisfed.org/docs/api/fred/errors.html); no per-second limit

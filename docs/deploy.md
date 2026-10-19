@@ -1,16 +1,15 @@
 # Deploy Loops Watch to Vercel
 
 A step-by-step guide for putting Loops Watch online at your own `https://<name>.vercel.app` address. Everything here
-is free: Vercel Hobby, MongoDB Atlas free tier, Inngest free tier, and the free Finnhub, FRED and Alpaca keys you
-already use. You do every step yourself, in your own accounts. Never paste a key or password into a chat, an issue
-or a screenshot; they only go into your `.env` file and Vercel's settings.
+is free: Vercel Hobby, MongoDB Atlas free tier, Inngest free tier, and the free Finnhub, FRED and Alpaca keys. Every
+step happens in your own accounts. Never paste a key or password into an issue or a screenshot; keys only go into
+your `.env` file and Vercel's settings.
 
 ## 0. Before you start
 
-1. Merge the latest pull requests on GitHub, then bring your computer up to date in PowerShell:
+1. Bring your local copy up to date:
 
-   ```powershell
-   cd C:\Users\Loops\Documents\Signalist_Stock_tracker_app
+   ```bash
    git checkout main
    git pull
    npm install
@@ -23,7 +22,7 @@ or a screenshot; they only go into your `.env` file and Vercel's settings.
    Then stop it with Ctrl+C. Optional but useful: `npm run build` must finish without errors, because Vercel runs
    the same command.
 
-3. Keep your `.env` open in VS Code. You'll copy its values into Vercel in step 3.
+3. Keep your `.env` open in your editor. You'll copy its values into Vercel in step 3.
 
 ## 1. Let Vercel reach your database (MongoDB Atlas)
 
@@ -40,7 +39,7 @@ computer share one account, the same watchlists, workspaces and portfolios, and 
 
 ## 2. Create the Vercel project
 
-1. Go to https://vercel.com and **Sign up / Log in with GitHub** (the account `ethan-bryant1`). Choose the free
+1. Go to https://vercel.com and **Sign up / Log in with GitHub**. Choose the free
    **Hobby** plan.
 2. Click **Add New… → Project**. Find `Signalist_Stock_tracker_app` in the list and click **Import**. If it isn't
    listed, click **Adjust GitHub App Permissions** and give Vercel access to that repository.
